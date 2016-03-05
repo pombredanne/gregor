@@ -1,0 +1,30 @@
+
+@namespace("mb.1")
+protocol state_machine {
+
+	record TimeOrOffset {
+		TimeMsec time;
+		DurationMsec offset;
+	}
+
+	record InbandMessage {
+		UID uid;
+		Item item;
+	}
+
+	record Item {
+		MsgID msgid;
+
+	}
+
+	@typedef("int64") record TimeMsec {}
+	@typedef("int64") record DurationMsec;
+	@typedef("string") record Category {}
+	@typedef("string") record System {}
+	@typedef("[]byte") record UID {}
+	@typedef("[]byte") record MsgID {}
+	@typedef("[]byte") record DeviceID {}
+
+	void consumeInbandMessage(InbandMesasge m);
+}
+
