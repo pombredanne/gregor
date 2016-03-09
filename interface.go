@@ -5,84 +5,84 @@ import (
 )
 
 type UID interface {
-	GetBytes() []byte
+	Bytes() []byte
 }
 
 type MsgID interface {
-	GetBytes() []byte
+	Bytes() []byte
 }
 
 type DeviceID interface {
-	GetBytes() []byte
+	Bytes() []byte
 }
 
 type System interface {
-	GetString() string
+	String() string
 }
 
 type Category interface {
-	GetString() string
+	String() string
 }
 
 type Body interface {
-	GetBytes() []byte
+	Bytes() []byte
 }
 
 type Metadata interface {
-	GetUID() UID
-	GetMsgID() MsgID
-	GetCTime() TimeOrOffset
-	GetDeviceID() DeviceID
+	UID() UID
+	MsgID() MsgID
+	CTime() TimeOrOffset
+	DeviceID() DeviceID
 }
 
 type InbandMessage interface {
-	GetMetadata() Metadata
+	Metadata() Metadata
 	ToStateUpdateMessage() StateUpdateMessage
 	ToStateSyncMessage() StateSyncMessage
 }
 
 type StateUpdateMessage interface {
-	GetMetadata() Metadata
-	GetCreation() Item
-	GetDismissal() Dismissal
+	Metadata() Metadata
+	Creation() Item
+	Dismissal() Dismissal
 }
 
 type StateSyncMessage interface{}
 
 type OutOfBandMessage interface {
-	GetSystem() System
-	GetUID() UID
-	GetBody() Body
+	System() System
+	UID() UID
+	Body() Body
 }
 
 type TimeOrOffset interface {
-	GetTime() *time.Time
-	GetDuration() *time.Duration
+	Time() *time.Time
+	Duration() *time.Duration
 }
 
 type Item interface {
-	GetMetadata() Metadata
-	GetDTime() TimeOrOffset
-	GetNotifyTimes() []TimeOrOffset
-	GetBody() Body
-	GetCategory() Category
+	Metadata() Metadata
+	DTime() TimeOrOffset
+	NotifyTimes() []TimeOrOffset
+	Body() Body
+	Category() Category
 }
 
 type MsgRange interface {
-	GetMetadata() Metadata
-	GetEndTime() TimeOrOffset
-	GetCategory() Category
+	Metadata() Metadata
+	EndTime() TimeOrOffset
+	Category() Category
 }
 
 type Dismissal interface {
-	GetMetadata() Metadata
-	GetMsgIDsToDismiss() []MsgID
-	GetRangesToDismiss() []MsgRange
+	Metadata() Metadata
+	MsgIDsToDismiss() []MsgID
+	RangesToDismiss() []MsgRange
 }
 
 type State interface {
-	GetItems() ([]Item, error)
-	GetItemsInCategory(c Category) ([]Item, error)
+	Items() ([]Item, error)
+	ItemsInCategory(c Category) ([]Item, error)
 }
 
 type Message interface {
@@ -92,8 +92,8 @@ type Message interface {
 
 type StateMachine interface {
 	ConsumeMessage(m Message) error
-	GetState(u UID, d DeviceID, t TimeOrOffset) (State, error)
-	GetInbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error)
+	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
+	InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error)
 }
 
 type ObjFactory interface {

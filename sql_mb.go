@@ -11,24 +11,24 @@ type SQLEngine struct {
 	objFactory ObjFactory
 }
 
-func hexEnc(b getByter) string { return hex.EncodeToString(b.GetBytes()) }
+func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
-type getByter interface {
-	GetBytes() []byte
+type byter interface {
+	Bytes() []byte
 }
 
 func timeOrOffsetToSQL(too TimeOrOffset) (string, interface{}) {
-	if t := too.GetTime(); t != nil {
+	if t := too.Time(); t != nil {
 		return "?", *t
 	}
-	if d := too.GetDuration(); d != nil {
+	if d := too.Duration(); d != nil {
 		return "DATE_ADD(NOW(), INTERVAL ? MICROSECOND)", d.Nanoseconds() / 1000
 	}
 	return "?", nil
 }
 
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
-	q, a := timeOrOffsetToSQL(i.GetDTime())
+	q, a := timeOrOffsetToSQL(i.DTime())
 	stmt, err := tx.Prepare(`
 		INSERT INTO items(uid, msgid, devid, category, dtime, body)
 		VALUES(?,?,?,?,` + q + `,?)
@@ -37,15 +37,15 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 		return err
 	}
 	defer stmt.Close()
-	md := i.GetMetadata()
-	_, err = stmt.Exec(hexEnc(u), hexEnc(md.GetMsgID()),
-		hexEnc(md.GetDeviceID()), i.GetCategory(), a,
-		i.GetBody().GetBytes())
+	md := i.Metadata()
+	_, err = stmt.Exec(hexEnc(u), hexEnc(md.MsgID()),
+		hexEnc(md.DeviceID()), i.Category(), a,
+		i.Body().Bytes())
 	if err != nil {
 		return err
 	}
 
-	for _, t := range i.GetNotifyTimes() {
+	for _, t := range i.NotifyTimes() {
 		if t == nil {
 			continue
 		}
@@ -53,7 +53,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 		stmt, err = tx.Prepare(`
 			INSERT INTO items(uid, msgid, ntime) VALUES(?, ?, ` + q + `)
 		`)
-		_, err = stmt.Exec(hexEnc(u), hexEnc(md.GetMsgID()), a)
+		_, err = stmt.Exec(hexEnc(u), hexEnc(md.MsgID()), a)
 		stmt.Close()
 	}
 	return nil
@@ -89,7 +89,7 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []MsgRange) error {
 	for _, mr := range mrs {
-		q, a := timeOrOffsetToSQL(mr.GetEndTime())
+		q, a := timeOrOffsetToSQL(mr.EndTime())
 		ins, err := tx.Prepare(`
 			INSERT INTO dismissals_by_time(uid, msgid, category, dtime)
 			VALUES(?,?,?,` + q + `)
@@ -98,7 +98,7 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 			return err
 		}
 		defer ins.Close()
-		_, err = ins.Exec(hexEnc(u), hexEnc(mid), mr.GetCategory().GetString(), a)
+		_, err = ins.Exec(hexEnc(u), hexEnc(mid), mr.Category().String(), a)
 		if err != nil {
 			return err
 		}
@@ -109,7 +109,7 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 			return err
 		}
 		defer upd.Close()
-		_, err = upd.Exec(hexEnc(u), a, mr.GetCategory().GetString())
+		_, err = upd.Exec(hexEnc(u), a, mr.Category().String())
 		if err != nil {
 			return err
 		}
@@ -118,7 +118,7 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 }
 
 func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error {
-	q, a := timeOrOffsetToSQL(md.GetCTime())
+	q, a := timeOrOffsetToSQL(md.CTime())
 	ins, err := tx.Prepare(`
 		INSERT INTO messages(uid, msgid, ctime)
 		VALUES(?, ?, ` + q + `)
@@ -127,7 +127,7 @@ func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error 
 		return err
 	}
 	defer ins.Close()
-	_, err = ins.Exec(hexEnc(md.GetUID()), hexEnc(md.GetMsgID()), a)
+	_, err = ins.Exec(hexEnc(md.UID()), hexEnc(md.MsgID()), a)
 	return err
 }
 
@@ -154,17 +154,17 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 	if err != nil {
 		return err
 	}
-	md := m.GetMetadata()
+	md := m.Metadata()
 	if err := s.consumeInbandMessageMetadata(tx, md); err != nil {
 		return err
 	}
-	if err := s.consumeCreation(tx, md.GetUID(), m.GetCreation()); err != nil {
+	if err := s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
 		return err
 	}
-	if err := s.consumeMsgIDsToDismiss(tx, md.GetUID(), md.GetMsgID(), m.GetDismissal().GetMsgIDsToDismiss()); err != nil {
+	if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
 		return err
 	}
-	if err := s.consumeRangesToDismiss(tx, md.GetUID(), md.GetMsgID(), m.GetDismissal().GetRangesToDismiss()); err != nil {
+	if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
 		return err
 	}
 
@@ -205,15 +205,15 @@ func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
 	return s.objFactory.MakeItem(msgid, category, devid, ctime, dtimep, body)
 }
 
-func (s *SQLEngine) GetState(u UID, d DeviceID, t TimeOrOffset) (State, error) {
-	items, err := s.getItems(u, d, t, nil)
+func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
+	items, err := s.items(u, d, t, nil)
 	if err != nil {
 		return nil, err
 	}
 	return s.objFactory.MakeState(items)
 }
 
-func (s *SQLEngine) getItems(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, error) {
+func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, error) {
 	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=c.UID AND i.msgid=c.msgid)
@@ -250,12 +250,12 @@ func (s *SQLEngine) getItems(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item
 	return items, nil
 }
 
-func (s *SQLEngine) getInbandMsgIDs(u UID, t TimeOrOffset) ([]MsgID, error) {
+func (s *SQLEngine) inbandMsgIDs(u UID, t TimeOrOffset) ([]MsgID, error) {
 	return nil, nil
 }
 
-func (s *SQLEngine) GetInbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
-	_, err := s.getInbandMsgIDs(u, t)
+func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
+	_, err := s.inbandMsgIDs(u, t)
 	if err != nil {
 		return nil, err
 	}

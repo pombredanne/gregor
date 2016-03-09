@@ -58,44 +58,44 @@ type testMessage struct {
 
 type testBody string
 
-func (t testBody) GetBytes() []byte { return []byte(t) }
+func (t testBody) Bytes() []byte { return []byte(t) }
 
-func (t *testMetadata) GetMsgID() MsgID        { return t.m }
-func (t *testMetadata) GetCTime() TimeOrOffset { return t.t }
-func (t *testMetadata) GetDeviceID() DeviceID  { return t.d }
-func (t *testMetadata) GetUID() UID            { return t.u }
+func (t *testMetadata) MsgID() MsgID        { return t.m }
+func (t *testMetadata) CTime() TimeOrOffset { return t.t }
+func (t *testMetadata) DeviceID() DeviceID  { return t.d }
+func (t *testMetadata) UID() UID            { return t.u }
 
-func (t *testItem) GetDTime() TimeOrOffset         { return t.dtime }
-func (t *testItem) GetNotifyTimes() []TimeOrOffset { return t.nTimes }
-func (t *testItem) GetBody() Body                  { return t.payload }
-func (t *testItem) GetCategory() Category          { return t.cat }
-func (t *testItem) GetMetadata() Metadata          { return t.m }
+func (t *testItem) DTime() TimeOrOffset         { return t.dtime }
+func (t *testItem) NotifyTimes() []TimeOrOffset { return t.nTimes }
+func (t *testItem) Body() Body                  { return t.payload }
+func (t *testItem) Category() Category          { return t.cat }
+func (t *testItem) Metadata() Metadata          { return t.m }
 
-func (t testMsgRange) GetMetadata() Metadata    { return t.m }
-func (t testMsgRange) GetEndTime() TimeOrOffset { return t.e }
-func (t testMsgRange) GetCategory() Category    { return t.c }
+func (t testMsgRange) Metadata() Metadata    { return t.m }
+func (t testMsgRange) EndTime() TimeOrOffset { return t.e }
+func (t testMsgRange) Category() Category    { return t.c }
 
-func (t testInbandMessage) GetMetadata() Metadata                    { return t.m }
-func (t testInbandMessage) GetCreation() Item                        { return t.i }
-func (t testInbandMessage) GetDismissal() Dismissal                  { return t.d }
+func (t testInbandMessage) Metadata() Metadata                       { return t.m }
+func (t testInbandMessage) Creation() Item                           { return t.i }
+func (t testInbandMessage) Dismissal() Dismissal                     { return t.d }
 func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return nil }
 func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
 
-func (t *testDismissal) GetMetadata() Metadata       { return t.m }
-func (t *testDismissal) GetMsgIDsToDismiss() []MsgID { return t.ids }
+func (t *testDismissal) Metadata() Metadata       { return t.m }
+func (t *testDismissal) MsgIDsToDismiss() []MsgID { return t.ids }
 
-func (t testTimeOrOffset) GetTime() *time.Time         { return t.t }
-func (t testTimeOrOffset) GetDuration() *time.Duration { return t.d }
-func (t testUID) GetBytes() []byte                     { return t }
-func (t testMsgID) GetBytes() []byte                   { return t }
-func (t testDeviceID) GetBytes() []byte                { return t }
-func (t testCategory) GetString() string               { return string(t) }
-func (t testSystem) GetString() string                 { return string(t) }
+func (t testTimeOrOffset) Time() *time.Time         { return t.t }
+func (t testTimeOrOffset) Duration() *time.Duration { return t.d }
+func (t testUID) Bytes() []byte                     { return t }
+func (t testMsgID) Bytes() []byte                   { return t }
+func (t testDeviceID) Bytes() []byte                { return t }
+func (t testCategory) String() string               { return string(t) }
+func (t testSystem) String() string                 { return string(t) }
 
 func (m testMessage) ToInbandMessage() InbandMessage       { return m.i }
 func (m testMessage) ToOutOfBandMessage() OutOfBandMessage { return nil }
 
-func (t *testDismissal) GetRangesToDismiss() []MsgRange {
+func (t *testDismissal) RangesToDismiss() []MsgRange {
 	var ret []MsgRange
 	for _, r := range t.ranges {
 		ret = append(ret, MsgRange(r))
@@ -107,28 +107,28 @@ var _ Item = (*testItem)(nil)
 var _ InbandMessage = testInbandMessage{}
 
 func assertNItems(t *testing.T, sm StateMachine, u UID, d DeviceID, too TimeOrOffset, n int) {
-	state, err := sm.GetState(u, d, too)
-	require.Nil(t, err, "no error from GetState()")
-	it, err := state.GetItems()
-	require.Nil(t, err, "no error from GetItems()")
+	state, err := sm.State(u, d, too)
+	require.Nil(t, err, "no error from State()")
+	it, err := state.Items()
+	require.Nil(t, err, "no error from Items()")
 	require.Equal(t, len(it), n, "wrong number of items")
 }
 
 func assertNItemsInCategory(t *testing.T, sm StateMachine, u UID, d DeviceID, too TimeOrOffset, c Category, n int) {
-	state, err := sm.GetState(u, d, too)
-	require.Nil(t, err, "no error from GetState()")
-	it, err := state.GetItemsInCategory(c)
-	require.Nil(t, err, "no error from GetItemsInCategory()")
+	state, err := sm.State(u, d, too)
+	require.Nil(t, err, "no error from State()")
+	it, err := state.ItemsInCategory(c)
+	require.Nil(t, err, "no error from ItemsInCategory()")
 	require.Equal(t, len(it), n, "wrong number of items")
 }
 func assertPayloadsInCategory(t *testing.T, sm StateMachine, u UID, d DeviceID, too TimeOrOffset, c Category, v []string) {
-	state, err := sm.GetState(u, d, too)
-	require.Nil(t, err, "no error from GetState()")
-	it, err := state.GetItemsInCategory(c)
-	require.Nil(t, err, "no error from GetItemsInCategory()")
+	state, err := sm.State(u, d, too)
+	require.Nil(t, err, "no error from State()")
+	it, err := state.ItemsInCategory(c)
+	require.Nil(t, err, "no error from ItemsInCategory()")
 	require.Equal(t, len(it), len(v), "wrong number of items")
 	for i, p := range it {
-		require.Equal(t, []byte(v[i]), p.GetBody().GetBytes())
+		require.Equal(t, []byte(v[i]), p.Body().Bytes())
 	}
 }
 
