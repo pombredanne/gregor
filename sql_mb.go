@@ -18,6 +18,9 @@ type byter interface {
 }
 
 func timeOrOffsetToSQL(too TimeOrOffset) (string, interface{}) {
+	if too == nil {
+		return "", nil
+	}
 	if t := too.Time(); t != nil {
 		return "?", *t
 	}
@@ -175,10 +178,11 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 }
 
 func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
-	var msgidHex, devidHex, category string
+	var msgidHex, category string
 	var ctime, dtime time.Time
 	var bodyBytes []byte
-	if err := rows.Scan(&msgidHex, &devidHex, &category, &dtime, &bodyBytes, &ctime); err != nil {
+	deviceID := deviceIDScanner{o: s.objFactory}
+	if err := rows.Scan(&msgidHex, deviceID, &category, &dtime, &bodyBytes, &ctime); err != nil {
 		return nil, err
 	}
 	msgidBytes, err := hex.DecodeString(msgidHex)
@@ -189,11 +193,6 @@ func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	devidBytes, err := hex.DecodeString(msgidHex)
-	if err != nil {
-		return nil, err
-	}
-	devid, err := s.objFactory.MakeDeviceID(devidBytes)
 	var dtimep *time.Time
 	if !dtime.IsZero() {
 		dtimep = &dtime
@@ -202,7 +201,7 @@ func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeItem(msgid, category, devid, ctime, dtimep, body)
+	return s.objFactory.MakeItem(msgid, category, deviceID.DeviceID(), ctime, dtimep, body)
 }
 
 func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
@@ -239,6 +238,9 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 	}
 	defer stmt.Close()
 	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
 	var items []Item
 	for rows.Next() {
 		item, err := s.rowToItem(rows)
@@ -251,6 +253,24 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 }
 
 func (s *SQLEngine) inbandMsgIDs(u UID, t TimeOrOffset) ([]MsgID, error) {
+	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
+	q, a := timeOrOffsetToSQL(t)
+	args := []interface{}{hexEnc(u)}
+	if a != nil {
+		qry += " AND " + q
+		args = append(args, a)
+	}
+	qry += " ORDER BY ctime ASC"
+	stmt, err := s.driver.Prepare(qry)
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	_, err = stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
