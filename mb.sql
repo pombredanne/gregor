@@ -2,7 +2,6 @@
 CREATE TABLE `items` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
-	`devid` CHAR(16),
 	`category` VARCHAR(128) NOT NULL,
 	`dtime` DATETIME,
 	`body` BLOB,
@@ -16,6 +15,8 @@ CREATE TABLE `messages` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
 	`ctime` DATETIME NOT NULL,
+	`devid` CHAR(16),
+	`mtype` INTEGER UNSIGNED NOT NULL,
 	PRIMARY KEY(`uid`, `msgid`)
 );
 

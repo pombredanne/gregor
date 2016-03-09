@@ -37,9 +37,17 @@ type Metadata interface {
 
 type InbandMessage interface {
 	GetMetadata() Metadata
+	ToStateUpdateMessage() StateUpdateMessage
+	ToStateSyncMessage() StateSyncMessage
+}
+
+type StateUpdateMessage interface {
+	GetMetadata() Metadata
 	GetCreation() Item
 	GetDismissal() Dismissal
 }
+
+type StateSyncMessage interface{}
 
 type OutOfBandMessage interface {
 	GetSystem() System

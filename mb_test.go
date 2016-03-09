@@ -75,9 +75,11 @@ func (t testMsgRange) GetMetadata() Metadata    { return t.m }
 func (t testMsgRange) GetEndTime() TimeOrOffset { return t.e }
 func (t testMsgRange) GetCategory() Category    { return t.c }
 
-func (t testInbandMessage) GetMetadata() Metadata   { return t.m }
-func (t testInbandMessage) GetCreation() Item       { return t.i }
-func (t testInbandMessage) GetDismissal() Dismissal { return t.d }
+func (t testInbandMessage) GetMetadata() Metadata                    { return t.m }
+func (t testInbandMessage) GetCreation() Item                        { return t.i }
+func (t testInbandMessage) GetDismissal() Dismissal                  { return t.d }
+func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return nil }
+func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
 
 func (t *testDismissal) GetMetadata() Metadata       { return t.m }
 func (t *testDismissal) GetMsgIDsToDismiss() []MsgID { return t.ids }

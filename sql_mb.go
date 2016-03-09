@@ -132,14 +132,24 @@ func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error 
 }
 
 func (s *SQLEngine) ConsumeMessage(m Message) error {
-	if im := m.ToInbandMessage(); m != nil {
-		return s.consumeInbandMessage(im)
+	switch {
+	case m.ToInbandMessage() != nil:
+		return s.consumeInbandMessage(m.ToInbandMessage())
+	default:
+		return nil
 	}
-	// Other messages types aren't handled by the SQL broker
-	return nil
 }
 
 func (s *SQLEngine) consumeInbandMessage(m InbandMessage) error {
+	switch {
+	case m.ToStateUpdateMessage() != nil:
+		return s.consumeStateUpdateMessage(m.ToStateUpdateMessage())
+	default:
+		return nil
+	}
+}
+
+func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return err
