@@ -46,3 +46,39 @@ func (d deviceIDScanner) Scan(src interface{}) error {
 	d.deviceID, err = d.o.MakeDeviceID(b)
 	return err
 }
+
+type msgIDScanner struct {
+	o     ObjFactory
+	msgID MsgID
+}
+
+func (m msgIDScanner) MsgID() MsgID { return m.msgID }
+
+func (m msgIDScanner) Scan(src interface{}) error {
+	b, err := scanHexToBytes(src)
+	if err != nil {
+		return err
+	}
+	m.msgID, err = m.o.MakeMsgID(b)
+	return err
+}
+
+type inbandMsgTypeScanner struct {
+	t InbandMsgType
+}
+
+func (i inbandMsgTypeScanner) InbandMsgType() InbandMsgType { return i.t }
+
+func (i inbandMsgTypeScanner) Scan(src interface{}) error {
+	if raw, ok := src.(int); ok {
+		t := InbandMsgType(raw)
+		switch t {
+		case InbandMsgTypeUpdate, InbandMsgTypeSync:
+			i.t = t
+		default:
+			return ErrBadScan
+		}
+	}
+	return ErrBadScan
+
+}

@@ -60,10 +60,11 @@ type testBody string
 
 func (t testBody) Bytes() []byte { return []byte(t) }
 
-func (t *testMetadata) MsgID() MsgID        { return t.m }
-func (t *testMetadata) CTime() TimeOrOffset { return t.t }
-func (t *testMetadata) DeviceID() DeviceID  { return t.d }
-func (t *testMetadata) UID() UID            { return t.u }
+func (t *testMetadata) MsgID() MsgID                 { return t.m }
+func (t *testMetadata) CTime() TimeOrOffset          { return t.t }
+func (t *testMetadata) DeviceID() DeviceID           { return t.d }
+func (t *testMetadata) UID() UID                     { return t.u }
+func (t *testMetadata) InbandMsgType() InbandMsgType { return InbandMsgTypeUpdate }
 
 func (t *testItem) DTime() TimeOrOffset         { return t.dtime }
 func (t *testItem) NotifyTimes() []TimeOrOffset { return t.nTimes }

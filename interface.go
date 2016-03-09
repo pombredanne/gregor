@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+type InbandMsgType int
+
+const (
+	InbandMsgTypeUpdate InbandMsgType = 1
+	InbandMsgTypeSync   InbandMsgType = 2
+)
+
 type UID interface {
 	Bytes() []byte
 }
@@ -33,21 +40,28 @@ type Metadata interface {
 	MsgID() MsgID
 	CTime() TimeOrOffset
 	DeviceID() DeviceID
+	InbandMsgType() InbandMsgType
+}
+
+type MessageWithMetadata interface {
+	Metadata() Metadata
 }
 
 type InbandMessage interface {
-	Metadata() Metadata
+	MessageWithMetadata
 	ToStateUpdateMessage() StateUpdateMessage
 	ToStateSyncMessage() StateSyncMessage
 }
 
 type StateUpdateMessage interface {
-	Metadata() Metadata
+	MessageWithMetadata
 	Creation() Item
 	Dismissal() Dismissal
 }
 
-type StateSyncMessage interface{}
+type StateSyncMessage interface {
+	MessageWithMetadata
+}
 
 type OutOfBandMessage interface {
 	System() System
@@ -103,6 +117,7 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeItem(msgid MsgID, category string, deviceid DeviceID, ctime time.Time, dtime *time.Time, body Body) (Item, error)
 	MakeState(i []Item) (State, error)
+	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
 }
 
 type Server interface {

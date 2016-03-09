@@ -178,19 +178,12 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 }
 
 func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
-	var msgidHex, category string
+	var category string
 	var ctime, dtime time.Time
 	var bodyBytes []byte
 	deviceID := deviceIDScanner{o: s.objFactory}
-	if err := rows.Scan(&msgidHex, deviceID, &category, &dtime, &bodyBytes, &ctime); err != nil {
-		return nil, err
-	}
-	msgidBytes, err := hex.DecodeString(msgidHex)
-	if err != nil {
-		return nil, err
-	}
-	msgid, err := s.objFactory.MakeMsgID(msgidBytes)
-	if err != nil {
+	msgID := msgIDScanner{o: s.objFactory}
+	if err := rows.Scan(msgID, deviceID, &category, &dtime, &bodyBytes, &ctime); err != nil {
 		return nil, err
 	}
 	var dtimep *time.Time
@@ -201,7 +194,7 @@ func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
 	if err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeItem(msgid, category, deviceID.DeviceID(), ctime, dtimep, body)
+	return s.objFactory.MakeItem(msgID.MsgID(), category, deviceID.DeviceID(), ctime, dtimep, body)
 }
 
 func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
@@ -252,7 +245,19 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 	return items, nil
 }
 
-func (s *SQLEngine) inbandMsgIDs(u UID, t TimeOrOffset) ([]MsgID, error) {
+func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (Metadata, error) {
+	var ctime time.Time
+	uid := uidScanner{o: s.objFactory}
+	deviceID := deviceIDScanner{o: s.objFactory}
+	msgID := msgIDScanner{o: s.objFactory}
+	inbandMsgType := inbandMsgTypeScanner{}
+	if err := rows.Scan(uid, msgID, &ctime, deviceID, inbandMsgType); err != nil {
+		return nil, err
+	}
+	return s.objFactory.MakeMetadata(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime, inbandMsgType.InbandMsgType())
+}
+
+func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, error) {
 	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
 	q, a := timeOrOffsetToSQL(t)
 	args := []interface{}{hexEnc(u)}
@@ -266,16 +271,23 @@ func (s *SQLEngine) inbandMsgIDs(u UID, t TimeOrOffset) ([]MsgID, error) {
 		return nil, err
 	}
 	defer stmt.Close()
-	_, err = stmt.Query(args...)
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		return nil, err
 	}
-
-	return nil, nil
+	var ret []Metadata
+	for rows.Next() {
+		md, err := s.rowToMetadata(rows)
+		if err != nil {
+			return nil, err
+		}
+		ret = append(ret, md)
+	}
+	return ret, nil
 }
 
 func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
-	_, err := s.inbandMsgIDs(u, t)
+	_, err := s.inbandMetadataSince(u, t)
 	if err != nil {
 		return nil, err
 	}
