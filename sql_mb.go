@@ -214,7 +214,7 @@ func (s *SQLEngine) GetState(u UID, d DeviceID, t TimeOrOffset) (State, error) {
 }
 
 func (s *SQLEngine) getItems(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, error) {
-	qry := `SELECT i.msgid, i.devid, i.category, i.dtime, i.body, m.ctime
+	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=c.UID AND i.msgid=c.msgid)
 	        WHERE ISNULL(i.dtime) AND i.uid=?`

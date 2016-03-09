@@ -3,7 +3,7 @@ CREATE TABLE `items` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
 	`category` VARCHAR(128) NOT NULL,
-	`dtime` DATETIME,
+	`dtime` DATETIME(6),
 	`body` BLOB,
 	PRIMARY KEY(`uid`, `msgid`),
 	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`),
@@ -14,16 +14,16 @@ CREATE TABLE `items` (
 CREATE TABLE `messages` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
-	`ctime` DATETIME NOT NULL,
+	`ctime` DATETIME(6) NOT NULL,
 	`devid` CHAR(16),
-	`mtype` INTEGER UNSIGNED NOT NULL,
+	`mtype` INTEGER UNSIGNED NOT NULL COMMENT "specify for 'Update' or 'Sync' types",
 	PRIMARY KEY(`uid`, `msgid`)
 );
 
 CREATE TABLE `reminders` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
-	`ntime` DATETIME NOT NULL,
+	`ntime` DATETIME(6) NOT NULL,
 	PRIMARY KEY(`uid`, `msgid`, `ntime`),
 );
 
