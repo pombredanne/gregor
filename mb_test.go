@@ -1,4 +1,4 @@
-package message_broker
+package gregor
 
 import (
 	"crypto/rand"
@@ -52,6 +52,10 @@ type testInbandMessage struct {
 	d *testDismissal
 }
 
+type testMessage struct {
+	i *testInbandMessage
+}
+
 type testBody string
 
 func (t testBody) GetBytes() []byte { return []byte(t) }
@@ -85,6 +89,9 @@ func (t testMsgID) GetBytes() []byte                   { return t }
 func (t testDeviceID) GetBytes() []byte                { return t }
 func (t testCategory) GetString() string               { return string(t) }
 func (t testSystem) GetString() string                 { return string(t) }
+
+func (m testMessage) ToInbandMessage() InbandMessage       { return m.i }
+func (m testMessage) ToOutOfBandMessage() OutOfBandMessage { return nil }
 
 func (t *testDismissal) GetRangesToDismiss() []MsgRange {
 	var ret []MsgRange
@@ -140,16 +147,16 @@ func timeToTimeOrOffset(t time.Time) TimeOrOffset {
 	return testTimeOrOffset{t: &t}
 }
 
-func newCreation(u UID, m MsgID, d DeviceID, c Category, data string, dtime TimeOrOffset) InbandMessage {
+func newCreation(u UID, m MsgID, d DeviceID, c Category, data string, dtime TimeOrOffset) Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	item := &testItem{m: md, dtime: dtime, payload: testBody(data)}
-	return &testInbandMessage{m: md, i: item}
+	return testMessage{i: &testInbandMessage{m: md, i: item}}
 }
 
-func newDismissalByIDs(u UID, m MsgID, d DeviceID, ids []MsgID) InbandMessage {
+func newDismissalByIDs(u UID, m MsgID, d DeviceID, ids []MsgID) Message {
 	md := &testMetadata{u: u, m: d, d: d}
 	dismissal := &testDismissal{m: md, ids: ids}
-	return &testInbandMessage{m: md, d: dismissal}
+	return testMessage{i: &testInbandMessage{m: md, d: dismissal}}
 }
 
 func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.FakeClock) {
@@ -162,7 +169,7 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	}
 	assert1(nil)
 	m1 := makeMsgID()
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, m1, nil, c1, "f1", nil),
 	)
 	assert2 := func(too TimeOrOffset) {
@@ -170,7 +177,7 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 1)
 	}
 	assert2(nil)
-	sm.ConsumeInbandMessage(newDismissalByIDs(u1, makeMsgID(), nil, []MsgID{m1}))
+	sm.ConsumeMessage(newDismissalByIDs(u1, makeMsgID(), nil, []MsgID{m1}))
 	assert3 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
@@ -178,13 +185,13 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	assert3(nil)
 	tm3 := fc.Now()
 	fc.Advance(time.Second)
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, makeMsgID(), nil, c1, "f2", nil),
 	)
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, makeMsgID(), nil, c1, "f3", makeOffset(3)),
 	)
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, makeMsgID(), nil, c2, "b1", nil),
 	)
 	assert4 := func(too TimeOrOffset) {
@@ -217,7 +224,7 @@ func testStateMachinePerDevice(t *testing.T, sm StateMachine, fc clockwork.FakeC
 	}
 	assert1(nil)
 	m1 := makeMsgID()
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, m1, d1, c1, "f1", nil),
 	)
 	assert2 := func(too TimeOrOffset) {
@@ -227,7 +234,7 @@ func testStateMachinePerDevice(t *testing.T, sm StateMachine, fc clockwork.FakeC
 	assert2(nil)
 	m2 := makeMsgID()
 	d2 := makeDeviceID()
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newCreation(u1, m2, d2, c1, "f1", nil),
 	)
 	assert3 := func(too TimeOrOffset) {
@@ -236,7 +243,7 @@ func testStateMachinePerDevice(t *testing.T, sm StateMachine, fc clockwork.FakeC
 		assertPayloadsInCategory(t, sm, u1, d2, too, c1, []string{"f2"})
 	}
 	assert3(nil)
-	sm.ConsumeInbandMessage(
+	sm.ConsumeMessage(
 		newDismissalByIDs(u1, makeMsgID(), nil, []MsgID{m1}),
 	)
 	assert4 := func(too TimeOrOffset) {

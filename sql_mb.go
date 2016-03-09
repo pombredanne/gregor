@@ -1,4 +1,4 @@
-package message_broker
+package gregor
 
 import (
 	"database/sql"
@@ -131,7 +131,15 @@ func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error 
 	return err
 }
 
-func (s *SQLEngine) ConsumeInbandMessage(m InbandMessage) error {
+func (s *SQLEngine) ConsumeMessage(m Message) error {
+	if im := m.ToInbandMessage(); m != nil {
+		return s.consumeInbandMessage(im)
+	}
+	// Other messages types aren't handled by the SQL broker
+	return nil
+}
+
+func (s *SQLEngine) consumeInbandMessage(m InbandMessage) error {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return err
@@ -153,11 +161,6 @@ func (s *SQLEngine) ConsumeInbandMessage(m InbandMessage) error {
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	return nil
-}
-
-// ConsumeOutOfBand message doesn't do anything for the SQL engine.
-func (s *SQLEngine) ConsumeOutOfBandMessage(m OutOfBandMesasge) error {
 	return nil
 }
 

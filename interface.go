@@ -1,4 +1,4 @@
-package message_broker
+package gregor
 
 import (
 	"time"
@@ -41,7 +41,7 @@ type InbandMessage interface {
 	GetDismissal() Dismissal
 }
 
-type OutOfBandMesasge interface {
+type OutOfBandMessage interface {
 	GetSystem() System
 	GetUID() UID
 	GetBody() Body
@@ -77,9 +77,13 @@ type State interface {
 	GetItemsInCategory(c Category) ([]Item, error)
 }
 
+type Message interface {
+	ToInbandMessage() InbandMessage
+	ToOutOfBandMessage() OutOfBandMessage
+}
+
 type StateMachine interface {
-	ConsumeInbandMessage(m InbandMessage) error
-	ConsumeOutOfBandMessage(m OutOfBandMesasge) error
+	ConsumeMessage(m Message) error
 	GetState(u UID, d DeviceID, t TimeOrOffset) (State, error)
 	GetInbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error)
 }
@@ -95,6 +99,6 @@ type ObjFactory interface {
 
 type Server interface {
 	BrodcastInbandMessage(m InbandMessage) error
-	BrodcastOutOfBandMessage(m OutOfBandMesasge) error
+	BrodcastOutOfBandMessage(m OutOfBandMessage) error
 	TriggerNotification(m InbandMessage) error
 }
