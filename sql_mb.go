@@ -262,7 +262,7 @@ func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, erro
 	q, a := timeOrOffsetToSQL(t)
 	args := []interface{}{hexEnc(u)}
 	if a != nil {
-		qry += " AND " + q
+		qry += " AND ctime >= " + q
 		args = append(args, a)
 	}
 	qry += " ORDER BY ctime ASC"
@@ -287,11 +287,19 @@ func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, erro
 }
 
 func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
-	_, err := s.inbandMetadataSince(u, t)
+	items, err := s.items(u, d, t, nil)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	var out []InbandMessage
+	for _, item := range items {
+		im, err := s.objFactory.MakeInbandMessageFromItem(item)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, im)
+	}
+	return out, nil
 }
 
 var _ StateMachine = (*SQLEngine)(nil)

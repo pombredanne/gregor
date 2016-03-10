@@ -118,6 +118,7 @@ type ObjFactory interface {
 	MakeItem(msgid MsgID, category string, deviceid DeviceID, ctime time.Time, dtime *time.Time, body Body) (Item, error)
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
+	MakeInbandMessageFromItem(i Item) (InbandMessage, error)
 }
 
 type Server interface {
