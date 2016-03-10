@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/jonboulle/clockwork"
+	"strings"
 	"time"
 )
 
@@ -13,58 +14,85 @@ type SQLEngine struct {
 	clock      clockwork.Clock
 }
 
+type queryBuilder struct {
+	args []interface{}
+	qry  []string
+}
+
+func (q *queryBuilder) Build(f string, args ...interface{}) {
+	q.qry = append(q.qry, f)
+	q.args = append(q.args, args...)
+}
+
+func (q *queryBuilder) Clone() *queryBuilder {
+	ret := &queryBuilder{
+		args: make([]interface{}, len(q.args)),
+		qry:  make([]string, len(q.qry)),
+	}
+	copy(ret.args, q.args)
+	copy(ret.qry, q.qry)
+	return ret
+}
+
+func (q *queryBuilder) Query() string       { return strings.Join(q.qry, " ") }
+func (q *queryBuilder) Args() []interface{} { return q.args }
+
+func (q *queryBuilder) Exec(tx *sql.Tx) error {
+	stmt, err := tx.Prepare(q.Query())
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(q.Args()...)
+	return err
+}
+
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
 type byter interface {
 	Bytes() []byte
 }
 
-func (s *SQLEngine) sqlNow(argv []interface{}) (string, []interface{}) {
+func (s *SQLEngine) sqlNow(q *queryBuilder) {
 	if s.clock == nil {
-		return "NOW()", argv
+		q.Build("NOW()")
+	} else {
+		q.Build("?", s.clock.Now())
 	}
-	argv = append(argv, s.clock.Now())
-	return "?", argv
 }
 
-func (s *SQLEngine) timeOrOffsetToSQL(too TimeOrOffset, argv []interface{}) (string, []interface{}) {
+func (s *SQLEngine) timeOrOffsetToSQL(too TimeOrOffset, q *queryBuilder) {
 	if too == nil {
-		return "", argv
+		q.Build("NULL")
+		return
 	}
 	if t := too.Time(); t != nil {
-		argv = append(argv, *t)
-		return "?", argv
+		q.Build("?", *t)
+		return
 	}
 	if d := too.Duration(); d != nil {
-		var nq string
-		nq, argv = s.sqlNow(argv)
-		ret := "DATE_ADD(" + nq + ", INTERVAL ? MICROSECOND)"
-		argv = append(argv, (d.Nanoseconds() / 1000))
-		return ret, argv
+		q.Build("DATE_ADD(")
+		s.sqlNow(q)
+		q.Build(", INTERVAL ? MICROSECOND)", (d.Nanoseconds() / 1000))
+		return
 	}
-	return "NULL", argv
+	q.Build("NULL")
+	return
 }
 
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 	md := i.Metadata()
-	argv := []interface{}{
+	var qb queryBuilder
+	qb.Build("INSERT INTO items(uid, msgid, devid, category, body, dtime) VALUES(?,?,?,?,?,",
 		hexEnc(u),
 		hexEnc(md.MsgID()),
 		hexEnc(md.DeviceID()),
 		i.Category(),
 		i.Body().Bytes(),
-	}
-	var tq string
-	tq, argv = s.timeOrOffsetToSQL(i.DTime(), argv)
-	stmt, err := tx.Prepare(`
-		INSERT INTO items(uid, msgid, devid, category, body, dtime)
-		VALUES(?,?,?,?,?,` + tq + `)
-	`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec(argv...)
+	)
+	s.timeOrOffsetToSQL(i.DTime(), &qb)
+	qb.Build(")")
+	err := qb.Exec(tx)
 	if err != nil {
 		return err
 	}
@@ -73,31 +101,29 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 		if t == nil {
 			continue
 		}
-		argv = []interface{}{hexEnc(u), hexEnc(md.MsgID())}
-		tq, argv = s.timeOrOffsetToSQL(t, argv)
-		stmt, err = tx.Prepare(`
-			INSERT INTO items(uid, msgid, ntime) VALUES(?, ?, ` + tq + `)
-		`)
-		_, err = stmt.Exec(argv...)
-		stmt.Close()
+		var nqb queryBuilder
+		nqb.Build("INSERT INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
+		s.timeOrOffsetToSQL(t, &nqb)
+		nqb.Build(")")
+		err = nqb.Exec(tx)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids []MsgID) error {
-	ins, err := tx.Prepare(`
-		INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)
-	`)
+	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer ins.Close()
-	var tq string
-	var args []interface{}
-	tq, args = s.sqlNow(args)
-	upd, err := tx.Prepare(`
-		UPDATE items SET dtime=` + tq + ` WHERE uid=? AND msgid=?
-	`)
+	var qb queryBuilder
+	qb.Build("UPDATE items SET dtime=")
+	s.sqlNow(&qb)
+	qb.Build("WHERE uid=? AND msgid=?")
+	upd, err := tx.Prepare(qb.Query())
 	if err != nil {
 		return err
 	}
@@ -107,10 +133,9 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 		if err != nil {
 			return err
 		}
-		args2 := make([]interface{}, len(args))
-		copy(args2, args)
-		args2 = append(args2, hexEnc(u), hexEnc(dmid))
-		_, err = upd.Exec(args2...)
+		qbc := qb.Clone()
+		qbc.Build("", hexEnc(u), hexEnc(dmid))
+		_, err = upd.Exec(qbc.Args()...)
 		if err != nil {
 			return err
 		}
@@ -120,34 +145,23 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []MsgRange) error {
 	for _, mr := range mrs {
-		argv := []interface{}{hexEnc(u), hexEnc(mid), mr.Category().String()}
-		var tq, tqnow string
-		tq, argv = s.timeOrOffsetToSQL(mr.EndTime(), argv)
-		ins, err := tx.Prepare(`
-			INSERT INTO dismissals_by_time(uid, msgid, category, dtime)
-			VALUES(?,?,?,` + tq + `)
-		`)
-		if err != nil {
+
+		var qb queryBuilder
+		qb.Build("INSERT INTO dismissals_by_time(uid, msgid, category, dtime) VALUES(?,?,?,",
+			hexEnc(u), hexEnc(mid), mr.Category().String())
+		s.timeOrOffsetToSQL(mr.EndTime(), &qb)
+		qb.Build(")")
+		if err := qb.Exec(tx); err != nil {
 			return err
 		}
-		defer ins.Close()
-		_, err = ins.Exec(argv...)
-		if err != nil {
-			return err
-		}
-		argv = []interface{}{}
-		tqnow, argv = s.sqlNow(argv)
-		argv = append(argv, hexEnc(u), mr.Category().String())
-		tq, argv = s.timeOrOffsetToSQL(mr.EndTime(), argv)
-		upd, err := tx.Prepare(`
-			UPDATE items SET dtime=` + tqnow + ` WHERE uid=? AND category=? AND ctime<=` + tq,
-		)
-		if err != nil {
-			return err
-		}
-		defer upd.Close()
-		_, err = upd.Exec(argv...)
-		if err != nil {
+
+		var qbu queryBuilder
+		qbu.Build("UPDATE items SET dtime=")
+		s.sqlNow(&qbu)
+		qbu.Build("WHERE uid=? AND category=? AND ctime <= ",
+			hexEnc(u), mr.Category().String())
+		s.timeOrOffsetToSQL(mr.EndTime(), &qbu)
+		if err := qbu.Exec(tx); err != nil {
 			return err
 		}
 	}
@@ -155,19 +169,12 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 }
 
 func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error {
-	argv := []interface{}{hexEnc(md.UID()), hexEnc(md.MsgID())}
-	var tq string
-	tq, argv = s.timeOrOffsetToSQL(md.CTime(), argv)
-	ins, err := tx.Prepare(`
-		INSERT INTO messages(uid, msgid, ctime)
-		VALUES(?, ?, ` + tq + `)
-	`)
-	if err != nil {
-		return err
-	}
-	defer ins.Close()
-	_, err = ins.Exec(argv...)
-	return err
+	var qb queryBuilder
+	qb.Build("INSERT INTO messages(uid, msgid, ctime) VALUES(?, ?,",
+		hexEnc(md.UID()), hexEnc(md.MsgID()))
+	s.timeOrOffsetToSQL(md.CTime(), &qb)
+	qb.Build(")")
+	return qb.Exec(tx)
 }
 
 func (s *SQLEngine) ConsumeMessage(m Message) error {
@@ -239,27 +246,25 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=c.UID AND i.msgid=c.msgid)
 	        WHERE ISNULL(i.dtime) AND i.uid=?`
-	args := []interface{}{hexEnc(u)}
+	var qb queryBuilder
+	qb.Build(qry, hexEnc(u))
 	if d != nil {
-		qry += " AND i.devid=?"
-		args = append(args, hexEnc(d))
+		qb.Build("AND i.devid=?", hexEnc(d))
 	}
 	if t != nil {
-		var tq string
-		tq, args = s.timeOrOffsetToSQL(t, args)
-		qry += " AND m.ctime >= " + tq
+		qb.Build("AND m.ctime >=")
+		s.timeOrOffsetToSQL(t, &qb)
 	}
 	if m != nil {
-		qry += " AND i.msgid=?"
-		args = append(args, hexEnc(m))
+		qb.Build("AND i.msgid=?", hexEnc(m))
 	}
-	qry += " ORDER BY m.ctime ASC"
-	stmt, err := s.driver.Prepare(qry)
+	qb.Build("ORDER BY m.ctime ASC")
+	stmt, err := s.driver.Prepare(qb.Query())
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(args...)
+	rows, err := stmt.Query(qb.Args()...)
 	if err != nil {
 		return nil, err
 	}
@@ -288,19 +293,19 @@ func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (Metadata, error) {
 
 func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, error) {
 	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
-	args := []interface{}{hexEnc(u)}
+	var qb queryBuilder
+	qb.Build(qry, hexEnc(u))
 	if t != nil {
-		var tq string
-		tq, args = s.timeOrOffsetToSQL(t, args)
-		qry += " AND ctime >= " + tq
+		qb.Build("AND ctime >= ")
+		s.timeOrOffsetToSQL(t, &qb)
 	}
-	qry += " ORDER BY ctime ASC"
-	stmt, err := s.driver.Prepare(qry)
+	qb.Build("ORDER BY ctime ASC")
+	stmt, err := s.driver.Prepare(qb.Query())
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(args...)
+	rows, err := stmt.Query(qb.Args()...)
 	if err != nil {
 		return nil, err
 	}
@@ -370,23 +375,22 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 	        LEFT JOIN dismissals_by_time AS dt ON (m.uid=dt.uid AND m.msgid=dt.msgid)
 	        LEFT JOIN dismissals_by_id AS di ON (m.uid=di.uid AND m.msgid=di.msgid)
 	        WHERE ISNULL(i.dtime) AND i.uid=?`
-	args := []interface{}{hexEnc(u)}
+	var qb queryBuilder
+	qb.Build(qry, hexEnc(u))
 	if d != nil {
-		qry += " AND i.devid=?"
-		args = append(args, hexEnc(d))
+		qb.Build("AND i.devid=?", hexEnc(d))
 	}
 
-	var tq string
-	tq, args = s.timeOrOffsetToSQL(t, args)
-	qry += " AND m.ctime >= " + tq
+	qb.Build("AND m.ctime >= ")
+	s.timeOrOffsetToSQL(t, &qb)
 
-	qry += " ORDER BY m.ctime ASC"
-	stmt, err := s.driver.Prepare(qry)
+	qb.Build("ORDER BY m.ctime ASC")
+	stmt, err := s.driver.Prepare(qb.Query())
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
-	rows, err := stmt.Query(args...)
+	rows, err := stmt.Query(qb.Args()...)
 	if err != nil {
 		return nil, err
 	}
