@@ -2,8 +2,10 @@ package gregor
 
 import (
 	"crypto/rand"
+	_ "database/sql"
 	"errors"
 	"fmt"
+	_ "github.com/cznic/ql/driver"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -21,7 +23,7 @@ type testItem struct {
 	dtime   TimeOrOffset
 	nTimes  []TimeOrOffset
 	cat     Category
-	payload testBody
+	payload Body
 }
 
 type testTimeOrOffset struct {
@@ -57,6 +59,67 @@ type testInbandMessage struct {
 type testMessage struct {
 	i *testInbandMessage
 }
+
+type testObjFactory struct{}
+
+func (f testObjFactory) MakeUID(b []byte) (UID, error) {
+	return testUID(b), nil
+}
+func (f testObjFactory) MakeMsgID(b []byte) (MsgID, error) {
+	return testMsgID(b), nil
+}
+func (f testObjFactory) MakeDeviceID(b []byte) (DeviceID, error) {
+	return testDeviceID(b), nil
+}
+func (f testObjFactory) MakeBody(b []byte) (Body, error) {
+	return testBody(b), nil
+}
+func (f testObjFactory) MakeCategory(s string) (Category, error) {
+	return testCategory(s), nil
+}
+func (f testObjFactory) MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error) {
+	ret := &testItem{
+		m:       newTestMetadata(u, msgid, deviceid, ctime),
+		cat:     c,
+		payload: body,
+	}
+	if dtime != nil {
+		ret.dtime = timeToTimeOrOffset(*dtime)
+	}
+	return ret, nil
+}
+func (f testObjFactory) MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (Dismissal, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (StateSyncMessage, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeState(i []Item) (State, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeInbandMessageFromItem(i Item) (InbandMessage, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeInbandMessageFromDismissal(d Dismissal) (InbandMessage, error) {
+	return nil, nil
+}
+func (f testObjFactory) MakeInbandMessageFromStateSync(s StateSyncMessage) (InbandMessage, error) {
+	return nil, nil
+}
+
+func newTestMetadata(u UID, msgid MsgID, devid DeviceID, ctime time.Time) *testMetadata {
+	return &testMetadata{
+		u: u, m: msgid, d: devid, t: timeToTimeOrOffset(ctime),
+	}
+}
+
+var _ ObjFactory = testObjFactory{}
 
 type testBody string
 

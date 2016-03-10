@@ -5,8 +5,8 @@ CREATE TABLE `items` (
 	`category` VARCHAR(128) NOT NULL,
 	`dtime` DATETIME(6),
 	`body` BLOB,
-	PRIMARY KEY(`uid`, `msgid`),
 	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`),
+	PRIMARY KEY(`uid`, `msgid`),
 	KEY `user_order` (`uid`, `category`, `ctime`),
 	KEY `cleanup_order` (`uid`, `dtime`)
 );
@@ -24,22 +24,22 @@ CREATE TABLE `reminders` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
 	`ntime` DATETIME(6) NOT NULL,
-	PRIMARY KEY(`uid`, `msgid`, `ntime`),
+	PRIMARY KEY(`uid`, `msgid`, `ntime`)
 );
 
 CREATE TABLE `dismissals_by_id` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
 	`dmsgid` CHAR(16) NOT NULL COMMENT "the message IDs to dismiss",
-	PRIMARY KEY(`uid`, `msgid`, `dmsgid`),
-	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`)
+	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`),
+	PRIMARY KEY(`uid`, `msgid`, `dmsgid`)
 );
 
 CREATE TABLE `dismissals_by_time` (
 	`uid`   CHAR(16) NOT NULL,
 	`msgid` CHAR(16) NOT NULL,
 	`category` VARCHAR(128) NOT NULL,
-	`dtime` DATETIME NOT NULL COMMENT "throw out matching events before dtime",
+	`dtime` DATETIME(6) NOT NULL COMMENT "throw out matching events before dtime",
+	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`),
 	PRIMARY KEY(`uid`, `msgid`, `category`, `dtime`),
-	FOREIGN KEY(`uid`, `msgid`) REFERENCES `messages` (`uid`, `msgid`)
 );
