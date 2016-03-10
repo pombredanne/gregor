@@ -7,6 +7,7 @@ import (
 type InbandMsgType int
 
 const (
+	InbandMsgTypeNone   InbandMsgType = 0
 	InbandMsgTypeUpdate InbandMsgType = 1
 	InbandMsgTypeSync   InbandMsgType = 2
 )
@@ -51,6 +52,7 @@ type InbandMessage interface {
 	MessageWithMetadata
 	ToStateUpdateMessage() StateUpdateMessage
 	ToStateSyncMessage() StateSyncMessage
+	Merge(m1 InbandMessage) error
 }
 
 type StateUpdateMessage interface {
@@ -115,7 +117,9 @@ type ObjFactory interface {
 	MakeMsgID(b []byte) (MsgID, error)
 	MakeDeviceID(b []byte) (DeviceID, error)
 	MakeBody(b []byte) (Body, error)
-	MakeItem(msgid MsgID, category string, deviceid DeviceID, ctime time.Time, dtime *time.Time, body Body) (Item, error)
+	MakeCategory(s string) (Category, error)
+	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
+	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error)
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
 	MakeInbandMessageFromItem(i Item) (InbandMessage, error)

@@ -2,6 +2,8 @@ package gregor
 
 import (
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -81,6 +83,26 @@ func (t testInbandMessage) Creation() Item                           { return t.
 func (t testInbandMessage) Dismissal() Dismissal                     { return t.d }
 func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return nil }
 func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
+
+func (t testInbandMessage) Merge(m2 InbandMessage) error {
+	t2, ok := m2.(testInbandMessage)
+	if !ok {
+		return fmt.Errorf("bad merge; wrong type: %T", m2)
+	}
+	if t.i != nil && t2.i != nil {
+		return errors.New("clash of creations")
+	}
+	if t.i == nil {
+		t.i = t2.i
+	}
+	if t.d == nil {
+		t.d = t2.d
+	} else if t2.d != nil {
+		t.d.ids = append(t.d.ids, t2.d.ids...)
+		t.d.ranges = append(t.d.ranges, t2.d.ranges...)
+	}
+	return nil
+}
 
 func (t *testDismissal) Metadata() Metadata       { return t.m }
 func (t *testDismissal) MsgIDsToDismiss() []MsgID { return t.ids }

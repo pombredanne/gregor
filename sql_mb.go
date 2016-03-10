@@ -177,24 +177,17 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 	return nil
 }
 
-func (s *SQLEngine) rowToItem(rows *sql.Rows) (Item, error) {
-	var category string
-	var ctime, dtime time.Time
-	var bodyBytes []byte
+func (s *SQLEngine) rowToItem(u UID, rows *sql.Rows) (Item, error) {
+	var ctime time.Time
 	deviceID := deviceIDScanner{o: s.objFactory}
 	msgID := msgIDScanner{o: s.objFactory}
-	if err := rows.Scan(msgID, deviceID, &category, &dtime, &bodyBytes, &ctime); err != nil {
+	category := categoryScanner{o: s.objFactory}
+	body := bodyScanner{o: s.objFactory}
+	var dtime timeOrNilScanner
+	if err := rows.Scan(msgID, deviceID, category, dtime, body, &ctime); err != nil {
 		return nil, err
 	}
-	var dtimep *time.Time
-	if !dtime.IsZero() {
-		dtimep = &dtime
-	}
-	body, err := s.objFactory.MakeBody(bodyBytes)
-	if err != nil {
-		return nil, err
-	}
-	return s.objFactory.MakeItem(msgID.MsgID(), category, deviceID.DeviceID(), ctime, dtimep, body)
+	return s.objFactory.MakeItem(u, msgID.MsgID(), deviceID.DeviceID(), ctime, category.Category(), dtime.Time(), body.Body())
 }
 
 func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
@@ -236,7 +229,7 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 	}
 	var items []Item
 	for rows.Next() {
-		item, err := s.rowToItem(rows)
+		item, err := s.rowToItem(u, rows)
 		if err != nil {
 			return nil, err
 		}
@@ -286,13 +279,41 @@ func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, erro
 	return ret, nil
 }
 
-func (s *SQLEngine) rowToInbandMessage(r *sql.Rows) (InbandMessage, error) {
+func (s *SQLEngine) rowToInbandMessage(u UID, rows *sql.Rows) (InbandMessage, error) {
+	msgID := msgIDScanner{o: s.objFactory}
+	devID := deviceIDScanner{o: s.objFactory}
+	var ctime time.Time
+	var mtype inbandMsgTypeScanner
+	category := categoryScanner{o: s.objFactory}
+	body := bodyScanner{o: s.objFactory}
+	dCategory := categoryScanner{o: s.objFactory}
+	var dTime timeOrNilScanner
+	dMsgID := msgIDScanner{o: s.objFactory}
+
+	if err := rows.Scan(msgID, devID, &ctime, mtype, category, body, dCategory, dTime, dMsgID); err != nil {
+		return nil, err
+	}
+
+	switch {
+	case category.IsSet():
+		i, err := s.objFactory.MakeItem(u, msgID.MsgID(), devID.DeviceID(), ctime, category.Category(), nil, body.Body())
+		if err != nil {
+			return nil, err
+		}
+		return s.objFactory.MakeInbandMessageFromItem(i)
+	case dCategory.IsSet() && dTime.Time() != nil:
+		_, err := s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime, dCategory.Category(), *(dTime.Time()))
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return nil, nil
 }
 
 func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
-               i.category, i.dtime, i.body,
+               i.category, i.body,
                dt.category, dt.dtime,
                di.dmsgid
 	        FROM messages AS m
@@ -322,7 +343,7 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 	}
 	var ret []InbandMessage
 	for rows.Next() {
-		ibm, err := s.rowToInbandMessage(rows)
+		ibm, err := s.rowToInbandMessage(u, rows)
 		if err != nil {
 			return nil, err
 		}
