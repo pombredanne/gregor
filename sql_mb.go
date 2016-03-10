@@ -3,12 +3,14 @@ package gregor
 import (
 	"database/sql"
 	"encoding/hex"
+	"github.com/jonboulle/clockwork"
 	"time"
 )
 
 type SQLEngine struct {
 	driver     *sql.DB
 	objFactory ObjFactory
+	clock      clockwork.Clock
 }
 
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
@@ -17,33 +19,52 @@ type byter interface {
 	Bytes() []byte
 }
 
-func timeOrOffsetToSQL(too TimeOrOffset) (string, interface{}) {
+func (s *SQLEngine) sqlNow(argv []interface{}) (string, []interface{}) {
+	if s.clock == nil {
+		return "NOW()", argv
+	}
+	argv = append(argv, s.clock.Now())
+	return "?", argv
+}
+
+func (s *SQLEngine) timeOrOffsetToSQL(too TimeOrOffset, argv []interface{}) (string, []interface{}) {
 	if too == nil {
-		return "", nil
+		return "", argv
 	}
 	if t := too.Time(); t != nil {
-		return "?", *t
+		argv = append(argv, *t)
+		return "?", argv
 	}
 	if d := too.Duration(); d != nil {
-		return "DATE_ADD(NOW(), INTERVAL ? MICROSECOND)", d.Nanoseconds() / 1000
+		var nq string
+		nq, argv = s.sqlNow(argv)
+		ret := "DATE_ADD(" + nq + ", INTERVAL ? MICROSECOND)"
+		argv = append(argv, (d.Nanoseconds() / 1000))
+		return ret, argv
 	}
-	return "?", nil
+	return "NULL", argv
 }
 
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
-	q, a := timeOrOffsetToSQL(i.DTime())
+	md := i.Metadata()
+	argv := []interface{}{
+		hexEnc(u),
+		hexEnc(md.MsgID()),
+		hexEnc(md.DeviceID()),
+		i.Category(),
+		i.Body().Bytes(),
+	}
+	var tq string
+	tq, argv = s.timeOrOffsetToSQL(i.DTime(), argv)
 	stmt, err := tx.Prepare(`
-		INSERT INTO items(uid, msgid, devid, category, dtime, body)
-		VALUES(?,?,?,?,` + q + `,?)
+		INSERT INTO items(uid, msgid, devid, category, body, dtime)
+		VALUES(?,?,?,?,?,` + tq + `)
 	`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
-	md := i.Metadata()
-	_, err = stmt.Exec(hexEnc(u), hexEnc(md.MsgID()),
-		hexEnc(md.DeviceID()), i.Category(), a,
-		i.Body().Bytes())
+	_, err = stmt.Exec(argv...)
 	if err != nil {
 		return err
 	}
@@ -52,11 +73,12 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 		if t == nil {
 			continue
 		}
-		q, a = timeOrOffsetToSQL(t)
+		argv = []interface{}{hexEnc(u), hexEnc(md.MsgID())}
+		tq, argv = s.timeOrOffsetToSQL(t, argv)
 		stmt, err = tx.Prepare(`
-			INSERT INTO items(uid, msgid, ntime) VALUES(?, ?, ` + q + `)
+			INSERT INTO items(uid, msgid, ntime) VALUES(?, ?, ` + tq + `)
 		`)
-		_, err = stmt.Exec(hexEnc(u), hexEnc(md.MsgID()), a)
+		_, err = stmt.Exec(argv...)
 		stmt.Close()
 	}
 	return nil
@@ -70,8 +92,11 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 		return err
 	}
 	defer ins.Close()
+	var tq string
+	var args []interface{}
+	tq, args = s.sqlNow(args)
 	upd, err := tx.Prepare(`
-		UPDATE items SET dtime=NOW() WHERE uid=? AND msgid=?
+		UPDATE items SET dtime=` + tq + ` WHERE uid=? AND msgid=?
 	`)
 	if err != nil {
 		return err
@@ -82,7 +107,10 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 		if err != nil {
 			return err
 		}
-		_, err = upd.Exec(hexEnc(u), hexEnc(dmid))
+		args2 := make([]interface{}, len(args))
+		copy(args2, args)
+		args2 = append(args2, hexEnc(u), hexEnc(dmid))
+		_, err = upd.Exec(args2...)
 		if err != nil {
 			return err
 		}
@@ -92,27 +120,33 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u UID, mid MsgID, dmids [
 
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []MsgRange) error {
 	for _, mr := range mrs {
-		q, a := timeOrOffsetToSQL(mr.EndTime())
+		argv := []interface{}{hexEnc(u), hexEnc(mid), mr.Category().String()}
+		var tq, tqnow string
+		tq, argv = s.timeOrOffsetToSQL(mr.EndTime(), argv)
 		ins, err := tx.Prepare(`
 			INSERT INTO dismissals_by_time(uid, msgid, category, dtime)
-			VALUES(?,?,?,` + q + `)
+			VALUES(?,?,?,` + tq + `)
 		`)
 		if err != nil {
 			return err
 		}
 		defer ins.Close()
-		_, err = ins.Exec(hexEnc(u), hexEnc(mid), mr.Category().String(), a)
+		_, err = ins.Exec(argv...)
 		if err != nil {
 			return err
 		}
+		argv = []interface{}{}
+		tqnow, argv = s.sqlNow(argv)
+		argv = append(argv, hexEnc(u), mr.Category().String())
+		tq, argv = s.timeOrOffsetToSQL(mr.EndTime(), argv)
 		upd, err := tx.Prepare(`
-			UPDATE items SET dtime=NOW() WHERE uid=? AND ctime<=` + q + ` AND category=?
-		`)
+			UPDATE items SET dtime=` + tqnow + ` WHERE uid=? AND category=? AND ctime<=` + tq,
+		)
 		if err != nil {
 			return err
 		}
 		defer upd.Close()
-		_, err = upd.Exec(hexEnc(u), a, mr.Category().String())
+		_, err = upd.Exec(argv...)
 		if err != nil {
 			return err
 		}
@@ -121,16 +155,18 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 }
 
 func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error {
-	q, a := timeOrOffsetToSQL(md.CTime())
+	argv := []interface{}{hexEnc(md.UID()), hexEnc(md.MsgID())}
+	var tq string
+	tq, argv = s.timeOrOffsetToSQL(md.CTime(), argv)
 	ins, err := tx.Prepare(`
 		INSERT INTO messages(uid, msgid, ctime)
-		VALUES(?, ?, ` + q + `)
+		VALUES(?, ?, ` + tq + `)
 	`)
 	if err != nil {
 		return err
 	}
 	defer ins.Close()
-	_, err = ins.Exec(hexEnc(md.UID()), hexEnc(md.MsgID()), a)
+	_, err = ins.Exec(argv...)
 	return err
 }
 
@@ -209,9 +245,9 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 		args = append(args, hexEnc(d))
 	}
 	if t != nil {
-		q, a := timeOrOffsetToSQL(t)
-		qry += " AND m.ctime >= " + q
-		args = append(args, a)
+		var tq string
+		tq, args = s.timeOrOffsetToSQL(t, args)
+		qry += " AND m.ctime >= " + tq
 	}
 	if m != nil {
 		qry += " AND i.msgid=?"
@@ -252,11 +288,11 @@ func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (Metadata, error) {
 
 func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, error) {
 	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
-	q, a := timeOrOffsetToSQL(t)
 	args := []interface{}{hexEnc(u)}
-	if a != nil {
-		qry += " AND ctime >= " + q
-		args = append(args, a)
+	if t != nil {
+		var tq string
+		tq, args = s.timeOrOffsetToSQL(t, args)
+		qry += " AND ctime >= " + tq
 	}
 	qry += " ORDER BY ctime ASC"
 	stmt, err := s.driver.Prepare(qry)
@@ -340,9 +376,9 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 		args = append(args, hexEnc(d))
 	}
 
-	q, a := timeOrOffsetToSQL(t)
-	qry += " AND m.ctime >= " + q
-	args = append(args, a)
+	var tq string
+	tq, args = s.timeOrOffsetToSQL(t, args)
+	qry += " AND m.ctime >= " + tq
 
 	qry += " ORDER BY m.ctime ASC"
 	stmt, err := s.driver.Prepare(qry)
