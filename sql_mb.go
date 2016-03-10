@@ -286,20 +286,49 @@ func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, erro
 	return ret, nil
 }
 
+func (s *SQLEngine) rowToInbandMessage(r *sql.Rows) (InbandMessage, error) {
+	return nil, nil
+}
+
 func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
-	items, err := s.items(u, d, t, nil)
+	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
+               i.category, i.dtime, i.body,
+               dt.category, dt.dtime,
+               di.dmsgid
+	        FROM messages AS m
+	        LEFT JOIN items AS i ON (m.uid=i.UID AND m.msgid=i.msgid)
+	        LEFT JOIN dismissals_by_time AS dt ON (m.uid=dt.uid AND m.msgid=dt.msgid)
+	        LEFT JOIN dismissals_by_id AS di ON (m.uid=di.uid AND m.msgid=di.msgid)
+	        WHERE ISNULL(i.dtime) AND i.uid=?`
+	args := []interface{}{hexEnc(u)}
+	if d != nil {
+		qry += " AND i.devid=?"
+		args = append(args, hexEnc(d))
+	}
+	if t != nil {
+		q, a := timeOrOffsetToSQL(t)
+		qry += " AND m.ctime >= " + q
+		args = append(args, a)
+	}
+	qry += " ORDER BY m.ctime ASC"
+	stmt, err := s.driver.Prepare(qry)
 	if err != nil {
 		return nil, err
 	}
-	var out []InbandMessage
-	for _, item := range items {
-		im, err := s.objFactory.MakeInbandMessageFromItem(item)
+	defer stmt.Close()
+	rows, err := stmt.Query(args...)
+	if err != nil {
+		return nil, err
+	}
+	var ret []InbandMessage
+	for rows.Next() {
+		ibm, err := s.rowToInbandMessage(rows)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, im)
+		ret = append(ret, ibm)
 	}
-	return out, nil
+	return ret, nil
 }
 
 var _ StateMachine = (*SQLEngine)(nil)
