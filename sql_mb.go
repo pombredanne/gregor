@@ -305,11 +305,11 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 		qry += " AND i.devid=?"
 		args = append(args, hexEnc(d))
 	}
-	if t != nil {
-		q, a := timeOrOffsetToSQL(t)
-		qry += " AND m.ctime >= " + q
-		args = append(args, a)
-	}
+
+	q, a := timeOrOffsetToSQL(t)
+	qry += " AND m.ctime >= " + q
+	args = append(args, a)
+
 	qry += " ORDER BY m.ctime ASC"
 	stmt, err := s.driver.Prepare(qry)
 	if err != nil {
