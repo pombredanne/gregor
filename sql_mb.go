@@ -217,7 +217,7 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 	}
 	if t != nil {
 		q, a := timeOrOffsetToSQL(t)
-		qry += " AND m.ctime=" + q
+		qry += " AND m.ctime >= " + q
 		args = append(args, a)
 	}
 	if m != nil {
