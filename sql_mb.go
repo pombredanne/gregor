@@ -355,12 +355,21 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 		return nil, err
 	}
 	var ret []InbandMessage
+	lookup := make(map[string]InbandMessage)
 	for rows.Next() {
 		ibm, err := s.rowToInbandMessage(u, rows)
 		if err != nil {
 			return nil, err
 		}
-		ret = append(ret, ibm)
+		msgIDString := hexEnc(ibm.Metadata().MsgID())
+		if ibm2 := lookup[msgIDString]; ibm2 != nil {
+			if err = ibm2.Merge(ibm); err != nil {
+				return nil, err
+			}
+		} else {
+			ret = append(ret, ibm)
+			lookup[msgIDString] = ibm
+		}
 	}
 	return ret, nil
 }
