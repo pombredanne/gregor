@@ -120,9 +120,13 @@ type ObjFactory interface {
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
 	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error)
+	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (Dismissal, error)
+	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (StateSyncMessage, error)
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
 	MakeInbandMessageFromItem(i Item) (InbandMessage, error)
+	MakeInbandMessageFromDismissal(d Dismissal) (InbandMessage, error)
+	MakeInbandMessageFromStateSync(s StateSyncMessage) (InbandMessage, error)
 }
 
 type Server interface {

@@ -302,10 +302,23 @@ func (s *SQLEngine) rowToInbandMessage(u UID, rows *sql.Rows) (InbandMessage, er
 		}
 		return s.objFactory.MakeInbandMessageFromItem(i)
 	case dCategory.IsSet() && dTime.Time() != nil:
-		_, err := s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime, dCategory.Category(), *(dTime.Time()))
+		d, err := s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime, dCategory.Category(), *(dTime.Time()))
 		if err != nil {
 			return nil, err
 		}
+		return s.objFactory.MakeInbandMessageFromDismissal(d)
+	case dMsgID.MsgID() != nil:
+		d, err := s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime, dMsgID.MsgID())
+		if err != nil {
+			return nil, err
+		}
+		return s.objFactory.MakeInbandMessageFromDismissal(d)
+	case mtype.InbandMsgType() == InbandMsgTypeSync:
+		d, err := s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime)
+		if err != nil {
+			return nil, err
+		}
+		return s.objFactory.MakeInbandMessageFromStateSync(d)
 	}
 
 	return nil, nil
