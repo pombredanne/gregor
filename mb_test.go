@@ -56,6 +56,7 @@ type testInbandMessage struct {
 	m *testMetadata
 	i *testItem
 	d *testDismissal
+	s *testSyncMessage
 }
 
 type testMessage struct {
@@ -63,6 +64,7 @@ type testMessage struct {
 }
 
 type testObjFactory struct{}
+type testState []Item
 
 func (f testObjFactory) MakeUID(b []byte) (UID, error) {
 	return testUID(b), nil
@@ -115,18 +117,34 @@ func (f testObjFactory) MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceI
 	return (*testSyncMessage)(md), nil
 }
 func (f testObjFactory) MakeState(i []Item) (State, error) {
-	return nil, nil
+	return testState(i), nil
 }
 func (f testObjFactory) MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error) {
-	return nil, nil
+	return newTestMetadata(uid, msgid, devid, ctime), nil
 }
+
+var errBadType = errors.New("bad type in cast")
+
 func (f testObjFactory) MakeInbandMessageFromItem(i Item) (InbandMessage, error) {
-	return nil, nil
+	ti, ok := i.(*testItem)
+	if !ok {
+		return nil, errBadType
+	}
+	return &testInbandMessage{m: ti.m, i: ti}, nil
 }
 func (f testObjFactory) MakeInbandMessageFromDismissal(d Dismissal) (InbandMessage, error) {
-	return nil, nil
+	td, ok := d.(*testDismissal)
+	if !ok {
+		return nil, errBadType
+	}
+	return &testInbandMessage{m: td.m, d: td}, nil
 }
 func (f testObjFactory) MakeInbandMessageFromStateSync(s StateSyncMessage) (InbandMessage, error) {
+	ts, ok := s.(*testSyncMessage)
+	if !ok {
+		return nil, errBadType
+	}
+	return &testInbandMessage{m: (*testMetadata)(ts), s: ts}, nil
 	return nil, nil
 }
 
@@ -163,7 +181,7 @@ func (t *testSyncMessage) Metadata() Metadata { return (*testMetadata)(t) }
 func (t testInbandMessage) Metadata() Metadata                       { return t.m }
 func (t testInbandMessage) Creation() Item                           { return t.i }
 func (t testInbandMessage) Dismissal() Dismissal                     { return t.d }
-func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return nil }
+func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return t.s }
 func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
 
 func (t testInbandMessage) Merge(m2 InbandMessage) error {
@@ -206,6 +224,20 @@ func (t *testDismissal) RangesToDismiss() []MsgRange {
 		ret = append(ret, MsgRange(r))
 	}
 	return ret
+}
+
+func (t testState) Items() ([]Item, error) {
+	return []Item(t), nil
+}
+
+func (t testState) ItemsInCategory(c Category) ([]Item, error) {
+	var ret []Item
+	for _, item := range t {
+		if item.Category().String() == c.String() {
+			ret = append(ret, item)
+		}
+	}
+	return ret, nil
 }
 
 var _ Item = (*testItem)(nil)
