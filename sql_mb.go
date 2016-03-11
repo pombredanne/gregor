@@ -3,6 +3,7 @@ package gregor
 import (
 	"database/sql"
 	"encoding/hex"
+	"fmt"
 	"github.com/jonboulle/clockwork"
 	"strings"
 	"time"
@@ -12,6 +13,10 @@ type SQLEngine struct {
 	driver     *sql.DB
 	objFactory ObjFactory
 	clock      clockwork.Clock
+}
+
+func NewSQLEngine(d *sql.DB, of ObjFactory, cl clockwork.Clock) *SQLEngine {
+	return &SQLEngine{driver: d, objFactory: of, clock: cl}
 }
 
 type queryBuilder struct {
@@ -45,11 +50,19 @@ func (q *queryBuilder) Exec(tx *sql.Tx) error {
 		return err
 	}
 	defer stmt.Close()
+	fmt.Printf("Exec %q %+v\n", q.Query(), q.Args())
 	_, err = stmt.Exec(q.Args()...)
 	return err
 }
 
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
+
+func hexEncOrNull(b byter) interface{} {
+	if b == nil {
+		return nil
+	}
+	return hexEnc(b)
+}
 
 type byter interface {
 	Bytes() []byte
@@ -90,10 +103,9 @@ func (s *SQLEngine) newQueryBuilder() *queryBuilder {
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 	md := i.Metadata()
 	qb := s.newQueryBuilder()
-	qb.Build("INSERT INTO items(uid, msgid, devid, category, body, dtime) VALUES(?,?,?,?,?,",
+	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
 		hexEnc(u),
 		hexEnc(md.MsgID()),
-		hexEnc(md.DeviceID()),
 		i.Category(),
 		i.Body().Bytes(),
 	)
@@ -175,11 +187,11 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u UID, mid MsgID, mrs []M
 	return nil
 }
 
-func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata) error {
+func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata, t InbandMsgType) error {
 	qb := s.newQueryBuilder()
-	qb.Build("INSERT INTO messages(uid, msgid, ctime) VALUES(?, ?,",
-		hexEnc(md.UID()), hexEnc(md.MsgID()))
-	qb.TimeOrOffset(md.CTime())
+	qb.Build("INSERT INTO messages(uid, msgid, mtype, ctime) VALUES(?, ?, ?,",
+		hexEnc(md.UID()), hexEnc(md.MsgID()), int(t))
+	qb.Now()
 	qb.Build(")")
 	return qb.Exec(tx)
 }
@@ -208,18 +220,22 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 		return err
 	}
 	md := m.Metadata()
-	if err := s.consumeInbandMessageMetadata(tx, md); err != nil {
+	if err := s.consumeInbandMessageMetadata(tx, md, InbandMsgTypeUpdate); err != nil {
 		return err
 	}
+	fmt.Printf("A\n")
 	if err := s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
 		return err
 	}
+	fmt.Printf("B\n")
 	if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
 		return err
 	}
+	fmt.Printf("C\n")
 	if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
 		return err
 	}
+	fmt.Printf("D\n")
 
 	if err := tx.Commit(); err != nil {
 		return err
@@ -251,8 +267,8 @@ func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
 func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, error) {
 	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
 	        FROM items AS i
-	        INNER JOIN messages AS m ON (i.uid=c.UID AND i.msgid=c.msgid)
-	        WHERE ISNULL(i.dtime) AND i.uid=?`
+	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
+	        WHERE i.dtime IS NULL AND i.uid=?`
 	qb := s.newQueryBuilder()
 	qb.Build(qry, hexEnc(u))
 	if d != nil {

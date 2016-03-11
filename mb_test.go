@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	_ "github.com/cznic/ql/driver"
 	"github.com/jonboulle/clockwork"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 	"time"
 )
@@ -298,6 +299,13 @@ func newDismissalByIDs(u UID, m MsgID, d DeviceID, ids []MsgID) Message {
 	return testMessage{i: &testInbandMessage{m: md, d: dismissal}}
 }
 
+func consumeMessage(t *testing.T, sm StateMachine, m Message) {
+	err := sm.ConsumeMessage(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.FakeClock) {
 	u1 := makeUID()
 	c1 := testCategory("foos")
@@ -308,7 +316,7 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	}
 	assert1(nil)
 	m1 := makeMsgID()
-	sm.ConsumeMessage(
+	consumeMessage(t, sm,
 		newCreation(u1, m1, nil, c1, "f1", nil),
 	)
 	assert2 := func(too TimeOrOffset) {
@@ -393,8 +401,10 @@ func testStateMachinePerDevice(t *testing.T, sm StateMachine, fc clockwork.FakeC
 	assert4(nil)
 }
 
-func createQlDb() (*sql.DB, error) {
-	db, err := sql.Open("ql-mem", "mem.db")
+func createSqliteDb() (*sql.DB, error) {
+	name := "./gregor.db"
+	os.Remove(name)
+	db, err := sql.Open("sqlite3", name)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +412,6 @@ func createQlDb() (*sql.DB, error) {
 	if err != nil {
 		return db, err
 	}
-	fmt.Printf(QlSchema() + "\n")
 	if _, err = tx.Exec(QlSchema()); err != nil {
 		return db, err
 	}
@@ -413,12 +422,15 @@ func createQlDb() (*sql.DB, error) {
 	return db, nil
 }
 
-func TestQlEngine(t *testing.T) {
-	db, err := createQlDb()
+func TestSqliteEngine(t *testing.T) {
+	db, err := createSqliteDb()
 	if db != nil {
 		defer db.Close()
 	}
 	if err != nil {
 		t.Fatal(err)
 	}
+	cl := clockwork.NewFakeClock()
+	eng := NewSQLEngine(db, testObjFactory{}, cl)
+	testStateMachineAllDevices(t, eng, cl)
 }
