@@ -2,7 +2,7 @@ package gregor
 
 import (
 	"crypto/rand"
-	_ "database/sql"
+	"database/sql"
 	"errors"
 	"fmt"
 	_ "github.com/cznic/ql/driver"
@@ -391,4 +391,34 @@ func testStateMachinePerDevice(t *testing.T, sm StateMachine, fc clockwork.FakeC
 		assertPayloadsInCategory(t, sm, u1, d2, too, c1, []string{"f2"})
 	}
 	assert4(nil)
+}
+
+func createQlDb() (*sql.DB, error) {
+	db, err := sql.Open("ql-mem", "mem.db")
+	if err != nil {
+		return nil, err
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return db, err
+	}
+	fmt.Printf(QlSchema() + "\n")
+	if _, err = tx.Exec(QlSchema()); err != nil {
+		return db, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return db, err
+	}
+	return db, nil
+}
+
+func TestQlEngine(t *testing.T) {
+	db, err := createQlDb()
+	if db != nil {
+		defer db.Close()
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
 }
