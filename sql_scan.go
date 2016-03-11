@@ -3,10 +3,12 @@ package gregor
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 )
 
 var ErrBadScan = errors.New("bad scan of data type")
+var ErrBadString = errors.New("expected either a string or a []byte")
 
 type uidScanner struct {
 	o   ObjFactory
@@ -15,12 +17,23 @@ type uidScanner struct {
 
 func (u uidScanner) UID() UID { return u.uid }
 
-func scanHexToBytes(src interface{}) ([]byte, error) {
-	if s, ok := src.(string); ok {
-		b, err := hex.DecodeString(s)
-		return b, err
+func toString(src interface{}) (string, error) {
+	switch s := src.(type) {
+	case string:
+		return s, nil
+	case []byte:
+		return string(s), nil
+	default:
+		return "", ErrBadString
 	}
-	return nil, ErrBadScan
+}
+
+func scanHexToBytes(src interface{}) ([]byte, error) {
+	s, err := toString(src)
+	if err != nil {
+		return nil, err
+	}
+	return hex.DecodeString(s)
 }
 
 func (u uidScanner) Scan(src interface{}) error {
@@ -62,6 +75,7 @@ type msgIDScanner struct {
 func (m msgIDScanner) MsgID() MsgID { return m.msgID }
 
 func (m msgIDScanner) Scan(src interface{}) error {
+	fmt.Printf("scanning -> %v\n", src)
 	if src == nil {
 		return nil
 	}
@@ -105,15 +119,15 @@ func (c categoryScanner) Scan(src interface{}) error {
 	if src == nil {
 		return nil
 	}
-	if raw, ok := src.(string); ok {
-		var err error
-		c.c, err = c.o.MakeCategory(raw)
-		if err == nil {
-			c.isSet = true
-		}
+	s, err := toString(src)
+	if err != nil {
 		return err
 	}
-	return ErrBadScan
+	c.c, err = c.o.MakeCategory(s)
+	if err == nil {
+		c.isSet = true
+	}
+	return err
 }
 
 func (c categoryScanner) Category() Category { return c.c }
@@ -144,6 +158,7 @@ type timeOrNilScanner struct {
 }
 
 func (t timeOrNilScanner) Scan(src interface{}) error {
+	fmt.Printf("scan %T %v %s\n", src, src, src)
 	if src == nil {
 		return nil
 	}

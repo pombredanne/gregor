@@ -180,10 +180,21 @@ func (t testMsgRange) Category() Category    { return t.c }
 func (t *testSyncMessage) Metadata() Metadata { return (*testMetadata)(t) }
 
 func (t testInbandMessage) Metadata() Metadata                       { return t.m }
-func (t testInbandMessage) Creation() Item                           { return t.i }
-func (t testInbandMessage) Dismissal() Dismissal                     { return t.d }
 func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return t.s }
 func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
+
+func (t testInbandMessage) Dismissal() Dismissal {
+	if t.d == nil {
+		return nil
+	}
+	return t.d
+}
+func (t testInbandMessage) Creation() Item {
+	if t.i == nil {
+		return nil
+	}
+	return t.i
+}
 
 func (t testInbandMessage) Merge(m2 InbandMessage) error {
 	t2, ok := m2.(testInbandMessage)
@@ -289,7 +300,7 @@ func timeToTimeOrOffset(t time.Time) TimeOrOffset {
 
 func newCreation(u UID, m MsgID, d DeviceID, c Category, data string, dtime TimeOrOffset) Message {
 	md := &testMetadata{u: u, m: m, d: d}
-	item := &testItem{m: md, dtime: dtime, payload: testBody(data)}
+	item := &testItem{m: md, dtime: dtime, payload: testBody(data), cat: c}
 	return testMessage{i: &testInbandMessage{m: md, i: item}}
 }
 

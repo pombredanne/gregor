@@ -106,7 +106,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u UID, i Item) error {
 	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
 		hexEnc(u),
 		hexEnc(md.MsgID()),
-		i.Category(),
+		i.Category().String(),
 		i.Body().Bytes(),
 	)
 	qb.TimeOrOffset(i.DTime())
@@ -228,12 +228,17 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 		return err
 	}
 	fmt.Printf("B\n")
-	if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
-		return err
-	}
-	fmt.Printf("C\n")
-	if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
-		return err
+
+	fmt.Printf("m -> %v %v %+v\n", m.Dismissal(), (m.Dismissal() == nil), m)
+
+	if m.Dismissal() != nil {
+		if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
+			return err
+		}
+		fmt.Printf("C\n")
+		if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
+			return err
+		}
 	}
 	fmt.Printf("D\n")
 
@@ -244,16 +249,16 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 }
 
 func (s *SQLEngine) rowToItem(u UID, rows *sql.Rows) (Item, error) {
-	var ctime time.Time
 	deviceID := deviceIDScanner{o: s.objFactory}
 	msgID := msgIDScanner{o: s.objFactory}
 	category := categoryScanner{o: s.objFactory}
 	body := bodyScanner{o: s.objFactory}
 	var dtime timeOrNilScanner
-	if err := rows.Scan(msgID, deviceID, category, dtime, body, &ctime); err != nil {
+	var ctime timeOrNilScanner
+	if err := rows.Scan(msgID, deviceID, category, dtime, body, ctime); err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeItem(u, msgID.MsgID(), deviceID.DeviceID(), ctime, category.Category(), dtime.Time(), body.Body())
+	return s.objFactory.MakeItem(u, msgID.MsgID(), deviceID.DeviceID(), *ctime.Time(), category.Category(), dtime.Time(), body.Body())
 }
 
 func (s *SQLEngine) State(u UID, d DeviceID, t TimeOrOffset) (State, error) {
@@ -287,6 +292,8 @@ func (s *SQLEngine) items(u UID, d DeviceID, t TimeOrOffset, m MsgID) ([]Item, e
 		return nil, err
 	}
 	defer stmt.Close()
+	fmt.Printf("q %q\n", qb.Query())
+	fmt.Printf("args %v\n", qb.Args())
 	rows, err := stmt.Query(qb.Args()...)
 	if err != nil {
 		return nil, err
