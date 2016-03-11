@@ -33,7 +33,7 @@ type testTimeOrOffset struct {
 
 type testMsgRange struct {
 	m *testMetadata
-	e testTimeOrOffset
+	e TimeOrOffset
 	c Category
 }
 
@@ -49,6 +49,8 @@ type testMetadata struct {
 	d DeviceID
 	t TimeOrOffset
 }
+
+type testSyncMessage testMetadata
 
 type testInbandMessage struct {
 	m *testMetadata
@@ -89,13 +91,28 @@ func (f testObjFactory) MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime ti
 	return ret, nil
 }
 func (f testObjFactory) MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error) {
-	return nil, nil
+	md := newTestMetadata(uid, msgid, devid, ctime)
+	return &testDismissal{
+		m: md,
+		ranges: []testMsgRange{
+			testMsgRange{
+				m: md,
+				e: timeToTimeOrOffset(d),
+				c: c,
+			},
+		},
+	}, nil
 }
 func (f testObjFactory) MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (Dismissal, error) {
-	return nil, nil
+	md := newTestMetadata(uid, msgid, devid, ctime)
+	return &testDismissal{
+		m:   md,
+		ids: []MsgID{d},
+	}, nil
 }
 func (f testObjFactory) MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (StateSyncMessage, error) {
-	return nil, nil
+	md := newTestMetadata(uid, msgid, devid, ctime)
+	return (*testSyncMessage)(md), nil
 }
 func (f testObjFactory) MakeState(i []Item) (State, error) {
 	return nil, nil
@@ -140,6 +157,8 @@ func (t *testItem) Metadata() Metadata          { return t.m }
 func (t testMsgRange) Metadata() Metadata    { return t.m }
 func (t testMsgRange) EndTime() TimeOrOffset { return t.e }
 func (t testMsgRange) Category() Category    { return t.c }
+
+func (t *testSyncMessage) Metadata() Metadata { return (*testMetadata)(t) }
 
 func (t testInbandMessage) Metadata() Metadata                       { return t.m }
 func (t testInbandMessage) Creation() Item                           { return t.i }
