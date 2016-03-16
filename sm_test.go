@@ -327,28 +327,49 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	u1 := makeUID()
 	c1 := testCategory("foos")
 	c2 := testCategory("bars")
+
+	// Make an assertion: that there are no items total in the StateMachine,
+	// and no items at in the category 'foos'
 	assert1 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
+
+	// Do the assertion for "now" = nil
 	assert1(nil)
+
+	// Produce a new mesasge, with payload "f1"
 	m1 := makeMsgID()
 	consumeMessage(t, "m1", sm,
 		newCreation(u1, m1, nil, c1, "f1", nil),
 	)
+
+	// Make an assertion: that there is 1 item in the StateMachine,
+	// and 1 item for the category "foos"
 	assert2 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 1)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 1)
 	}
+
+	// Do the assertion for "now" = nil
 	assert2(nil)
+
+	// Produce a new *dismissal* message that dismisses the first message
+	// we added (m1)
 	consumeMessage(t, "d1", sm, newDismissalByIDs(u1, makeMsgID(), nil, []MsgID{m1}))
+
+	// Make an assertion: that there are no items left in the StateMachine
 	assert3 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
 	tm3 := fc.Now()
+
+	// Do the assertion for "now" = nil
 	assert3(nil)
 	fc.Advance(time.Second)
+
+	// Make and consume 3 new messages.
 	consumeMessage(t, "m2", sm,
 		newCreation(u1, makeMsgID(), nil, c1, "f2", nil),
 	)
@@ -358,6 +379,9 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	consumeMessage(t, "m4", sm,
 		newCreation(u1, makeMsgID(), nil, c2, "b1", nil),
 	)
+
+	// Make an assertion: that the items wound up and in the right
+	// categories.
 	assert4 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 3)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 2)
@@ -366,6 +390,8 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	assert4(nil)
 	tm4 := fc.Now()
 	fc.Advance(time.Duration(4) * time.Second)
+
+	// Make an assertion: that the dismissals worked as planned
 	assert5 := func(too TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 1)
@@ -374,6 +400,7 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	}
 	tm5 := fc.Now()
 	assert5(nil)
+
 	// Assert our previous checkpoint still works
 	assert3(timeToTimeOrOffset(tm3))
 	assert4(timeToTimeOrOffset(tm4))
