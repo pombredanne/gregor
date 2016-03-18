@@ -3,6 +3,12 @@ os:
 language: go
 go:
   - 1.5
+services:
+  - mysql
+before_install:
+  - mysql -e "create database IF NOT EXISTS test;" -uroot
+env:
+  - MYSQL_DSN=root:@/test
 notifications:
   slack:
     rooms:
