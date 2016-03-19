@@ -1,6 +1,7 @@
 package gregor
 
 import (
+	context "golang.org/x/net/context"
 	"time"
 )
 
@@ -73,11 +74,11 @@ type OutOfBandMessage interface {
 
 type TimeOrOffset interface {
 	Time() *time.Time
-	Duration() *time.Duration
+	Offset() *time.Duration
 }
 
 type Item interface {
-	Metadata() Metadata
+	MessageWithMetadata
 	DTime() TimeOrOffset
 	NotifyTimes() []TimeOrOffset
 	Body() Body
@@ -85,13 +86,11 @@ type Item interface {
 }
 
 type MsgRange interface {
-	Metadata() Metadata
 	EndTime() TimeOrOffset
 	Category() Category
 }
 
 type Dismissal interface {
-	Metadata() Metadata
 	MsgIDsToDismiss() []MsgID
 	RangesToDismiss() []MsgRange
 }
@@ -119,18 +118,39 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
-	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error)
-	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (Dismissal, error)
-	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (StateSyncMessage, error)
+	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InbandMessage, error)
+	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InbandMessage, error)
+	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InbandMessage, error)
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
 	MakeInbandMessageFromItem(i Item) (InbandMessage, error)
-	MakeInbandMessageFromDismissal(d Dismissal) (InbandMessage, error)
-	MakeInbandMessageFromStateSync(s StateSyncMessage) (InbandMessage, error)
+}
+
+type NetworkInterfaceIncoming interface {
+	ConsumeMessage(c context.Context, m Message) error
+}
+
+type NetworkInterfaceOutgoing interface {
+	BroadcastMessage(c context.Context, m Message) error
+}
+
+type NetworkInterface interface {
+	NetworkInterfaceOutgoing
+	Serve(i NetworkInterfaceIncoming) error
 }
 
 type Server interface {
-	BrodcastInbandMessage(m InbandMessage) error
-	BrodcastOutOfBandMessage(m OutOfBandMessage) error
 	TriggerNotification(m InbandMessage) error
+}
+
+func UIDFromMessage(m Message) UID {
+	if ibm := m.ToInbandMessage(); ibm != nil {
+		if md := ibm.Metadata(); md != nil {
+			return md.UID()
+		}
+	}
+	if oobm := m.ToOutOfBandMessage(); oobm != nil {
+		return oobm.UID()
+	}
+	return nil
 }

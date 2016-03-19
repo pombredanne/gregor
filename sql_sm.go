@@ -383,23 +383,11 @@ func (s *SQLEngine) rowToInbandMessage(u UID, rows *sql.Rows) (InbandMessage, er
 		}
 		return s.objFactory.MakeInbandMessageFromItem(i)
 	case dCategory.IsSet() && dTime.TimeOrNil() != nil:
-		d, err := s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
-		if err != nil {
-			return nil, err
-		}
-		return s.objFactory.MakeInbandMessageFromDismissal(d)
+		return s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
 	case dMsgID.MsgID() != nil:
-		d, err := s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
-		if err != nil {
-			return nil, err
-		}
-		return s.objFactory.MakeInbandMessageFromDismissal(d)
+		return s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
 	case mtype.InbandMsgType() == InbandMsgTypeSync:
-		d, err := s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
-		if err != nil {
-			return nil, err
-		}
-		return s.objFactory.MakeInbandMessageFromStateSync(d)
+		return s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
 	}
 
 	return nil, nil
