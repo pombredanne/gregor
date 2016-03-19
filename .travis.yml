@@ -1,0 +1,26 @@
+os:
+  - linux
+language: go
+go:
+  - 1.6
+dist: trusty
+sudo: required
+addons:
+  apt:
+    packages:
+    - mysql-server-5.6
+    - mysql-client-core-5.6
+    - mysql-client-5.6
+before_install:
+  - mysql -e "create database IF NOT EXISTS test;" -uroot
+env:
+  - MYSQL_DSN=root:@/test
+notifications:
+  slack:
+    rooms:
+      secure: W5hUm0MPWJ3v2VGRAq9fxgroVvqFOkwnbrxllEX3Zadf3e909fwQzm7KEUvSEd9fhsKrdBxPrphCZd1UCq5cXjCkfokKFojnbgnYPKZYgL4M7GWqiURCfIUY7r0gQCDnFzIIANacIbhT8089IkQva8QWCdfX4zVycTKOvMC0msE=
+matrix:
+  - os: osx
+branches:
+  only:
+    - master
