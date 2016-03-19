@@ -2,7 +2,7 @@ os:
   - linux
 language: go
 go:
-  - 1.5
+  - 1.6
 dist: trusty
 sudo: required
 addons:

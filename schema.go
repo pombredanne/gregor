@@ -1,7 +1,5 @@
 package gregor
 
-import ()
-
 var schema = []string{
 
 	`DROP TABLE IF EXISTS dismissals_by_time`,

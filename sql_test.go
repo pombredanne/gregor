@@ -5,8 +5,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jonboulle/clockwork"
 	_ "github.com/mattn/go-sqlite3"
+	"net/url"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -56,19 +56,18 @@ func TestSqliteEngine(t *testing.T) {
 func TestMySQLEngine(t *testing.T) {
 	name := os.Getenv("MYSQL_DSN")
 	if name == "" {
-		t.Skip()
-		return
+		t.Skip("MYSQL_DSN not set")
 	}
 
 	// We need to have parseTime=true as one of our DSN paramenters,
 	// so if it's not there, add it on. This way, in sql_scan, we'll get
 	// time.Time values back from MySQL.
-	if !strings.Contains(name, "parseTime=true") {
-		if !strings.Contains(name, "?") {
-			name = name + "?"
-		}
-		name = name + "parseTime=true"
+	u, err := url.Parse(name)
+	if err != nil {
+		t.Fatalf("couldn't parse MYSQL_DSN: %v", err)
 	}
-
-	testEngine(t, "mysql", name, mysqlTimeWriter{})
+	query := u.Query()
+	query.Set("parseTime", "true")
+	u.RawQuery = query.Encode()
+	testEngine(t, "mysql", u.String(), mysqlTimeWriter{})
 }
