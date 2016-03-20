@@ -1,0 +1,71 @@
+@namespace("gregor.1")
+
+protocol common {
+
+	import idl "github.com/keybase/client/go/protocol" as keybase1;
+
+	record TimeOrOffset {
+		keybase1.Time time_;
+		DurationMsec offset_;
+	}
+
+	record Metadata {
+		UID uid;
+		MsgID msgID_;
+		TimeOrOffset ctime;
+		DeviceID deviceID_;
+		int inbandMsgType_;
+	}
+
+	record InbandMessage {
+		union { null, StateUpdateMessage } stateUpdate;
+		union { null, StateSyncMessage} stateSync;
+	}
+
+	record StateUpdateMessage {
+		Metadata md;
+		union { null, Item } creation_;
+		union { null, Dismissal } dismissal_;
+	}
+
+	record StateSyncMessage {
+		Metadata md;
+	}
+
+	record MsgRange {
+		TimeOrOffset endTime_;
+		Category category_;
+	}
+
+	record Dismissal {
+		array<MsgID> msgIDs;
+		array<MsgRange> ranges;
+	}
+
+	record Item {
+		Category category;
+		TimeOrOffset dtime;
+		array<TimeOrOffset> notifyTimes;
+		Body body;
+	}
+
+	record OutOfBandMessage {
+		UID uid;
+		System system_;
+		Body body_;
+	}
+
+	record Message {
+		union { null, OutOfBandMessage } oobm;
+		union { null, InbandMessage } ibm;
+	}
+
+	@typedef("int64") record DurationMsec {}
+	@typedef("string") record Category {}
+	@typedef("string") record System {}
+	@typedef("keybase1.UID") record UID {}
+	@typedef("bytes") record MsgID {}
+	@typedef("bytes") record DeviceID {}
+	@typedef("bytes") record Body {}
+}
+
