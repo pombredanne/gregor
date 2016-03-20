@@ -39,6 +39,8 @@ func (t TimeOrOffset) Time() *time.Time {
 	return &ret
 }
 
+func (u UID) IsNil() bool { return keybase1.UID(u).IsNil() }
+
 func (t TimeOrOffset) Offset() *time.Duration {
 	if t.Offset_ == 0 {
 		return nil
