@@ -24,7 +24,7 @@ func (m mysqlTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too TimeOrO
 		b.Build("?", *t)
 		return
 	}
-	if d := too.Duration(); d != nil {
+	if d := too.Offset(); d != nil {
 		b.Build("DATE_ADD(")
 		m.Now(b, cl)
 		b.Build(", INTERVAL ? MICROSECOND)", (d.Nanoseconds() / 1000))
@@ -64,7 +64,7 @@ func (m sqliteTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too TimeOr
 		b.Build("?", timeInUnix(*t))
 		return
 	}
-	if d := too.Duration(); d != nil {
+	if d := too.Offset(); d != nil {
 		t := nowTime(cl).Add(*d)
 		b.Build("?", timeInUnix(t))
 		return

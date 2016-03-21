@@ -85,20 +85,20 @@ func (m *msgIDScanner) Scan(src interface{}) error {
 	return err
 }
 
-type inbandMsgTypeScanner struct {
-	t InbandMsgType
+type inBandMsgTypeScanner struct {
+	t InBandMsgType
 }
 
-func (i inbandMsgTypeScanner) InbandMsgType() InbandMsgType { return i.t }
+func (i inBandMsgTypeScanner) InBandMsgType() InBandMsgType { return i.t }
 
-func (i *inbandMsgTypeScanner) Scan(src interface{}) error {
+func (i *inBandMsgTypeScanner) Scan(src interface{}) error {
 	if src == nil {
 		return nil
 	}
 	if raw, ok := src.(int); ok {
-		t := InbandMsgType(raw)
+		t := InBandMsgType(raw)
 		switch t {
-		case InbandMsgTypeUpdate, InbandMsgTypeSync:
+		case InBandMsgTypeUpdate, InBandMsgTypeSync:
 			i.t = t
 		default:
 			return ErrBadScan

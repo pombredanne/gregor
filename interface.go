@@ -1,15 +1,16 @@
 package gregor
 
 import (
+	context "golang.org/x/net/context"
 	"time"
 )
 
-type InbandMsgType int
+type InBandMsgType int
 
 const (
-	InbandMsgTypeNone   InbandMsgType = 0
-	InbandMsgTypeUpdate InbandMsgType = 1
-	InbandMsgTypeSync   InbandMsgType = 2
+	InBandMsgTypeNone   InBandMsgType = 0
+	InBandMsgTypeUpdate InBandMsgType = 1
+	InBandMsgTypeSync   InBandMsgType = 2
 )
 
 type UID interface {
@@ -41,18 +42,18 @@ type Metadata interface {
 	MsgID() MsgID
 	CTime() TimeOrOffset
 	DeviceID() DeviceID
-	InbandMsgType() InbandMsgType
+	InBandMsgType() InBandMsgType
 }
 
 type MessageWithMetadata interface {
 	Metadata() Metadata
 }
 
-type InbandMessage interface {
+type InBandMessage interface {
 	MessageWithMetadata
 	ToStateUpdateMessage() StateUpdateMessage
 	ToStateSyncMessage() StateSyncMessage
-	Merge(m1 InbandMessage) error
+	Merge(m1 InBandMessage) error
 }
 
 type StateUpdateMessage interface {
@@ -73,11 +74,11 @@ type OutOfBandMessage interface {
 
 type TimeOrOffset interface {
 	Time() *time.Time
-	Duration() *time.Duration
+	Offset() *time.Duration
 }
 
 type Item interface {
-	Metadata() Metadata
+	MessageWithMetadata
 	DTime() TimeOrOffset
 	NotifyTimes() []TimeOrOffset
 	Body() Body
@@ -85,13 +86,11 @@ type Item interface {
 }
 
 type MsgRange interface {
-	Metadata() Metadata
 	EndTime() TimeOrOffset
 	Category() Category
 }
 
 type Dismissal interface {
-	Metadata() Metadata
 	MsgIDsToDismiss() []MsgID
 	RangesToDismiss() []MsgRange
 }
@@ -102,14 +101,14 @@ type State interface {
 }
 
 type Message interface {
-	ToInbandMessage() InbandMessage
+	ToInBandMessage() InBandMessage
 	ToOutOfBandMessage() OutOfBandMessage
 }
 
 type StateMachine interface {
 	ConsumeMessage(m Message) error
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
-	InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error)
+	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
 }
 
 type ObjFactory interface {
@@ -119,18 +118,39 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
-	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (Dismissal, error)
-	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (Dismissal, error)
-	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (StateSyncMessage, error)
+	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error)
+	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InBandMessage, error)
+	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error)
 	MakeState(i []Item) (State, error)
-	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
-	MakeInbandMessageFromItem(i Item) (InbandMessage, error)
-	MakeInbandMessageFromDismissal(d Dismissal) (InbandMessage, error)
-	MakeInbandMessageFromStateSync(s StateSyncMessage) (InbandMessage, error)
+	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InBandMsgType) (Metadata, error)
+	MakeInBandMessageFromItem(i Item) (InBandMessage, error)
+}
+
+type NetworkInterfaceIncoming interface {
+	ConsumeMessage(c context.Context, m Message) error
+}
+
+type NetworkInterfaceOutgoing interface {
+	BroadcastMessage(c context.Context, m Message) error
+}
+
+type NetworkInterface interface {
+	NetworkInterfaceOutgoing
+	Serve(i NetworkInterfaceIncoming) error
 }
 
 type Server interface {
-	BrodcastInbandMessage(m InbandMessage) error
-	BrodcastOutOfBandMessage(m OutOfBandMessage) error
-	TriggerNotification(m InbandMessage) error
+	TriggerNotification(m InBandMessage) error
+}
+
+func UIDFromMessage(m Message) UID {
+	if ibm := m.ToInBandMessage(); ibm == nil {
+		return nil
+	} else if md := ibm.Metadata(); md != nil {
+		return md.UID()
+	}
+	if oobm := m.ToOutOfBandMessage(); oobm != nil {
+		return oobm.UID()
+	}
+	return nil
 }

@@ -1,0 +1,6 @@
+
+@namespace("gregor.1")
+
+protocol incoming {
+	void consumeMessage(Message m);
+}
