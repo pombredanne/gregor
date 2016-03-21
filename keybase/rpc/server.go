@@ -72,7 +72,6 @@ func (s *Server) serve() error {
 	return nil
 }
 
-
 func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
 	s.nii = i
 	return s.serve()

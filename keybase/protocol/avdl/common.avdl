@@ -1,20 +1,20 @@
 @namespace("gregor.1")
-
+@go_field_suffix("_")
 protocol common {
 
 	import idl "github.com/keybase/client/go/protocol" as keybase1;
 
 	record TimeOrOffset {
-		keybase1.Time time_;
-		DurationMsec offset_;
+		keybase1.Time time;
+		DurationMsec offset;
 	}
 
 	record Metadata {
 		UID uid;
-		MsgID msgID_;
+		MsgID msgID;
 		TimeOrOffset ctime;
-		DeviceID deviceID_;
-		int inbandMsgType_;
+		DeviceID deviceID;
+		int inbandMsgType;
 	}
 
 	record InbandMessage {
@@ -24,8 +24,8 @@ protocol common {
 
 	record StateUpdateMessage {
 		Metadata md;
-		union { null, Item } creation_;
-		union { null, Dismissal } dismissal_;
+		union { null, Item } creation;
+		union { null, Dismissal } dismissal;
 	}
 
 	record StateSyncMessage {
@@ -33,8 +33,8 @@ protocol common {
 	}
 
 	record MsgRange {
-		TimeOrOffset endTime_;
-		Category category_;
+		TimeOrOffset endTime;
+		Category category;
 	}
 
 	record Dismissal {
@@ -51,8 +51,8 @@ protocol common {
 
 	record OutOfBandMessage {
 		UID uid;
-		System system_;
-		Body body_;
+		System system;
+		Body body;
 	}
 
 	record Message {

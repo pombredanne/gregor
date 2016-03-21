@@ -65,9 +65,9 @@ func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid grego
 		return Metadata{}, e
 	}
 	return Metadata{
-		Uid:            uid2,
+		Uid_:           uid2,
 		MsgID_:         MsgID(msgid.Bytes()),
-		Ctime:          timeToTimeOrOffset(&ctime),
+		Ctime_:         timeToTimeOrOffset(&ctime),
 		DeviceID_:      DeviceID(devid.Bytes()),
 		InbandMsgType_: int(i),
 	}, nil
@@ -75,9 +75,9 @@ func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid grego
 
 func (o ObjFactory) makeItem(c gregor.Category, d *time.Time, b gregor.Body) (Item, error) {
 	return Item{
-		Dtime:    timeToTimeOrOffset(d),
-		Category: Category(c.String()),
-		Body:     Body(b.Bytes()),
+		Dtime_:    timeToTimeOrOffset(d),
+		Category_: Category(c.String()),
+		Body_:     Body(b.Bytes()),
 	}, nil
 }
 
@@ -102,10 +102,10 @@ func (o ObjFactory) MakeDismissalByRange(uid gregor.UID, msgid gregor.MsgID, dev
 		return nil, err
 	}
 	return InbandMessage{
-		StateUpdate: &StateUpdateMessage{
-			Md: md,
+		StateUpdate_: &StateUpdateMessage{
+			Md_: md,
 			Dismissal_: &Dismissal{
-				Ranges: []MsgRange{{
+				Ranges_: []MsgRange{{
 					EndTime_:  timeToTimeOrOffset(&d),
 					Category_: Category(c.String()),
 				}},
@@ -120,10 +120,10 @@ func (o ObjFactory) MakeDismissalByID(uid gregor.UID, msgid gregor.MsgID, devid 
 		return nil, err
 	}
 	return InbandMessage{
-		StateUpdate: &StateUpdateMessage{
-			Md: md,
+		StateUpdate_: &StateUpdateMessage{
+			Md_: md,
 			Dismissal_: &Dismissal{
-				MsgIDs: []MsgID{MsgID(d.Bytes())},
+				MsgIDs_: []MsgID{MsgID(d.Bytes())},
 			},
 		},
 	}, nil
@@ -135,8 +135,8 @@ func (o ObjFactory) MakeStateSyncMessage(uid gregor.UID, msgid gregor.MsgID, dev
 		return nil, err
 	}
 	return InbandMessage{
-		StateSync: &StateSyncMessage{
-			Md: md,
+		StateSync_: &StateSyncMessage{
+			Md_: md,
 		},
 	}, nil
 }
@@ -163,8 +163,8 @@ func (o ObjFactory) MakeInbandMessageFromItem(i gregor.Item) (gregor.InbandMessa
 		return nil, err
 	}
 	return InbandMessage{
-		StateUpdate: &StateUpdateMessage{
-			Md:        *ourItem.md,
+		StateUpdate_: &StateUpdateMessage{
+			Md_:       *ourItem.md,
 			Creation_: ourItem.i,
 		},
 	}, nil

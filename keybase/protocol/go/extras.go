@@ -41,7 +41,7 @@ func (t TimeOrOffset) Offset() *time.Duration {
 }
 
 func (s StateSyncMessage) Metadata() gregor.Metadata {
-	return s.Md
+	return s.Md_
 }
 
 func (m MsgRange) EndTime() gregor.TimeOrOffset {
@@ -54,7 +54,7 @@ func (m MsgRange) Category() gregor.Category {
 
 func (d Dismissal) RangesToDismiss() []gregor.MsgRange {
 	var ret []gregor.MsgRange
-	for _, r := range d.Ranges {
+	for _, r := range d.Ranges_ {
 		ret = append(ret, r)
 	}
 	return ret
@@ -62,7 +62,7 @@ func (d Dismissal) RangesToDismiss() []gregor.MsgRange {
 
 func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	var ret []gregor.MsgID
-	for _, m := range d.MsgIDs {
+	for _, m := range d.MsgIDs_ {
 		ret = append(ret, m)
 	}
 	return ret
@@ -73,25 +73,25 @@ type ItemAndMetadata struct {
 	i  *Item
 }
 
-func (m Metadata) UID() gregor.UID                   { return m.Uid }
+func (m Metadata) UID() gregor.UID                   { return m.Uid_ }
 func (i ItemAndMetadata) Metadata() gregor.Metadata  { return *i.md }
-func (i ItemAndMetadata) Body() gregor.Body          { return i.i.Body }
-func (i ItemAndMetadata) Category() gregor.Category  { return i.i.Category }
-func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.i.Dtime }
+func (i ItemAndMetadata) Body() gregor.Body          { return i.i.Body_ }
+func (i ItemAndMetadata) Category() gregor.Category  { return i.i.Category_ }
+func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.i.Dtime_ }
 func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
 	var ret []gregor.TimeOrOffset
-	for _, t := range i.i.NotifyTimes {
+	for _, t := range i.i.NotifyTimes_ {
 		ret = append(ret, t)
 	}
 	return ret
 }
 
-func (s StateUpdateMessage) Metadata() gregor.Metadata { return s.Md }
+func (s StateUpdateMessage) Metadata() gregor.Metadata { return s.Md_ }
 func (s StateUpdateMessage) Creation() gregor.Item {
 	if s.Creation_ != nil {
 		return nil
 	}
-	return ItemAndMetadata{md: &s.Md, i: s.Creation_}
+	return ItemAndMetadata{md: &s.Md_, i: s.Creation_}
 }
 func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
 	if s.Dismissal_ != nil {
@@ -105,10 +105,10 @@ func (i InbandMessage) Merge(i2 gregor.InbandMessage) error {
 	if !ok {
 		return fmt.Errorf("bad merge; wrong type: %T", i2)
 	}
-	if i.StateSync != nil || t2.StateSync != nil {
+	if i.StateSync_ != nil || t2.StateSync_ != nil {
 		return errors.New("Cannot merge sync messages")
 	}
-	return i.StateUpdate.Merge(t2.StateUpdate)
+	return i.StateUpdate_.Merge(t2.StateUpdate_)
 }
 
 func (s StateUpdateMessage) Merge(s2 *StateUpdateMessage) error {
@@ -121,57 +121,57 @@ func (s StateUpdateMessage) Merge(s2 *StateUpdateMessage) error {
 	if s.Dismissal_ == nil {
 		s.Dismissal_ = s2.Dismissal_
 	} else if s.Dismissal_ != nil {
-		s.Dismissal_.MsgIDs = append(s.Dismissal_.MsgIDs, s2.Dismissal_.MsgIDs...)
-		s.Dismissal_.Ranges = append(s.Dismissal_.Ranges, s2.Dismissal_.Ranges...)
+		s.Dismissal_.MsgIDs_ = append(s.Dismissal_.MsgIDs_, s2.Dismissal_.MsgIDs_...)
+		s.Dismissal_.Ranges_ = append(s.Dismissal_.Ranges_, s2.Dismissal_.Ranges_...)
 	}
 	return nil
 }
 
 func (i InbandMessage) Metadata() gregor.Metadata {
-	if i.StateUpdate != nil {
-		return i.StateUpdate.Md
+	if i.StateUpdate_ != nil {
+		return i.StateUpdate_.Md_
 	}
-	if i.StateSync != nil {
-		return i.StateSync.Md
+	if i.StateSync_ != nil {
+		return i.StateSync_.Md_
 	}
 	return nil
 }
 
 func (i InbandMessage) ToStateSyncMessage() gregor.StateSyncMessage {
-	if i.StateSync == nil {
+	if i.StateSync_ == nil {
 		return nil
 	}
-	return i.StateSync
+	return i.StateSync_
 }
 
 func (i InbandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
-	if i.StateUpdate == nil {
+	if i.StateUpdate_ == nil {
 		return nil
 	}
-	return i.StateUpdate
+	return i.StateUpdate_
 }
 
 func (m Metadata) MsgID() gregor.MsgID                 { return m.MsgID_ }
-func (m Metadata) CTime() gregor.TimeOrOffset          { return m.Ctime }
+func (m Metadata) CTime() gregor.TimeOrOffset          { return m.Ctime_ }
 func (m Metadata) DeviceID() gregor.DeviceID           { return m.DeviceID_ }
 func (m Metadata) InbandMsgType() gregor.InbandMsgType { return gregor.InbandMsgType(m.InbandMsgType_) }
 
 func (o OutOfBandMessage) Body() gregor.Body     { return o.Body_ }
 func (o OutOfBandMessage) System() gregor.System { return o.System_ }
-func (o OutOfBandMessage) UID() gregor.UID       { return o.Uid }
+func (o OutOfBandMessage) UID() gregor.UID       { return o.Uid_ }
 
 func (m Message) ToInbandMessage() gregor.InbandMessage {
-	if m.Ibm == nil {
+	if m.Ibm_ == nil {
 		return nil
 	}
-	return m.Ibm
+	return m.Ibm_
 }
 
 func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
-	if m.Oobm != nil {
+	if m.Oobm_ == nil {
 		return nil
 	}
-	return m.Oobm
+	return m.Oobm_
 }
 
 type State struct {
@@ -187,7 +187,7 @@ func (s State) Items() ([]gregor.Item, error) {
 }
 
 func (i ItemAndMetadata) InCategory(c Category) bool {
-	return i.i.Category.Eq(c)
+	return i.i.Category_.Eq(c)
 }
 
 func (s State) ItemsInCategory(gc gregor.Category) ([]gregor.Item, error) {

@@ -144,10 +144,10 @@ type Server interface {
 }
 
 func UIDFromMessage(m Message) UID {
-	if ibm := m.ToInbandMessage(); ibm != nil {
-		if md := ibm.Metadata(); md != nil {
-			return md.UID()
-		}
+	if ibm := m.ToInbandMessage(); ibm == nil {
+		return nil
+	} else if md := ibm.Metadata(); md != nil {
+		return md.UID()
 	}
 	if oobm := m.ToOutOfBandMessage(); oobm != nil {
 		return oobm.UID()
