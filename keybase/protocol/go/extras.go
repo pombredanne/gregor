@@ -100,8 +100,8 @@ func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
 	return s.Dismissal_
 }
 
-func (i InbandMessage) Merge(i2 gregor.InbandMessage) error {
-	t2, ok := i2.(InbandMessage)
+func (i InBandMessage) Merge(i2 gregor.InBandMessage) error {
+	t2, ok := i2.(InBandMessage)
 	if !ok {
 		return fmt.Errorf("bad merge; wrong type: %T", i2)
 	}
@@ -127,7 +127,7 @@ func (s StateUpdateMessage) Merge(s2 *StateUpdateMessage) error {
 	return nil
 }
 
-func (i InbandMessage) Metadata() gregor.Metadata {
+func (i InBandMessage) Metadata() gregor.Metadata {
 	if i.StateUpdate_ != nil {
 		return i.StateUpdate_.Md_
 	}
@@ -137,14 +137,14 @@ func (i InbandMessage) Metadata() gregor.Metadata {
 	return nil
 }
 
-func (i InbandMessage) ToStateSyncMessage() gregor.StateSyncMessage {
+func (i InBandMessage) ToStateSyncMessage() gregor.StateSyncMessage {
 	if i.StateSync_ == nil {
 		return nil
 	}
 	return i.StateSync_
 }
 
-func (i InbandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
+func (i InBandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
 	if i.StateUpdate_ == nil {
 		return nil
 	}
@@ -154,13 +154,13 @@ func (i InbandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
 func (m Metadata) MsgID() gregor.MsgID                 { return m.MsgID_ }
 func (m Metadata) CTime() gregor.TimeOrOffset          { return m.Ctime_ }
 func (m Metadata) DeviceID() gregor.DeviceID           { return m.DeviceID_ }
-func (m Metadata) InbandMsgType() gregor.InbandMsgType { return gregor.InbandMsgType(m.InbandMsgType_) }
+func (m Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
 
 func (o OutOfBandMessage) Body() gregor.Body     { return o.Body_ }
 func (o OutOfBandMessage) System() gregor.System { return o.System_ }
 func (o OutOfBandMessage) UID() gregor.UID       { return o.Uid_ }
 
-func (m Message) ToInbandMessage() gregor.InbandMessage {
+func (m Message) ToInBandMessage() gregor.InBandMessage {
 	if m.Ibm_ == nil {
 		return nil
 	}
@@ -214,7 +214,7 @@ var _ gregor.MsgRange = MsgRange{}
 var _ gregor.Dismissal = Dismissal{}
 var _ gregor.Item = ItemAndMetadata{}
 var _ gregor.StateUpdateMessage = StateUpdateMessage{}
-var _ gregor.InbandMessage = InbandMessage{}
+var _ gregor.InBandMessage = InBandMessage{}
 var _ gregor.OutOfBandMessage = OutOfBandMessage{}
 var _ gregor.Message = Message{}
 var _ gregor.State = State{}

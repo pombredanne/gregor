@@ -192,11 +192,11 @@ func checkMetadataForInsert(m Metadata) error {
 	return nil
 }
 
-func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata, t InbandMsgType) error {
+func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md Metadata, t InBandMsgType) error {
 	if err := checkMetadataForInsert(md); err != nil {
 		return err
 	}
-	if t != InbandMsgTypeUpdate && t != InbandMsgTypeSync {
+	if t != InBandMsgTypeUpdate && t != InBandMsgTypeSync {
 		return fmt.Errorf("bad metadata: unrecognized msg type")
 	}
 	qb := s.newQueryBuilder()
@@ -209,14 +209,14 @@ func (s *SQLEngine) consumeInbandMessageMetadata(tx *sql.Tx, md Metadata, t Inba
 
 func (s *SQLEngine) ConsumeMessage(m Message) error {
 	switch {
-	case m.ToInbandMessage() != nil:
-		return s.consumeInbandMessage(m.ToInbandMessage())
+	case m.ToInBandMessage() != nil:
+		return s.consumeInBandMessage(m.ToInBandMessage())
 	default:
 		return nil
 	}
 }
 
-func (s *SQLEngine) consumeInbandMessage(m InbandMessage) error {
+func (s *SQLEngine) consumeInBandMessage(m InBandMessage) error {
 	switch {
 	case m.ToStateUpdateMessage() != nil:
 		return s.consumeStateUpdateMessage(m.ToStateUpdateMessage())
@@ -231,7 +231,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m StateUpdateMessage) error {
 		return err
 	}
 	md := m.Metadata()
-	if err := s.consumeInbandMessageMetadata(tx, md, InbandMsgTypeUpdate); err != nil {
+	if err := s.consumeInBandMessageMetadata(tx, md, InBandMsgTypeUpdate); err != nil {
 		return err
 	}
 	if m.Creation() != nil {
@@ -324,14 +324,14 @@ func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (Metadata, error) {
 	uid := uidScanner{o: s.objFactory}
 	deviceID := deviceIDScanner{o: s.objFactory}
 	msgID := msgIDScanner{o: s.objFactory}
-	inbandMsgType := inbandMsgTypeScanner{}
-	if err := rows.Scan(&uid, &msgID, &ctime, &deviceID, &inbandMsgType); err != nil {
+	inBandMsgType := inBandMsgTypeScanner{}
+	if err := rows.Scan(&uid, &msgID, &ctime, &deviceID, &inBandMsgType); err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeMetadata(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime, inbandMsgType.InbandMsgType())
+	return s.objFactory.MakeMetadata(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime, inBandMsgType.InBandMsgType())
 }
 
-func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, error) {
+func (s *SQLEngine) inBandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, error) {
 	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
 	qb := s.newQueryBuilder()
 	qb.Build(qry, hexEnc(u))
@@ -360,11 +360,11 @@ func (s *SQLEngine) inbandMetadataSince(u UID, t TimeOrOffset) ([]Metadata, erro
 	return ret, nil
 }
 
-func (s *SQLEngine) rowToInbandMessage(u UID, rows *sql.Rows) (InbandMessage, error) {
+func (s *SQLEngine) rowToInBandMessage(u UID, rows *sql.Rows) (InBandMessage, error) {
 	msgID := msgIDScanner{o: s.objFactory}
 	devID := deviceIDScanner{o: s.objFactory}
 	var ctime timeScanner
-	var mtype inbandMsgTypeScanner
+	var mtype inBandMsgTypeScanner
 	category := categoryScanner{o: s.objFactory}
 	body := bodyScanner{o: s.objFactory}
 	dCategory := categoryScanner{o: s.objFactory}
@@ -381,19 +381,19 @@ func (s *SQLEngine) rowToInbandMessage(u UID, rows *sql.Rows) (InbandMessage, er
 		if err != nil {
 			return nil, err
 		}
-		return s.objFactory.MakeInbandMessageFromItem(i)
+		return s.objFactory.MakeInBandMessageFromItem(i)
 	case dCategory.IsSet() && dTime.TimeOrNil() != nil:
 		return s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
 	case dMsgID.MsgID() != nil:
 		return s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
-	case mtype.InbandMsgType() == InbandMsgTypeSync:
+	case mtype.InBandMsgType() == InBandMsgTypeSync:
 		return s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
 	}
 
 	return nil, nil
 }
 
-func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error) {
+func (s *SQLEngine) InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
                i.category, i.body,
                dt.category, dt.dtime,
@@ -424,10 +424,10 @@ func (s *SQLEngine) InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]In
 	if err != nil {
 		return nil, err
 	}
-	var ret []InbandMessage
-	lookup := make(map[string]InbandMessage)
+	var ret []InBandMessage
+	lookup := make(map[string]InBandMessage)
 	for rows.Next() {
-		ibm, err := s.rowToInbandMessage(u, rows)
+		ibm, err := s.rowToInBandMessage(u, rows)
 		if err != nil {
 			return nil, err
 		}

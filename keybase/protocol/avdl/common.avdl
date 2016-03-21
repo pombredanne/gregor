@@ -14,10 +14,10 @@ protocol common {
 		MsgID msgID;
 		TimeOrOffset ctime;
 		DeviceID deviceID;
-		int inbandMsgType;
+		int inBandMsgType;
 	}
 
-	record InbandMessage {
+	record InBandMessage {
 		union { null, StateUpdateMessage } stateUpdate;
 		union { null, StateSyncMessage} stateSync;
 	}
@@ -57,7 +57,7 @@ protocol common {
 
 	record Message {
 		union { null, OutOfBandMessage } oobm;
-		union { null, InbandMessage } ibm;
+		union { null, InBandMessage } ibm;
 	}
 
 	@typedef("int64") record DurationMsec {}

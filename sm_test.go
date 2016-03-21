@@ -48,7 +48,7 @@ type testMetadata struct {
 
 type testSyncMessage testMetadata
 
-type testInbandMessage struct {
+type testInBandMessage struct {
 	m *testMetadata
 	i *testItem
 	d *testDismissal
@@ -56,7 +56,7 @@ type testInbandMessage struct {
 }
 
 type testMessage struct {
-	i *testInbandMessage
+	i *testInBandMessage
 }
 
 type testObjFactory struct{}
@@ -88,7 +88,7 @@ func (f testObjFactory) MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime ti
 	}
 	return ret, nil
 }
-func (f testObjFactory) MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InbandMessage, error) {
+func (f testObjFactory) MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
 	td := &testDismissal{
 		ranges: []testMsgRange{
@@ -98,37 +98,37 @@ func (f testObjFactory) MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceI
 			},
 		},
 	}
-	return &testInbandMessage{m: md, d: td}, nil
+	return &testInBandMessage{m: md, d: td}, nil
 }
 
-func (f testObjFactory) MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InbandMessage, error) {
+func (f testObjFactory) MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
 	td := &testDismissal{
 		ids: []MsgID{d},
 	}
-	return &testInbandMessage{m: md, d: td}, nil
+	return &testInBandMessage{m: md, d: td}, nil
 }
 
-func (f testObjFactory) MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InbandMessage, error) {
+func (f testObjFactory) MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
-	return &testInbandMessage{m: md, s: (*testSyncMessage)(md)}, nil
+	return &testInBandMessage{m: md, s: (*testSyncMessage)(md)}, nil
 }
 
 func (f testObjFactory) MakeState(i []Item) (State, error) {
 	return testState(i), nil
 }
-func (f testObjFactory) MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error) {
+func (f testObjFactory) MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InBandMsgType) (Metadata, error) {
 	return newTestMetadata(uid, msgid, devid, ctime), nil
 }
 
 var errBadType = errors.New("bad type in cast")
 
-func (f testObjFactory) MakeInbandMessageFromItem(i Item) (InbandMessage, error) {
+func (f testObjFactory) MakeInBandMessageFromItem(i Item) (InBandMessage, error) {
 	ti, ok := i.(*testItem)
 	if !ok {
 		return nil, errBadType
 	}
-	return &testInbandMessage{m: ti.m, i: ti}, nil
+	return &testInBandMessage{m: ti.m, i: ti}, nil
 }
 
 func newTestMetadata(u UID, msgid MsgID, devid DeviceID, ctime time.Time) *testMetadata {
@@ -147,7 +147,7 @@ func (t *testMetadata) MsgID() MsgID                 { return t.m }
 func (t *testMetadata) CTime() TimeOrOffset          { return t.t }
 func (t *testMetadata) DeviceID() DeviceID           { return t.d }
 func (t *testMetadata) UID() UID                     { return t.u }
-func (t *testMetadata) InbandMsgType() InbandMsgType { return InbandMsgTypeUpdate }
+func (t *testMetadata) InBandMsgType() InBandMsgType { return InBandMsgTypeUpdate }
 
 func (t *testItem) DTime() TimeOrOffset         { return t.dtime }
 func (t *testItem) NotifyTimes() []TimeOrOffset { return t.nTimes }
@@ -160,25 +160,25 @@ func (t testMsgRange) Category() Category    { return t.c }
 
 func (t *testSyncMessage) Metadata() Metadata { return (*testMetadata)(t) }
 
-func (t testInbandMessage) Metadata() Metadata                       { return t.m }
-func (t testInbandMessage) ToStateSyncMessage() StateSyncMessage     { return t.s }
-func (t testInbandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
+func (t testInBandMessage) Metadata() Metadata                       { return t.m }
+func (t testInBandMessage) ToStateSyncMessage() StateSyncMessage     { return t.s }
+func (t testInBandMessage) ToStateUpdateMessage() StateUpdateMessage { return t }
 
-func (t testInbandMessage) Dismissal() Dismissal {
+func (t testInBandMessage) Dismissal() Dismissal {
 	if t.d == nil {
 		return nil
 	}
 	return t.d
 }
-func (t testInbandMessage) Creation() Item {
+func (t testInBandMessage) Creation() Item {
 	if t.i == nil {
 		return nil
 	}
 	return t.i
 }
 
-func (t testInbandMessage) Merge(m2 InbandMessage) error {
-	t2, ok := m2.(testInbandMessage)
+func (t testInBandMessage) Merge(m2 InBandMessage) error {
+	t2, ok := m2.(testInBandMessage)
 	if !ok {
 		return fmt.Errorf("bad merge; wrong type: %T", m2)
 	}
@@ -207,7 +207,7 @@ func (t testDeviceID) Bytes() []byte              { return t }
 func (t testCategory) String() string             { return string(t) }
 func (t testSystem) String() string               { return string(t) }
 
-func (m testMessage) ToInbandMessage() InbandMessage       { return m.i }
+func (m testMessage) ToInBandMessage() InBandMessage       { return m.i }
 func (m testMessage) ToOutOfBandMessage() OutOfBandMessage { return nil }
 
 func (t *testDismissal) RangesToDismiss() []MsgRange {
@@ -233,7 +233,7 @@ func (t testState) ItemsInCategory(c Category) ([]Item, error) {
 }
 
 var _ Item = (*testItem)(nil)
-var _ InbandMessage = testInbandMessage{}
+var _ InBandMessage = testInBandMessage{}
 
 func assertNItems(t *testing.T, sm StateMachine, u UID, d DeviceID, too TimeOrOffset, n int) {
 	state, err := sm.State(u, d, too)
@@ -281,20 +281,20 @@ func timeToTimeOrOffset(t time.Time) TimeOrOffset {
 func newCreation(u UID, m MsgID, d DeviceID, c Category, data string, dtime TimeOrOffset) Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	item := &testItem{m: md, dtime: dtime, body: testBody(data), cat: c}
-	return testMessage{i: &testInbandMessage{m: md, i: item}}
+	return testMessage{i: &testInBandMessage{m: md, i: item}}
 }
 
 func newDismissalByIDs(u UID, m MsgID, d DeviceID, ids []MsgID) Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	dismissal := &testDismissal{ids: ids}
-	ret := testMessage{i: &testInbandMessage{m: md, d: dismissal}}
+	ret := testMessage{i: &testInBandMessage{m: md, d: dismissal}}
 	return ret
 }
 
 func newDismissalByCategory(u UID, m MsgID, d DeviceID, c Category, e TimeOrOffset) Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	dismissal := &testDismissal{ranges: []testMsgRange{{c: c, e: e}}}
-	ret := testMessage{i: &testInbandMessage{m: md, d: dismissal}}
+	ret := testMessage{i: &testInBandMessage{m: md, d: dismissal}}
 	return ret
 }
 
@@ -410,8 +410,8 @@ func testStateMachineAllDevices(t *testing.T, sm StateMachine, fc clockwork.Fake
 	// We make an optimization that we don't bother to return messages
 	// that have since expired or been dismissed. So we expect the
 	// two undismissed/unexpired messages above, and the two dismissals themselves.
-	msgs, err := sm.InbandMessagesSince(u1, nil, timeToTimeOrOffset(t0))
-	require.Nil(t, err, "no error from InbandMessagesSince")
+	msgs, err := sm.InBandMessagesSince(u1, nil, timeToTimeOrOffset(t0))
+	require.Nil(t, err, "no error from InBandMessagesSince")
 	require.Equal(t, 4, len(msgs), "expected 4 messages")
 	msgIDsToDismiss := msgs[0].ToStateUpdateMessage().Dismissal().MsgIDsToDismiss()
 	require.Equal(t, 1, len(msgIDsToDismiss), "only 1 msgID to dismiss")

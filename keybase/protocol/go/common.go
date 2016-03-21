@@ -18,10 +18,10 @@ type Metadata struct {
 	MsgID_         MsgID        `codec:"msgID" json:"msgID"`
 	Ctime_         TimeOrOffset `codec:"ctime" json:"ctime"`
 	DeviceID_      DeviceID     `codec:"deviceID" json:"deviceID"`
-	InbandMsgType_ int          `codec:"inbandMsgType" json:"inbandMsgType"`
+	InBandMsgType_ int          `codec:"inBandMsgType" json:"inBandMsgType"`
 }
 
-type InbandMessage struct {
+type InBandMessage struct {
 	StateUpdate_ *StateUpdateMessage `codec:"stateUpdate,omitempty" json:"stateUpdate,omitempty"`
 	StateSync_   *StateSyncMessage   `codec:"stateSync,omitempty" json:"stateSync,omitempty"`
 }
@@ -61,7 +61,7 @@ type OutOfBandMessage struct {
 
 type Message struct {
 	Oobm_ *OutOfBandMessage `codec:"oobm,omitempty" json:"oobm,omitempty"`
-	Ibm_  *InbandMessage    `codec:"ibm,omitempty" json:"ibm,omitempty"`
+	Ibm_  *InBandMessage    `codec:"ibm,omitempty" json:"ibm,omitempty"`
 }
 
 type DurationMsec int64

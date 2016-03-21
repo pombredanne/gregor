@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-type InbandMsgType int
+type InBandMsgType int
 
 const (
-	InbandMsgTypeNone   InbandMsgType = 0
-	InbandMsgTypeUpdate InbandMsgType = 1
-	InbandMsgTypeSync   InbandMsgType = 2
+	InBandMsgTypeNone   InBandMsgType = 0
+	InBandMsgTypeUpdate InBandMsgType = 1
+	InBandMsgTypeSync   InBandMsgType = 2
 )
 
 type UID interface {
@@ -42,18 +42,18 @@ type Metadata interface {
 	MsgID() MsgID
 	CTime() TimeOrOffset
 	DeviceID() DeviceID
-	InbandMsgType() InbandMsgType
+	InBandMsgType() InBandMsgType
 }
 
 type MessageWithMetadata interface {
 	Metadata() Metadata
 }
 
-type InbandMessage interface {
+type InBandMessage interface {
 	MessageWithMetadata
 	ToStateUpdateMessage() StateUpdateMessage
 	ToStateSyncMessage() StateSyncMessage
-	Merge(m1 InbandMessage) error
+	Merge(m1 InBandMessage) error
 }
 
 type StateUpdateMessage interface {
@@ -101,14 +101,14 @@ type State interface {
 }
 
 type Message interface {
-	ToInbandMessage() InbandMessage
+	ToInBandMessage() InBandMessage
 	ToOutOfBandMessage() OutOfBandMessage
 }
 
 type StateMachine interface {
 	ConsumeMessage(m Message) error
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
-	InbandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InbandMessage, error)
+	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
 }
 
 type ObjFactory interface {
@@ -118,12 +118,12 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
-	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InbandMessage, error)
-	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InbandMessage, error)
-	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InbandMessage, error)
+	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error)
+	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InBandMessage, error)
+	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error)
 	MakeState(i []Item) (State, error)
-	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InbandMsgType) (Metadata, error)
-	MakeInbandMessageFromItem(i Item) (InbandMessage, error)
+	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InBandMsgType) (Metadata, error)
+	MakeInBandMessageFromItem(i Item) (InBandMessage, error)
 }
 
 type NetworkInterfaceIncoming interface {
@@ -140,11 +140,11 @@ type NetworkInterface interface {
 }
 
 type Server interface {
-	TriggerNotification(m InbandMessage) error
+	TriggerNotification(m InBandMessage) error
 }
 
 func UIDFromMessage(m Message) UID {
-	if ibm := m.ToInbandMessage(); ibm == nil {
+	if ibm := m.ToInBandMessage(); ibm == nil {
 		return nil
 	} else if md := ibm.Metadata(); md != nil {
 		return md.UID()
