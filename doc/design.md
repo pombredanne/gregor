@@ -283,7 +283,7 @@ This example is almost as above. The notification contains the invite code
 that you need to send to Bob somehow.  It also might result in an automatic
 email notification too.
 
-### Alice Just Deleted /keybase/private/alice,max from her favorites
+#### Alice Just Deleted /keybase/private/alice,max from her favorites
 
 1. Let’s say Alice deletes this favorite on device A.
 1. Regular removal path is followed. The service sends a POST to `kbfs/favorite/delete.json`.

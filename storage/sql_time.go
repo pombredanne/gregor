@@ -1,6 +1,7 @@
-package gregor
+package storage
 
 import (
+	base "github.com/keybase/gregor"
 	"github.com/jonboulle/clockwork"
 	"time"
 )
@@ -15,7 +16,7 @@ func (m mysqlTimeWriter) Now(b builder, cl clockwork.Clock) {
 	}
 }
 
-func (m mysqlTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too TimeOrOffset) {
+func (m mysqlTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too base.TimeOrOffset) {
 	if too == nil {
 		b.Build("NULL")
 		return
@@ -55,7 +56,7 @@ func (m sqliteTimeWriter) Now(b builder, cl clockwork.Clock) {
 	b.Build("?", nowUnix(cl))
 }
 
-func (m sqliteTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too TimeOrOffset) {
+func (m sqliteTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too base.TimeOrOffset) {
 	if too == nil {
 		b.Build("NULL")
 		return

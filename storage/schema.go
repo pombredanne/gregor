@@ -1,4 +1,4 @@
-package gregor
+package storage
 
 var schema = []string{
 

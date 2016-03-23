@@ -1,10 +1,11 @@
-package gregor
+package storage
 
 import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jonboulle/clockwork"
 	_ "github.com/mattn/go-sqlite3"
+	test "github.com/keybase/gregor/test"
 	"net/url"
 	"os"
 	"testing"
@@ -41,9 +42,9 @@ func testEngine(t *testing.T, engine string, name string, w sqlTimeWriter) {
 		t.Fatal(err)
 	}
 	cl := clockwork.NewFakeClock()
-	eng := NewSQLEngine(db, testObjFactory{}, w, cl)
-	testStateMachineAllDevices(t, eng, cl)
-	testStateMachinePerDevice(t, eng, cl)
+	eng := NewSQLEngine(db, test.TestObjFactory{}, w, cl)
+	test.TestStateMachineAllDevices(t, eng, cl)
+	test.TestStateMachinePerDevice(t, eng, cl)
 }
 
 func TestSqliteEngine(t *testing.T) {

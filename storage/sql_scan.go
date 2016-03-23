@@ -1,6 +1,7 @@
-package gregor
+package storage
 
 import (
+	base "github.com/keybase/gregor"
 	"encoding/hex"
 	"errors"
 	"time"
@@ -10,11 +11,11 @@ var ErrBadScan = errors.New("bad scan of data type")
 var ErrBadString = errors.New("expected either a string or a []byte")
 
 type uidScanner struct {
-	o   ObjFactory
-	uid UID
+	o   base.ObjFactory
+	uid base.UID
 }
 
-func (u uidScanner) UID() UID { return u.uid }
+func (u uidScanner) UID() base.UID { return u.uid }
 
 func toString(src interface{}) (string, error) {
 	switch s := src.(type) {
@@ -48,11 +49,11 @@ func (u *uidScanner) Scan(src interface{}) error {
 }
 
 type deviceIDScanner struct {
-	o        ObjFactory
-	deviceID DeviceID
+	o        base.ObjFactory
+	deviceID base.DeviceID
 }
 
-func (d deviceIDScanner) DeviceID() DeviceID { return d.deviceID }
+func (d deviceIDScanner) DeviceID() base.DeviceID { return d.deviceID }
 
 func (d *deviceIDScanner) Scan(src interface{}) error {
 	if src == nil {
@@ -67,11 +68,11 @@ func (d *deviceIDScanner) Scan(src interface{}) error {
 }
 
 type msgIDScanner struct {
-	o     ObjFactory
-	msgID MsgID
+	o     base.ObjFactory
+	msgID base.MsgID
 }
 
-func (m msgIDScanner) MsgID() MsgID { return m.msgID }
+func (m msgIDScanner) MsgID() base.MsgID { return m.msgID }
 
 func (m *msgIDScanner) Scan(src interface{}) error {
 	if src == nil {
@@ -86,19 +87,19 @@ func (m *msgIDScanner) Scan(src interface{}) error {
 }
 
 type inBandMsgTypeScanner struct {
-	t InBandMsgType
+	t base.InBandMsgType
 }
 
-func (i inBandMsgTypeScanner) InBandMsgType() InBandMsgType { return i.t }
+func (i inBandMsgTypeScanner) InBandMsgType() base.InBandMsgType { return i.t }
 
 func (i *inBandMsgTypeScanner) Scan(src interface{}) error {
 	if src == nil {
 		return nil
 	}
 	if raw, ok := src.(int); ok {
-		t := InBandMsgType(raw)
+		t := base.InBandMsgType(raw)
 		switch t {
-		case InBandMsgTypeUpdate, InBandMsgTypeSync:
+		case base.InBandMsgTypeUpdate, base.InBandMsgTypeSync:
 			i.t = t
 		default:
 			return ErrBadScan
@@ -108,8 +109,8 @@ func (i *inBandMsgTypeScanner) Scan(src interface{}) error {
 }
 
 type categoryScanner struct {
-	o     ObjFactory
-	c     Category
+	o     base.ObjFactory
+	c     base.Category
 	isSet bool
 }
 
@@ -128,15 +129,15 @@ func (c *categoryScanner) Scan(src interface{}) error {
 	return err
 }
 
-func (c categoryScanner) Category() Category {
+func (c categoryScanner) Category() base.Category {
 	return c.c
 }
 
 func (c categoryScanner) IsSet() bool { return c.isSet }
 
 type bodyScanner struct {
-	o ObjFactory
-	b Body
+	o base.ObjFactory
+	b base.Body
 }
 
 func (b *bodyScanner) Scan(src interface{}) error {
@@ -151,7 +152,7 @@ func (b *bodyScanner) Scan(src interface{}) error {
 	return ErrBadScan
 }
 
-func (b bodyScanner) Body() Body { return b.b }
+func (b bodyScanner) Body() base.Body { return b.b }
 
 type timeScanner struct {
 	t time.Time
