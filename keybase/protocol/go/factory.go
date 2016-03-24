@@ -32,22 +32,6 @@ func castItem(i gregor.Item) (ItemAndMetadata, error) {
 	return ret, nil
 }
 
-func castMsgID(msgid gregor.MsgID, e *error) MsgID {
-	ret, ok := msgid.(MsgID)
-	if !ok {
-		*e = fmt.Errorf("Bad MsgID; wrong type")
-	}
-	return ret
-}
-
-func castDeviceID(d gregor.DeviceID, e *error) DeviceID {
-	ret, ok := d.(DeviceID)
-	if !ok {
-		*e = fmt.Errorf("Bad MsgID; wrong type")
-	}
-	return ret
-}
-
 func timeToTimeOrOffset(timeIn *time.Time) TimeOrOffset {
 	var timeOut keybase1.Time
 	if timeIn != nil && !timeIn.IsZero() {
