@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jonboulle/clockwork"
+	gregor "github.com/keybase/gregor"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
-	gregor "github.com/keybase/gregor"
 )
 
 type testUID []byte
@@ -251,15 +251,17 @@ func assertNItemsInCategory(t *testing.T, sm gregor.StateMachine, u gregor.UID, 
 	require.Nil(t, err, "no error from ItemsInCategory()")
 	require.Equal(t, n, len(it), "wrong number of items")
 }
-func assertBodiesInCategory(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, c gregor.Category, v []string) {
+func assertBodiesInCategory(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, c gregor.Category, expected []string) {
 	state, err := sm.State(u, d, too)
 	require.Nil(t, err, "no error from State()")
 	it, err := state.ItemsInCategory(c)
 	require.Nil(t, err, "no error from ItemsInCategory()")
-	require.Equal(t, len(v), len(it), "wrong number of items")
-	for i, p := range it {
-		require.Equal(t, []byte(v[i]), p.Body().Bytes())
+	require.Len(t, expected, len(it), "wrong number of items")
+	actual := make([]string, 0)
+	for _, a := range it {
+		actual = append(actual, string(a.Body().Bytes()))
 	}
+	require.Equal(t, expected, actual, "the right values in the store")
 }
 
 func randBytes(n int) []byte {
@@ -463,4 +465,18 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwor
 		assertBodiesInCategory(t, sm, u1, d2, too, c1, []string{"f2"})
 	}
 	assert4(nil)
+
+	// Make sure that "global" notifications are all picked-up if querying per-device;
+	// Advance the clock so that they will be ordered consistently.
+	m3 := makeMsgID()
+	fc.Advance(time.Duration(1) * time.Second)
+	sm.ConsumeMessage(
+		newCreation(u1, m3, nil, c1, "f3", nil),
+	)
+	assert5 := func(too gregor.TimeOrOffset) {
+		assertNItems(t, sm, u1, nil, too, 2)
+		assertBodiesInCategory(t, sm, u1, d1, too, c1, []string{"f3"})
+		assertBodiesInCategory(t, sm, u1, d2, too, c1, []string{"f2", "f3"})
+	}
+	assert5(nil)
 }
