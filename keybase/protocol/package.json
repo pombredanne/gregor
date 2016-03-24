@@ -16,6 +16,6 @@
   },
   "homepage": "https://github.com/keybase/gregor-keybase",
   "dependencies": {
-    "avdl-compiler": "^1.2.0"
+    "avdl-compiler": "^1.3.2"
   }
 }

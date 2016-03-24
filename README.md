@@ -6,47 +6,17 @@
 Gregor is a simple system for consuming, persisting, and broadcasting
 notifications to a collection clients for a user.
 
-## Architecture
+## Documents
 
-```
-                                            ┌──────────────────────────────────────────────┐    
-                                            │                                              │    
-                                            ▼                                              │    
-              ┌──────────────────────────────────────────────────────────┐                 │    
-              │                             │                    Server  │                 │    
-              │                             │                            │                 │    
-              │       ┌─────────────────────┘                            │                 │    
-              │       │                       ┌───────────────────┐      │                 │    
-              │       ▼                       │                   │      │                      
-              │  ┌─────────┐  Consume         │    SQL Backend    │      │   Inject new message 
-              │  │ Message │─────────────────▶│  (StateMachine)   │      │                      
-              │  └─────────┘                  │                   │      │                 │    
-              │       │                       └───────────────────┘      │                 │    
-              │       │                                                  │                 │    
-              │       │(copy)                                            │                 │    
-              │       │                       ┌───────────────────┐      │                 │    
-              │       ▼                       │                   │      │                 │    
-              │  ┌─────────┐  Consume         │    Broadcaster    │      │                 │    
-              │  │ Message │─────────────────▶│  (StateMachine)   │      │                 │    
-              │  └─────────┘                  │                   │      │                 │    
-              │                               └───────────────────┘      │                 │    
-              │                                         │                │                 │    
-              └─────────────────────────────────────────┼────────────────┘                 │    
-                                                        │                                  │    
-                                                        │                                  │    
-                                                        │                                  │    
-          ┌─────────────────────┬──────────────────────┬┴─────────────────────┐            │    
-          │                     │                      │                      │            │    
-          │                     │                      │                      │            │    
-          │Consume              │Consume               │Consume        Consume│            │    
-          │                     │                      │                      │            │    
-          ▼                     ▼                      ▼                      ▼            │    
-┌───────────────────┐ ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐  │    
-│                   │ │                   │  │                   │  │                   │  │    
-│   Client Store    │ │   Client Store    │  │   Client Store    │  │   Client Store    │  │    
-│  (StateMachine)   │ │  (StateMachine)   │  │  (StateMachine)   │  │  (StateMachine)   │──┘    
-│                   │ │                   │  │                   │  │                   │       
-└─────────┬─────────┤ └─────────┬─────────┤  └─────────┬─────────┤  └─────────┬─────────┤       
-          │device 1 │           │device 2 │            │device 3 │            │device 4 │       
-          └─────────┘           └─────────┘            └─────────┘            └─────────┘       
-```
+  * [Design](doc/design.md)
+  * [Architecture](doc/arch.md)
+  * [Code Organization](doc/code.md)
+
+## Repository Layout
+
+  * `.` — the top level interface to all major Gregor objects.  Right now, it just contains an interface.
+  * [`storage/`](storage/) — storage engines for persisting Gregor objects. Right now, only SQL is implemented.
+  * [`test/`](test/) — Test code that is used throughout
+  * [`keybase/`](keybase/) — Keybase-specific code that uses Keybase protocols.  Eventually we might fork this out into a different repo, but it's easiest to leave it in now for interating.
+    * [`keybase/protocol/go`](keybase/protocol/go/) — Keybase-flavored AVDL-generated data types that meet the high-level [Gregor interface](./interface.go).
+    * [`keybase/rpc/`](keybase/rpc/) — Code for managing and routing RPCs.
