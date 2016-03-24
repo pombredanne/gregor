@@ -105,18 +105,34 @@ type Message interface {
 	ToOutOfBandMessage() OutOfBandMessage
 }
 
-type StateMachine interface {
+// MessageConsumer consumes state update messages. It's half of
+// the state machine protocol
+type MessageConsumer interface {
 	// ConsumeMessage is called on a new incoming message to mutate the state
 	// of the state machine. Of course messages can be "inband" which actually
 	// perform state mutations, or might be "out-of-band" that just use the
 	// Gregor broadcast mechanism to make sure that all clients get the
 	// notification.
 	ConsumeMessage(m Message) error
+}
+
+// StateMachine is the central interface of the Gregor system. Various parts of the
+// server and client infrastructure will implement various parts of this interface,
+// to ensure that the state machine can be replicated, and that it can be queried.
+type StateMachine interface {
+
+	MessageConsumer
 
 	// State returns the state for the user u on device d at time t.
 	// d can be nil, in which case the global state (across all devices)
-	// is returned.
+	// is returned. If t is nil, then use Now, otherwise, return the state
+	// at the given time.
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
+
+	// InBandMessagesSince returns all messages since the given time
+	// for the user u on device d.  If d is nil, then we'll return
+	// all messages across all devices.  If d is a device, then we'll
+	// return global messages and per-device messages for that device.
 	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
 }
 
