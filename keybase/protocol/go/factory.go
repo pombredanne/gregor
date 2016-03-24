@@ -10,9 +10,11 @@ import (
 
 type ObjFactory struct{}
 
-func (o ObjFactory) MakeUID(b []byte) (gregor.UID, error)           { return UID(hex.EncodeToString(b)), nil }
-func (o ObjFactory) MakeMsgID(b []byte) (gregor.MsgID, error)       { return MsgID(b), nil }
-func (o ObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) { return DeviceID(b), nil }
+func (o ObjFactory) MakeUID(b []byte) (gregor.UID, error)     { return UID(hex.EncodeToString(b)), nil }
+func (o ObjFactory) MakeMsgID(b []byte) (gregor.MsgID, error) { return MsgID(b), nil }
+func (o ObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) {
+	return DeviceID(hex.EncodeToString(b)), nil
+}
 func (o ObjFactory) MakeBody(b []byte) (gregor.Body, error)         { return Body(b), nil }
 func (o ObjFactory) MakeCategory(s string) (gregor.Category, error) { return Category(s), nil }
 
@@ -20,6 +22,14 @@ func castUID(uid gregor.UID) (UID, error) {
 	ret, ok := uid.(UID)
 	if !ok {
 		return UID(""), fmt.Errorf("Bad UID; wrong type")
+	}
+	return ret, nil
+}
+
+func castDeviceID(d gregor.DeviceID) (DeviceID, error) {
+	ret, ok := d.(DeviceID)
+	if !ok {
+		return DeviceID(""), fmt.Errorf("Bad Device ID; wrong type")
 	}
 	return ret, nil
 }
@@ -48,11 +58,16 @@ func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid grego
 	if e != nil {
 		return Metadata{}, e
 	}
+	devid2, e := castDeviceID(devid)
+	if e != nil {
+		return Metadata{}, e
+	}
+
 	return Metadata{
 		Uid_:           uid2,
 		MsgID_:         MsgID(msgid.Bytes()),
 		Ctime_:         timeToTimeOrOffset(&ctime),
-		DeviceID_:      DeviceID(devid.Bytes()),
+		DeviceID_:      devid2,
 		InBandMsgType_: int(i),
 	}, nil
 }

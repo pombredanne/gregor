@@ -65,7 +65,7 @@ protocol common {
 	@typedef("string") record System {}
 	@typedef("keybase1.UID") record UID {}
 	@typedef("bytes") record MsgID {}
-	@typedef("bytes") record DeviceID {}
+	@typedef("keybase1.DeviceID") record DeviceID {}
 	@typedef("bytes") record Body {}
 }
 

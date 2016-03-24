@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	keybase1 "github.com/keybase/client/go/protocol"
-	"github.com/keybase/gregor"
+	gregor "github.com/keybase/gregor"
 	"time"
 )
 
@@ -17,8 +17,15 @@ func (u UID) Bytes() []byte {
 	return b
 }
 
+func (d DeviceID) Bytes() []byte {
+	b, err := hex.DecodeString(string(d))
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
 func (m MsgID) Bytes() []byte          { return []byte(m) }
-func (d DeviceID) Bytes() []byte       { return []byte(d) }
 func (s System) String() string        { return string(s) }
 func (c Category) String() string      { return string(c) }
 func (b Body) Bytes() []byte           { return []byte(b) }
@@ -203,7 +210,7 @@ func (s State) ItemsInCategory(gc gregor.Category) ([]gregor.Item, error) {
 
 var _ gregor.UID = UID("")
 var _ gregor.MsgID = MsgID{}
-var _ gregor.DeviceID = DeviceID{}
+var _ gregor.DeviceID = DeviceID("")
 var _ gregor.System = System("")
 var _ gregor.Body = Body{}
 var _ gregor.Category = Category("")
