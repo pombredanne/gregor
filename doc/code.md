@@ -38,7 +38,6 @@ The main loop is of the form:
 * Main goroutine (handles routing and new connections, and creation/dismissal of per-user goroutines)
 * One goroutine per user
 * One goroutine per user per client, probably interior to the RPC library
-* One goroutine per SQL worker, with a potential pool of ~10 workers
 
 #### Incoming Connections
 
@@ -54,12 +53,12 @@ The main loop is of the form:
 1. New incoming message comes in on a per-user-per-client goroutine to an RPC server
 1. Message injected into the per-user goroutine
 1. Message injected into the main goroutine
-1. Run message through registered MessageConsumers
+1. Main goroutine forks of a per-message Goroutine and then returns to the top:
+1. In the per-mesage go-routine, run through registered MessageConsumers:
 	1. SQL
-    	1. Pick an available worker
-    	1. Store to disk
+		1. Store to disk (note the SQL DB object is go-routine safe and has an underlying pool of go-routines)
 	1. Publisher (redis)
-		1. fire off a redis notification
+		1. fire off a redis notification (assuming goroutine-safe client)
 	1. Broadcaster
     	1. Send the message to the per-user goroutine
     	1. For each client
