@@ -27,9 +27,9 @@ The main loop is of the form:
   in a broken state, but we're not doing message delivery steps in an atomic
   transaction, so there's no way around this. Our story is that the consumers
   will have to resync to recover, as driven by clients.
- 	* We might want to fail further processing if we have a problem persisting the message
- 	  to SQL, for the reason that the state won't be recoverable without a persistent
- 	  record of the message.
+* We might want to fail further processing if we have a problem persisting the
+  message to SQL, for the reason that the state won't be recoverable without a
+  persistent record of the message.
 
 ### GoRoutine Organization
 
@@ -69,10 +69,10 @@ The main loop is of the form:
 
 1. When we hear an EOF on connection, close the connection (of course)
 1. Per-user goroutine updates accounting
-1. If this is the last connection for the user, the per-user goroutine sends a message
-   to the main goroutine, who cleans out the per-user goroutine and state,
-   and also unsubscribes from pubsub.  The main thread will serialize EOFs
-   and new connections so that we don't race when a new connection happens
+1. If this is the last connection for the user, the per-user goroutine sends a
+   message to the main goroutine, who cleans out the per-user goroutine and
+   state, and also unsubscribes from pubsub.  The main thread will serialize
+   EOFs and new connections so that we don't race when a new connection happens
    around the same time the last connection for a user dies. **Note this
    is the trickiest case, we should make sure we have a solution for it
    first!**
