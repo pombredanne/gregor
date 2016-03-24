@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/keybase/gregor.svg?branch=master)](https://travis-ci.org/keybase/gregor)
 
 Gregor is a simple system for consuming, persisting, and broadcasting
-notifications to a collection clients for a user.
+notifications to a collection of clients for a user.
 
 ## Documents
 
