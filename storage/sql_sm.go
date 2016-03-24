@@ -290,6 +290,8 @@ func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	}
 	qb.Build(")")
 	if d != nil {
+		// A "NULL" devid in this case means that the Item/message is intended for all
+		// devices. So include that as well.
 		qb.Build("AND (m.devid=? OR m.devid IS NULL)", hexEnc(d))
 	}
 	if t != nil {
