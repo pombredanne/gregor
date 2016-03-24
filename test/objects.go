@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
-	base "github.com/keybase/gregor"
+	gregor "github.com/keybase/gregor"
 )
 
 type testUID []byte
@@ -19,10 +19,10 @@ type testCategory string
 
 type testItem struct {
 	m      *testMetadata
-	dtime  base.TimeOrOffset
-	nTimes []base.TimeOrOffset
-	cat    base.Category
-	body   base.Body
+	dtime  gregor.TimeOrOffset
+	nTimes []gregor.TimeOrOffset
+	cat    gregor.Category
+	body   gregor.Body
 }
 
 type testTimeOrOffset struct {
@@ -31,20 +31,20 @@ type testTimeOrOffset struct {
 }
 
 type testMsgRange struct {
-	e base.TimeOrOffset
-	c base.Category
+	e gregor.TimeOrOffset
+	c gregor.Category
 }
 
 type testDismissal struct {
-	ids    []base.MsgID
+	ids    []gregor.MsgID
 	ranges []testMsgRange
 }
 
 type testMetadata struct {
-	u base.UID
-	m base.MsgID
-	d base.DeviceID
-	t base.TimeOrOffset
+	u gregor.UID
+	m gregor.MsgID
+	d gregor.DeviceID
+	t gregor.TimeOrOffset
 }
 
 type testSyncMessage testMetadata
@@ -61,24 +61,24 @@ type testMessage struct {
 }
 
 type TestObjFactory struct{}
-type testState []base.Item
+type testState []gregor.Item
 
-func (f TestObjFactory) MakeUID(b []byte) (base.UID, error) {
+func (f TestObjFactory) MakeUID(b []byte) (gregor.UID, error) {
 	return testUID(b), nil
 }
-func (f TestObjFactory) MakeMsgID(b []byte) (base.MsgID, error) {
+func (f TestObjFactory) MakeMsgID(b []byte) (gregor.MsgID, error) {
 	return testMsgID(b), nil
 }
-func (f TestObjFactory) MakeDeviceID(b []byte) (base.DeviceID, error) {
+func (f TestObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) {
 	return testDeviceID(b), nil
 }
-func (f TestObjFactory) MakeBody(b []byte) (base.Body, error) {
+func (f TestObjFactory) MakeBody(b []byte) (gregor.Body, error) {
 	return testBody(b), nil
 }
-func (f TestObjFactory) MakeCategory(s string) (base.Category, error) {
+func (f TestObjFactory) MakeCategory(s string) (gregor.Category, error) {
 	return testCategory(s), nil
 }
-func (f TestObjFactory) MakeItem(u base.UID, msgid base.MsgID, deviceid base.DeviceID, ctime time.Time, c base.Category, dtime *time.Time, body base.Body) (base.Item, error) {
+func (f TestObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.DeviceID, ctime time.Time, c gregor.Category, dtime *time.Time, body gregor.Body) (gregor.Item, error) {
 	ret := &testItem{
 		m:    newTestMetadata(u, msgid, deviceid, ctime),
 		cat:  c,
@@ -89,7 +89,7 @@ func (f TestObjFactory) MakeItem(u base.UID, msgid base.MsgID, deviceid base.Dev
 	}
 	return ret, nil
 }
-func (f TestObjFactory) MakeDismissalByRange(uid base.UID, msgid base.MsgID, devid base.DeviceID, ctime time.Time, c base.Category, d time.Time) (base.InBandMessage, error) {
+func (f TestObjFactory) MakeDismissalByRange(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, c gregor.Category, d time.Time) (gregor.InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
 	td := &testDismissal{
 		ranges: []testMsgRange{
@@ -102,29 +102,29 @@ func (f TestObjFactory) MakeDismissalByRange(uid base.UID, msgid base.MsgID, dev
 	return &testInBandMessage{m: md, d: td}, nil
 }
 
-func (f TestObjFactory) MakeDismissalByID(uid base.UID, msgid base.MsgID, devid base.DeviceID, ctime time.Time, d base.MsgID) (base.InBandMessage, error) {
+func (f TestObjFactory) MakeDismissalByID(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, d gregor.MsgID) (gregor.InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
 	td := &testDismissal{
-		ids: []base.MsgID{d},
+		ids: []gregor.MsgID{d},
 	}
 	return &testInBandMessage{m: md, d: td}, nil
 }
 
-func (f TestObjFactory) MakeStateSyncMessage(uid base.UID, msgid base.MsgID, devid base.DeviceID, ctime time.Time) (base.InBandMessage, error) {
+func (f TestObjFactory) MakeStateSyncMessage(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time) (gregor.InBandMessage, error) {
 	md := newTestMetadata(uid, msgid, devid, ctime)
 	return &testInBandMessage{m: md, s: (*testSyncMessage)(md)}, nil
 }
 
-func (f TestObjFactory) MakeState(i []base.Item) (base.State, error) {
+func (f TestObjFactory) MakeState(i []gregor.Item) (gregor.State, error) {
 	return testState(i), nil
 }
-func (f TestObjFactory) MakeMetadata(uid base.UID, msgid base.MsgID, devid base.DeviceID, ctime time.Time, i base.InBandMsgType) (base.Metadata, error) {
+func (f TestObjFactory) MakeMetadata(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, i gregor.InBandMsgType) (gregor.Metadata, error) {
 	return newTestMetadata(uid, msgid, devid, ctime), nil
 }
 
 var errBadType = errors.New("bad type in cast")
 
-func (f TestObjFactory) MakeInBandMessageFromItem(i base.Item) (base.InBandMessage, error) {
+func (f TestObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessage, error) {
 	ti, ok := i.(*testItem)
 	if !ok {
 		return nil, errBadType
@@ -132,53 +132,53 @@ func (f TestObjFactory) MakeInBandMessageFromItem(i base.Item) (base.InBandMessa
 	return &testInBandMessage{m: ti.m, i: ti}, nil
 }
 
-func newTestMetadata(u base.UID, msgid base.MsgID, devid base.DeviceID, ctime time.Time) *testMetadata {
+func newTestMetadata(u gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time) *testMetadata {
 	return &testMetadata{
 		u: u, m: msgid, d: devid, t: timeToTimeOrOffset(ctime),
 	}
 }
 
-var _ base.ObjFactory = TestObjFactory{}
+var _ gregor.ObjFactory = TestObjFactory{}
 
 type testBody string
 
 func (t testBody) Bytes() []byte { return []byte(t) }
 
-func (t *testMetadata) MsgID() base.MsgID                 { return t.m }
-func (t *testMetadata) CTime() base.TimeOrOffset          { return t.t }
-func (t *testMetadata) DeviceID() base.DeviceID           { return t.d }
-func (t *testMetadata) UID() base.UID                     { return t.u }
-func (t *testMetadata) InBandMsgType() base.InBandMsgType { return base.InBandMsgTypeUpdate }
+func (t *testMetadata) MsgID() gregor.MsgID                 { return t.m }
+func (t *testMetadata) CTime() gregor.TimeOrOffset          { return t.t }
+func (t *testMetadata) DeviceID() gregor.DeviceID           { return t.d }
+func (t *testMetadata) UID() gregor.UID                     { return t.u }
+func (t *testMetadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgTypeUpdate }
 
-func (t *testItem) DTime() base.TimeOrOffset         { return t.dtime }
-func (t *testItem) NotifyTimes() []base.TimeOrOffset { return t.nTimes }
-func (t *testItem) Body() base.Body                  { return t.body }
-func (t *testItem) Category() base.Category          { return t.cat }
-func (t *testItem) Metadata() base.Metadata          { return t.m }
+func (t *testItem) DTime() gregor.TimeOrOffset         { return t.dtime }
+func (t *testItem) NotifyTimes() []gregor.TimeOrOffset { return t.nTimes }
+func (t *testItem) Body() gregor.Body                  { return t.body }
+func (t *testItem) Category() gregor.Category          { return t.cat }
+func (t *testItem) Metadata() gregor.Metadata          { return t.m }
 
-func (t testMsgRange) EndTime() base.TimeOrOffset { return t.e }
-func (t testMsgRange) Category() base.Category    { return t.c }
+func (t testMsgRange) EndTime() gregor.TimeOrOffset { return t.e }
+func (t testMsgRange) Category() gregor.Category    { return t.c }
 
-func (t *testSyncMessage) Metadata() base.Metadata { return (*testMetadata)(t) }
+func (t *testSyncMessage) Metadata() gregor.Metadata { return (*testMetadata)(t) }
 
-func (t testInBandMessage) Metadata() base.Metadata                       { return t.m }
-func (t testInBandMessage) ToStateSyncMessage() base.StateSyncMessage     { return t.s }
-func (t testInBandMessage) ToStateUpdateMessage() base.StateUpdateMessage { return t }
+func (t testInBandMessage) Metadata() gregor.Metadata                       { return t.m }
+func (t testInBandMessage) ToStateSyncMessage() gregor.StateSyncMessage     { return t.s }
+func (t testInBandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage { return t }
 
-func (t testInBandMessage) Dismissal() base.Dismissal {
+func (t testInBandMessage) Dismissal() gregor.Dismissal {
 	if t.d == nil {
 		return nil
 	}
 	return t.d
 }
-func (t testInBandMessage) Creation() base.Item {
+func (t testInBandMessage) Creation() gregor.Item {
 	if t.i == nil {
 		return nil
 	}
 	return t.i
 }
 
-func (t testInBandMessage) Merge(m2 base.InBandMessage) error {
+func (t testInBandMessage) Merge(m2 gregor.InBandMessage) error {
 	t2, ok := m2.(testInBandMessage)
 	if !ok {
 		return fmt.Errorf("bad merge; wrong type: %T", m2)
@@ -198,7 +198,7 @@ func (t testInBandMessage) Merge(m2 base.InBandMessage) error {
 	return nil
 }
 
-func (t *testDismissal) MsgIDsToDismiss() []base.MsgID { return t.ids }
+func (t *testDismissal) MsgIDsToDismiss() []gregor.MsgID { return t.ids }
 
 func (t testTimeOrOffset) Time() *time.Time       { return t.t }
 func (t testTimeOrOffset) Offset() *time.Duration { return t.d }
@@ -208,23 +208,23 @@ func (t testDeviceID) Bytes() []byte              { return t }
 func (t testCategory) String() string             { return string(t) }
 func (t testSystem) String() string               { return string(t) }
 
-func (m testMessage) ToInBandMessage() base.InBandMessage       { return m.i }
-func (m testMessage) ToOutOfBandMessage() base.OutOfBandMessage { return nil }
+func (m testMessage) ToInBandMessage() gregor.InBandMessage       { return m.i }
+func (m testMessage) ToOutOfBandMessage() gregor.OutOfBandMessage { return nil }
 
-func (t *testDismissal) RangesToDismiss() []base.MsgRange {
-	var ret []base.MsgRange
+func (t *testDismissal) RangesToDismiss() []gregor.MsgRange {
+	var ret []gregor.MsgRange
 	for _, r := range t.ranges {
-		ret = append(ret, base.MsgRange(r))
+		ret = append(ret, gregor.MsgRange(r))
 	}
 	return ret
 }
 
-func (t testState) Items() ([]base.Item, error) {
-	return []base.Item(t), nil
+func (t testState) Items() ([]gregor.Item, error) {
+	return []gregor.Item(t), nil
 }
 
-func (t testState) ItemsInCategory(c base.Category) ([]base.Item, error) {
-	var ret []base.Item
+func (t testState) ItemsInCategory(c gregor.Category) ([]gregor.Item, error) {
+	var ret []gregor.Item
 	for _, item := range t {
 		if item.Category().String() == c.String() {
 			ret = append(ret, item)
@@ -233,10 +233,10 @@ func (t testState) ItemsInCategory(c base.Category) ([]base.Item, error) {
 	return ret, nil
 }
 
-var _ base.Item = (*testItem)(nil)
-var _ base.InBandMessage = testInBandMessage{}
+var _ gregor.Item = (*testItem)(nil)
+var _ gregor.InBandMessage = testInBandMessage{}
 
-func assertNItems(t *testing.T, sm base.StateMachine, u base.UID, d base.DeviceID, too base.TimeOrOffset, n int) {
+func assertNItems(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, n int) {
 	state, err := sm.State(u, d, too)
 	require.Nil(t, err, "no error from State()")
 	it, err := state.Items()
@@ -244,14 +244,14 @@ func assertNItems(t *testing.T, sm base.StateMachine, u base.UID, d base.DeviceI
 	require.Equal(t, n, len(it), "wrong number of items")
 }
 
-func assertNItemsInCategory(t *testing.T, sm base.StateMachine, u base.UID, d base.DeviceID, too base.TimeOrOffset, c base.Category, n int) {
+func assertNItemsInCategory(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, c gregor.Category, n int) {
 	state, err := sm.State(u, d, too)
 	require.Nil(t, err, "no error from State()")
 	it, err := state.ItemsInCategory(c)
 	require.Nil(t, err, "no error from ItemsInCategory()")
 	require.Equal(t, n, len(it), "wrong number of items")
 }
-func assertBodiesInCategory(t *testing.T, sm base.StateMachine, u base.UID, d base.DeviceID, too base.TimeOrOffset, c base.Category, v []string) {
+func assertBodiesInCategory(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, c gregor.Category, v []string) {
 	state, err := sm.State(u, d, too)
 	require.Nil(t, err, "no error from State()")
 	it, err := state.ItemsInCategory(c)
@@ -268,45 +268,45 @@ func randBytes(n int) []byte {
 	return ret
 }
 
-func makeUID() base.UID           { return testUID(randBytes(8)) }
-func makeMsgID() base.MsgID       { return testMsgID(randBytes(8)) }
-func makeDeviceID() base.DeviceID { return testDeviceID(randBytes(8)) }
-func makeOffset(i int) base.TimeOrOffset {
+func makeUID() gregor.UID           { return testUID(randBytes(8)) }
+func makeMsgID() gregor.MsgID       { return testMsgID(randBytes(8)) }
+func makeDeviceID() gregor.DeviceID { return testDeviceID(randBytes(8)) }
+func makeOffset(i int) gregor.TimeOrOffset {
 	d := time.Second * time.Duration(i)
 	return testTimeOrOffset{d: &d}
 }
-func timeToTimeOrOffset(t time.Time) base.TimeOrOffset {
+func timeToTimeOrOffset(t time.Time) gregor.TimeOrOffset {
 	return testTimeOrOffset{t: &t}
 }
 
-func newCreation(u base.UID, m base.MsgID, d base.DeviceID, c base.Category, data string, dtime base.TimeOrOffset) base.Message {
+func newCreation(u gregor.UID, m gregor.MsgID, d gregor.DeviceID, c gregor.Category, data string, dtime gregor.TimeOrOffset) gregor.Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	item := &testItem{m: md, dtime: dtime, body: testBody(data), cat: c}
 	return testMessage{i: &testInBandMessage{m: md, i: item}}
 }
 
-func newDismissalByIDs(u base.UID, m base.MsgID, d base.DeviceID, ids []base.MsgID) base.Message {
+func newDismissalByIDs(u gregor.UID, m gregor.MsgID, d gregor.DeviceID, ids []gregor.MsgID) gregor.Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	dismissal := &testDismissal{ids: ids}
 	ret := testMessage{i: &testInBandMessage{m: md, d: dismissal}}
 	return ret
 }
 
-func newDismissalByCategory(u base.UID, m base.MsgID, d base.DeviceID, c base.Category, e base.TimeOrOffset) base.Message {
+func newDismissalByCategory(u gregor.UID, m gregor.MsgID, d gregor.DeviceID, c gregor.Category, e gregor.TimeOrOffset) gregor.Message {
 	md := &testMetadata{u: u, m: m, d: d}
 	dismissal := &testDismissal{ranges: []testMsgRange{{c: c, e: e}}}
 	ret := testMessage{i: &testInBandMessage{m: md, d: dismissal}}
 	return ret
 }
 
-func consumeMessage(t *testing.T, which string, sm base.StateMachine, m base.Message) {
+func consumeMessage(t *testing.T, which string, sm gregor.StateMachine, m gregor.Message) {
 	err := sm.ConsumeMessage(m)
 	if err != nil {
 		t.Fatalf("In inserting msg %s: %v", which, err)
 	}
 }
 
-func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork.FakeClock) {
+func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) {
 	t0 := fc.Now()
 	u1 := makeUID()
 	c1 := testCategory("foos")
@@ -314,7 +314,7 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 
 	// Make an assertion: that there are no items total in the StateMachine,
 	// and no items at in the category 'foos'
-	assert1 := func(too base.TimeOrOffset) {
+	assert1 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
@@ -330,7 +330,7 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 
 	// Make an assertion: that there is 1 item in the StateMachine,
 	// and 1 item for the category "foos"
-	assert2 := func(too base.TimeOrOffset) {
+	assert2 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 1)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 1)
 	}
@@ -340,10 +340,10 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 
 	// Produce a new *dismissal* message that dismisses the first message
 	// we added (m1)
-	consumeMessage(t, "d1", sm, newDismissalByIDs(u1, makeMsgID(), nil, []base.MsgID{m1}))
+	consumeMessage(t, "d1", sm, newDismissalByIDs(u1, makeMsgID(), nil, []gregor.MsgID{m1}))
 
 	// Make an assertion: that there are no items left in the StateMachine
-	assert3 := func(too base.TimeOrOffset) {
+	assert3 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
@@ -366,7 +366,7 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 
 	// Make an assertion: that the items wound up and in the right
 	// categories.
-	assert4 := func(too base.TimeOrOffset) {
+	assert4 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 3)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 2)
 		assertNItemsInCategory(t, sm, u1, nil, too, c2, 1)
@@ -376,7 +376,7 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 	fc.Advance(time.Duration(4) * time.Second)
 
 	// Make an assertion: that the dismissals worked as planned
-	assert5 := func(too base.TimeOrOffset) {
+	assert5 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 1)
 		assertBodiesInCategory(t, sm, u1, nil, too, c1, []string{"f2"})
@@ -400,7 +400,7 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 	consumeMessage(t, "d2", sm,
 		newDismissalByCategory(u1, makeMsgID(), nil, c2, timeToTimeOrOffset(tm5)),
 	)
-	assert6 := func(too base.TimeOrOffset) {
+	assert6 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
 		assertBodiesInCategory(t, sm, u1, nil, too, c1, []string{"f2"})
 		assertBodiesInCategory(t, sm, u1, nil, too, c2, []string{"b4"})
@@ -425,11 +425,11 @@ func TestStateMachineAllDevices(t *testing.T, sm base.StateMachine, fc clockwork
 	require.Equal(t, tm5.UnixNano(), rangesToDismiss[0].EndTime().Time().UnixNano(), "the right dismissal time")
 }
 
-func TestStateMachinePerDevice(t *testing.T, sm base.StateMachine, fc clockwork.FakeClock) {
+func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) {
 	u1 := makeUID()
 	c1 := testCategory("foos")
 	d1 := makeDeviceID()
-	assert1 := func(too base.TimeOrOffset) {
+	assert1 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
@@ -438,7 +438,7 @@ func TestStateMachinePerDevice(t *testing.T, sm base.StateMachine, fc clockwork.
 	sm.ConsumeMessage(
 		newCreation(u1, m1, d1, c1, "f1", nil),
 	)
-	assert2 := func(too base.TimeOrOffset) {
+	assert2 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, d1, too, 1)
 		assertBodiesInCategory(t, sm, u1, d1, too, c1, []string{"f1"})
 	}
@@ -448,16 +448,16 @@ func TestStateMachinePerDevice(t *testing.T, sm base.StateMachine, fc clockwork.
 	sm.ConsumeMessage(
 		newCreation(u1, m2, d2, c1, "f2", nil),
 	)
-	assert3 := func(too base.TimeOrOffset) {
+	assert3 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
 		assertBodiesInCategory(t, sm, u1, d1, too, c1, []string{"f1"})
 		assertBodiesInCategory(t, sm, u1, d2, too, c1, []string{"f2"})
 	}
 	assert3(nil)
 	sm.ConsumeMessage(
-		newDismissalByIDs(u1, makeMsgID(), nil, []base.MsgID{m1}),
+		newDismissalByIDs(u1, makeMsgID(), nil, []gregor.MsgID{m1}),
 	)
-	assert4 := func(too base.TimeOrOffset) {
+	assert4 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 1)
 		assertBodiesInCategory(t, sm, u1, d1, too, c1, []string{})
 		assertBodiesInCategory(t, sm, u1, d2, too, c1, []string{"f2"})

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	base "github.com/keybase/gregor"
 	"github.com/jonboulle/clockwork"
+	gregor "github.com/keybase/gregor"
 	"regexp"
 	"strings"
 	"time"
@@ -17,12 +17,12 @@ func sqlWrapper(s string) string {
 
 type SQLEngine struct {
 	driver     *sql.DB
-	objFactory base.ObjFactory
+	objFactory gregor.ObjFactory
 	clock      clockwork.Clock
 	stw        sqlTimeWriter
 }
 
-func NewSQLEngine(d *sql.DB, of base.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock) *SQLEngine {
+func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock) *SQLEngine {
 	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl}
 }
 
@@ -32,7 +32,7 @@ type builder interface {
 
 type sqlTimeWriter interface {
 	Now(b builder, cl clockwork.Clock)
-	TimeOrOffset(b builder, cl clockwork.Clock, too base.TimeOrOffset)
+	TimeOrOffset(b builder, cl clockwork.Clock, too gregor.TimeOrOffset)
 }
 
 type queryBuilder struct {
@@ -46,7 +46,7 @@ func (q *queryBuilder) Now() {
 	q.stw.Now(q, q.clock)
 }
 
-func (q *queryBuilder) TimeOrOffset(too base.TimeOrOffset) {
+func (q *queryBuilder) TimeOrOffset(too gregor.TimeOrOffset) {
 	q.stw.TimeOrOffset(q, q.clock, too)
 }
 
@@ -95,7 +95,7 @@ func (s *SQLEngine) newQueryBuilder() *queryBuilder {
 	return &queryBuilder{clock: s.clock, stw: s.stw}
 }
 
-func (s *SQLEngine) consumeCreation(tx *sql.Tx, u base.UID, i base.Item) error {
+func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) error {
 	md := i.Metadata()
 	qb := s.newQueryBuilder()
 	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
@@ -127,7 +127,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u base.UID, i base.Item) error {
 	return nil
 }
 
-func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u base.UID, mid base.MsgID, dmids []base.MsgID) error {
+func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID) error {
 	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)")
 	if err != nil {
 		return err
@@ -157,7 +157,7 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u base.UID, mid base.MsgI
 	return err
 }
 
-func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u base.UID, mid base.MsgID, mrs []base.MsgRange) error {
+func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange) error {
 	for _, mr := range mrs {
 
 		qb := s.newQueryBuilder()
@@ -183,7 +183,7 @@ func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u base.UID, mid base.MsgI
 	return nil
 }
 
-func checkMetadataForInsert(m base.Metadata) error {
+func checkMetadataForInsert(m gregor.Metadata) error {
 	if m.MsgID() == nil {
 		return fmt.Errorf("bad metadata; nil MsgID")
 	}
@@ -193,11 +193,11 @@ func checkMetadataForInsert(m base.Metadata) error {
 	return nil
 }
 
-func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md base.Metadata, t base.InBandMsgType) error {
+func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata, t gregor.InBandMsgType) error {
 	if err := checkMetadataForInsert(md); err != nil {
 		return err
 	}
-	if t != base.InBandMsgTypeUpdate && t != base.InBandMsgTypeSync {
+	if t != gregor.InBandMsgTypeUpdate && t != gregor.InBandMsgTypeSync {
 		return fmt.Errorf("bad metadata: unrecognized msg type")
 	}
 	qb := s.newQueryBuilder()
@@ -208,7 +208,7 @@ func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md base.Metadata, t
 	return qb.Exec(tx)
 }
 
-func (s *SQLEngine) ConsumeMessage(m base.Message) error {
+func (s *SQLEngine) ConsumeMessage(m gregor.Message) error {
 	switch {
 	case m.ToInBandMessage() != nil:
 		return s.consumeInBandMessage(m.ToInBandMessage())
@@ -217,7 +217,7 @@ func (s *SQLEngine) ConsumeMessage(m base.Message) error {
 	}
 }
 
-func (s *SQLEngine) consumeInBandMessage(m base.InBandMessage) error {
+func (s *SQLEngine) consumeInBandMessage(m gregor.InBandMessage) error {
 	switch {
 	case m.ToStateUpdateMessage() != nil:
 		return s.consumeStateUpdateMessage(m.ToStateUpdateMessage())
@@ -226,13 +226,13 @@ func (s *SQLEngine) consumeInBandMessage(m base.InBandMessage) error {
 	}
 }
 
-func (s *SQLEngine) consumeStateUpdateMessage(m base.StateUpdateMessage) error {
+func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) error {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return err
 	}
 	md := m.Metadata()
-	if err := s.consumeInBandMessageMetadata(tx, md, base.InBandMsgTypeUpdate); err != nil {
+	if err := s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
 		return err
 	}
 	if m.Creation() != nil {
@@ -255,7 +255,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m base.StateUpdateMessage) error {
 	return nil
 }
 
-func (s *SQLEngine) rowToItem(u base.UID, rows *sql.Rows) (base.Item, error) {
+func (s *SQLEngine) rowToItem(u gregor.UID, rows *sql.Rows) (gregor.Item, error) {
 	deviceID := deviceIDScanner{o: s.objFactory}
 	msgID := msgIDScanner{o: s.objFactory}
 	category := categoryScanner{o: s.objFactory}
@@ -268,7 +268,7 @@ func (s *SQLEngine) rowToItem(u base.UID, rows *sql.Rows) (base.Item, error) {
 	return s.objFactory.MakeItem(u, msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
 }
 
-func (s *SQLEngine) State(u base.UID, d base.DeviceID, t base.TimeOrOffset) (base.State, error) {
+func (s *SQLEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {
 	items, err := s.items(u, d, t, nil)
 	if err != nil {
 		return nil, err
@@ -276,7 +276,7 @@ func (s *SQLEngine) State(u base.UID, d base.DeviceID, t base.TimeOrOffset) (bas
 	return s.objFactory.MakeState(items)
 }
 
-func (s *SQLEngine) items(u base.UID, d base.DeviceID, t base.TimeOrOffset, m base.MsgID) ([]base.Item, error) {
+func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, m gregor.MsgID) ([]gregor.Item, error) {
 	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
@@ -309,7 +309,7 @@ func (s *SQLEngine) items(u base.UID, d base.DeviceID, t base.TimeOrOffset, m ba
 	if err != nil {
 		return nil, err
 	}
-	var items []base.Item
+	var items []gregor.Item
 	for rows.Next() {
 		item, err := s.rowToItem(u, rows)
 		if err != nil {
@@ -320,7 +320,7 @@ func (s *SQLEngine) items(u base.UID, d base.DeviceID, t base.TimeOrOffset, m ba
 	return items, nil
 }
 
-func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (base.Metadata, error) {
+func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (gregor.Metadata, error) {
 	var ctime time.Time
 	uid := uidScanner{o: s.objFactory}
 	deviceID := deviceIDScanner{o: s.objFactory}
@@ -332,7 +332,7 @@ func (s *SQLEngine) rowToMetadata(rows *sql.Rows) (base.Metadata, error) {
 	return s.objFactory.MakeMetadata(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime, inBandMsgType.InBandMsgType())
 }
 
-func (s *SQLEngine) inBandMetadataSince(u base.UID, t base.TimeOrOffset) ([]base.Metadata, error) {
+func (s *SQLEngine) inBandMetadataSince(u gregor.UID, t gregor.TimeOrOffset) ([]gregor.Metadata, error) {
 	qry := `SELECT uid, msgid, ctime, devid, mtype FROM messages WHERE uid=?`
 	qb := s.newQueryBuilder()
 	qb.Build(qry, hexEnc(u))
@@ -350,7 +350,7 @@ func (s *SQLEngine) inBandMetadataSince(u base.UID, t base.TimeOrOffset) ([]base
 	if err != nil {
 		return nil, err
 	}
-	var ret []base.Metadata
+	var ret []gregor.Metadata
 	for rows.Next() {
 		md, err := s.rowToMetadata(rows)
 		if err != nil {
@@ -361,7 +361,7 @@ func (s *SQLEngine) inBandMetadataSince(u base.UID, t base.TimeOrOffset) ([]base
 	return ret, nil
 }
 
-func (s *SQLEngine) rowToInBandMessage(u base.UID, rows *sql.Rows) (base.InBandMessage, error) {
+func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InBandMessage, error) {
 	msgID := msgIDScanner{o: s.objFactory}
 	devID := deviceIDScanner{o: s.objFactory}
 	var ctime timeScanner
@@ -387,14 +387,14 @@ func (s *SQLEngine) rowToInBandMessage(u base.UID, rows *sql.Rows) (base.InBandM
 		return s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
 	case dMsgID.MsgID() != nil:
 		return s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
-	case mtype.InBandMsgType() == base.InBandMsgTypeSync:
+	case mtype.InBandMsgType() == gregor.InBandMsgTypeSync:
 		return s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
 	}
 
 	return nil, nil
 }
 
-func (s *SQLEngine) InBandMessagesSince(u base.UID, d base.DeviceID, t base.TimeOrOffset) ([]base.InBandMessage, error) {
+func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
                i.category, i.body,
                dt.category, dt.dtime,
@@ -425,8 +425,8 @@ func (s *SQLEngine) InBandMessagesSince(u base.UID, d base.DeviceID, t base.Time
 	if err != nil {
 		return nil, err
 	}
-	var ret []base.InBandMessage
-	lookup := make(map[string]base.InBandMessage)
+	var ret []gregor.InBandMessage
+	lookup := make(map[string]gregor.InBandMessage)
 	for rows.Next() {
 		ibm, err := s.rowToInBandMessage(u, rows)
 		if err != nil {
@@ -445,4 +445,4 @@ func (s *SQLEngine) InBandMessagesSince(u base.UID, d base.DeviceID, t base.Time
 	return ret, nil
 }
 
-var _ base.StateMachine = (*SQLEngine)(nil)
+var _ gregor.StateMachine = (*SQLEngine)(nil)
