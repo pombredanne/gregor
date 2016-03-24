@@ -290,7 +290,9 @@ func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	}
 	qb.Build(")")
 	if d != nil {
-		qb.Build("AND m.devid=?", hexEnc(d))
+		// A "NULL" devid in this case means that the Item/message is intended for all
+		// devices. So include that as well.
+		qb.Build("AND (m.devid=? OR m.devid IS NULL)", hexEnc(d))
 	}
 	if t != nil {
 		qb.Build("AND m.ctime <=")
@@ -409,7 +411,7 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	qb.Now()
 	qb.Build(")")
 	if d != nil {
-		qb.Build("AND i.devid=?", hexEnc(d))
+		qb.Build("AND (m.devid=? OR m.devid IS NULL)", hexEnc(d))
 	}
 
 	qb.Build("AND m.ctime >= ")

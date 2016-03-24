@@ -106,7 +106,16 @@ type Message interface {
 }
 
 type StateMachine interface {
+	// ConsumeMessage is called on a new incoming message to mutate the state
+	// of the state machine. Of course messages can be "inband" which actually
+	// perform state mutations, or might be "out-of-band" that just use the
+	// Gregor broadcast mechanism to make sure that all clients get the
+	// notification.
 	ConsumeMessage(m Message) error
+
+	// State returns the state for the user u on device d at time t.
+	// d can be nil, in which case the global state (across all devices)
+	// is returned.
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
 	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
 }
