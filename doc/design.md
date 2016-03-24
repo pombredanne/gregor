@@ -1,5 +1,5 @@
 # Gregor
-## A Messaging and Notification System for Front-End UX Synchronoization
+## A Messaging and Notification System for Front-End UX Synchronization
 
 ### Goals
 
@@ -22,7 +22,7 @@ system is common to both goals.
 * Supports notification delay until a client comes back online
 * Works with push notifications on Android and iOS
 * Supports email notifications if no client is online for a given timeout
-* Supports event aggregation after sends,
+* Supports event aggregation after sends
 
 ### Design
 
@@ -244,9 +244,9 @@ All of Alice’s online devices get sent:
 ```
 
 	8. On receipt, they apply this diff to their local JSON blobs and dismiss the
-notifications showing as a result of “5d44d2ad9aabab30” You Have a New
+notifications showing as a result of “5d44d2ad9aabab30”
 
-#### Follower On Keybase
+#### You Have A New Follower On Keybase
 
 This example is almost as above.  The notification to the user is sent via the
 GUI with a badge on the people tab, and a highlighted row showing who the new
