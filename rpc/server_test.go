@@ -36,39 +36,32 @@ func newLocalListener() net.Listener {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
-			panic(fmt.Sprintf("httptest: failed to listen on a port: %v", err))
+			panic(fmt.Sprintf("failed to listen on a port: %v", err))
 		}
 	}
 	return l
 }
 
-func newClient(addr net.Addr) (*rpc.Client, error) {
+func newClient(addr net.Addr) *rpc.Client {
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("failed to connect to test server: %s", err))
 	}
 	t := rpc.NewTransport(c, nil, nil)
-	return rpc.NewClient(t, nil), nil
+	return rpc.NewClient(t, nil)
 }
 
 func TestAuthentication(t *testing.T) {
 	_, l := startTestServer()
 	defer l.Close()
 
-	c, err := newClient(l.Addr())
-	if err != nil {
+	ac := protocol.AuthClient{Cli: newClient(l.Addr())}
+
+	if err := ac.Authenticate(context.TODO(), "goodtoken"); err != nil {
 		t.Fatal(err)
 	}
 
-	ac := protocol.AuthClient{Cli: c}
-
-	err = ac.Authenticate(context.TODO(), "goodtoken")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = ac.Authenticate(context.TODO(), "badtoken")
-	if err == nil {
+	if err := ac.Authenticate(context.TODO(), "badtoken"); err == nil {
 		t.Fatal("badtoken passed authentication")
 	}
 }
