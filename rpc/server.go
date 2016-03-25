@@ -1,16 +1,16 @@
 package rpc
 
 import (
+	"encoding/hex"
 	"errors"
+	"net"
+	"time"
+
 	"github.com/jonboulle/clockwork"
-	libkb "github.com/keybase/client/go/libkb"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	gregor "github.com/keybase/gregor"
 	protocol "github.com/keybase/gregor/protocol/go"
 	context "golang.org/x/net/context"
-	"encoding/hex"
-	"net"
-	"time"
 )
 
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
@@ -152,7 +152,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 func (s *Server) ListenLoop(l net.Listener) error {
 	for {
 		if c, err := l.Accept(); err != nil {
-			if libkb.IsSocketClosedError(err) {
+			if IsSocketClosedError(err) {
 				err = nil
 			}
 			return err
