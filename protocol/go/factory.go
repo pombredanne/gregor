@@ -3,7 +3,6 @@ package gregor1
 import (
 	"encoding/hex"
 	"fmt"
-	keybase1 "github.com/keybase/client/go/protocol"
 	"github.com/keybase/gregor"
 	"time"
 )
@@ -43,9 +42,9 @@ func castItem(i gregor.Item) (ItemAndMetadata, error) {
 }
 
 func timeToTimeOrOffset(timeIn *time.Time) TimeOrOffset {
-	var timeOut keybase1.Time
+	var timeOut Time
 	if timeIn != nil && !timeIn.IsZero() {
-		timeOut = keybase1.ToTime(*timeIn)
+		timeOut = ToTime(*timeIn)
 	}
 	return TimeOrOffset{
 		Offset_: 0,

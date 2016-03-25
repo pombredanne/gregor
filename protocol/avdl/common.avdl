@@ -2,10 +2,8 @@
 @go_field_suffix("_")
 protocol common {
 
-	import idl "github.com/keybase/client/go/protocol" as keybase1;
-
 	record TimeOrOffset {
-		keybase1.Time time;
+		Time time;
 		DurationMsec offset;
 	}
 
@@ -63,9 +61,10 @@ protocol common {
 	@typedef("int64") record DurationMsec {}
 	@typedef("string") record Category {}
 	@typedef("string") record System {}
-	@typedef("keybase1.UID") record UID {}
+	@typedef("bytes") record UID {}
 	@typedef("bytes") record MsgID {}
-	@typedef("keybase1.DeviceID") record DeviceID {}
+	@typedef("bytes") record DeviceID {}
 	@typedef("bytes") record Body {}
+	@typedef("long") record Time {}
 }
 
