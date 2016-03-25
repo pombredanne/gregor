@@ -3,6 +3,7 @@ package gregor
 import (
 	context "golang.org/x/net/context"
 	"time"
+	"net"
 )
 
 type InBandMsgType int
@@ -164,8 +165,8 @@ type NetworkInterface interface {
 	Serve(i NetworkInterfaceIncoming) error
 }
 
-type Server interface {
-	TriggerNotification(m InBandMessage) error
+type MainLoopServer interface {
+	MainLoop(n net.Listener) error
 }
 
 func UIDFromMessage(m Message) UID {
