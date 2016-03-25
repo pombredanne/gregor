@@ -80,6 +80,9 @@ func (c *connection) startAuthentication() error {
 	if err := srv.Register(prot); err != nil {
 		return err
 	}
+	if err := srv.Run(true /* async */); err != nil {
+		return err
+	}
 	err := <-c.authCh
 	if err != nil {
 		return err
@@ -151,14 +154,15 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 func (s *Server) ListenLoop(l net.Listener) error {
 	for {
-		if c, err := l.Accept(); err != nil {
+		c, err := l.Accept()
+		if err != nil {
 			if IsSocketClosedError(err) {
 				err = nil
 			}
 			return err
-		} else {
-			go s.handleNewConnection(c)
 		}
+
+		go s.handleNewConnection(c)
 	}
 	return nil
 }
