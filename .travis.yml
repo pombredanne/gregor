@@ -14,7 +14,7 @@ addons:
 before_install:
   - mysql -e "create database IF NOT EXISTS test;" -uroot
 env:
-  - MYSQL_DSN=root:@/test
+  - MYSQL_DSN=root:@/test GO15VENDOREXPERIMENT=1
 notifications:
   slack:
     rooms:
