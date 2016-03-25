@@ -1,30 +1,14 @@
 package gregor1
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
-	keybase1 "github.com/keybase/client/go/protocol"
 	gregor "github.com/keybase/gregor"
 	"time"
 )
 
-func (u UID) Bytes() []byte {
-	b, err := hex.DecodeString(string(u))
-	if err != nil {
-		return nil
-	}
-	return b
-}
-
-func (d DeviceID) Bytes() []byte {
-	b, err := hex.DecodeString(string(d))
-	if err != nil {
-		return nil
-	}
-	return b
-}
-
+func (u UID) Bytes() []byte            { return []byte(u) }
+func (d DeviceID) Bytes() []byte       { return []byte(d) }
 func (m MsgID) Bytes() []byte          { return []byte(m) }
 func (s System) String() string        { return string(s) }
 func (c Category) String() string      { return string(c) }
@@ -35,11 +19,9 @@ func (t TimeOrOffset) Time() *time.Time {
 	if t.Time_.IsZero() {
 		return nil
 	}
-	ret := keybase1.FromTime(t.Time_)
+	ret := FromTime(t.Time_)
 	return &ret
 }
-
-func (u UID) IsNil() bool { return keybase1.UID(u).IsNil() }
 
 func (t TimeOrOffset) Offset() *time.Duration {
 	if t.Offset_ == 0 {
@@ -210,9 +192,40 @@ func (s State) ItemsInCategory(gc gregor.Category) ([]gregor.Item, error) {
 	return ret, nil
 }
 
-var _ gregor.UID = UID("")
+func FromTime(t Time) time.Time {
+	if t == 0 {
+		return time.Time{}
+	}
+	return time.Unix(0, int64(t)*1000000)
+}
+
+// copied from keybase/client/go/protocol/extras.go. Consider eventually a
+// refactor to allow this code to be shared.
+func ToTime(t time.Time) Time {
+	// the result of calling UnixNano on the zero Time is undefined.
+	// https://golang.org/pkg/time/#Time.UnixNano
+	if t.IsZero() {
+		return 0
+	}
+	return Time(t.UnixNano() / 1000000)
+}
+
+func TimeFromSeconds(seconds int64) Time {
+	return Time(seconds * 1000)
+}
+
+func (t Time) IsZero() bool        { return t == 0 }
+func (t Time) After(t2 Time) bool  { return t > t2 }
+func (t Time) Before(t2 Time) bool { return t < t2 }
+
+func FormatTime(t Time) string {
+	layout := "2006-01-02 15:04:05 MST"
+	return FromTime(t).Format(layout)
+}
+
+var _ gregor.UID = UID{}
 var _ gregor.MsgID = MsgID{}
-var _ gregor.DeviceID = DeviceID("")
+var _ gregor.DeviceID = DeviceID{}
 var _ gregor.System = System("")
 var _ gregor.Body = Body{}
 var _ gregor.Category = Category("")

@@ -4,13 +4,12 @@
 package gregor1
 
 import (
-	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type TimeOrOffset struct {
-	Time_   keybase1.Time `codec:"time" json:"time"`
-	Offset_ DurationMsec  `codec:"offset" json:"offset"`
+	Time_   Time         `codec:"time" json:"time"`
+	Offset_ DurationMsec `codec:"offset" json:"offset"`
 }
 
 type Metadata struct {
@@ -67,10 +66,11 @@ type Message struct {
 type DurationMsec int64
 type Category string
 type System string
-type UID keybase1.UID
+type UID []byte
 type MsgID []byte
-type DeviceID keybase1.DeviceID
+type DeviceID []byte
 type Body []byte
+type Time int64
 type CommonInterface interface {
 }
 

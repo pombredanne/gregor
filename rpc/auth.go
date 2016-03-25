@@ -1,7 +1,7 @@
 package rpc
 
 import (
-	protocol "github.com/keybase/gregor/keybase/protocol/go"
+	protocol "github.com/keybase/gregor/protocol/go"
 	context "golang.org/x/net/context"
 )
 

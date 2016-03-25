@@ -6,8 +6,9 @@ import (
 	libkb "github.com/keybase/client/go/libkb"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	gregor "github.com/keybase/gregor"
-	protocol "github.com/keybase/gregor/keybase/protocol/go"
+	protocol "github.com/keybase/gregor/protocol/go"
 	context "golang.org/x/net/context"
+	"encoding/hex"
 	"net"
 	"time"
 )
@@ -47,7 +48,8 @@ type Server struct {
 	auth  Authenticator
 	clock clockwork.Clock
 
-	users map[protocol.UID](*PerUIDServer)
+	// key is the Hex-encoding of the binary UIDs
+	users map[string](*PerUIDServer)
 
 	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
@@ -82,7 +84,7 @@ func (c *connection) startAuthentication() error {
 	if err != nil {
 		return err
 	}
-	if c.uid.IsNil() {
+	if c.uid == nil {
 		return ErrBadUID
 	}
 	return nil
@@ -98,7 +100,8 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
 	if !ok {
 		return nil, ErrBadCast
 	}
-	ret := s.users[tuid]
+	k := hex.EncodeToString(tuid)
+	ret := s.users[k]
 	if ret != nil {
 		return ret, nil
 	}
