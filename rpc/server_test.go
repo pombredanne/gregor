@@ -6,7 +6,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/jonboulle/clockwork"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	protocol "github.com/keybase/gregor/protocol/go"
 	"golang.org/x/net/context"
@@ -23,10 +22,8 @@ func (m mockAuth) Authenticate(_ context.Context, tok protocol.AuthToken) (proto
 }
 
 func startTestServer() (*Server, net.Listener) {
-	s := &Server{
-		auth:  mockAuth{},
-		clock: clockwork.NewRealClock(),
-	}
+	s := NewServer()
+	s.auth = mockAuth{}
 	l := newLocalListener()
 	go s.ListenLoop(l)
 	return s, l
@@ -64,4 +61,24 @@ func TestAuthentication(t *testing.T) {
 	if err := ac.Authenticate(context.TODO(), "badtoken"); err == nil {
 		t.Fatal("badtoken passed authentication")
 	}
+}
+
+func TestCreatePerUIDServer(t *testing.T) {
+	s, l := startTestServer()
+	defer l.Close()
+
+	ac := protocol.AuthClient{Cli: newClient(l.Addr())}
+
+	if err := ac.Authenticate(context.TODO(), "goodtoken"); err != nil {
+		t.Fatal(err)
+	}
+
+	f := func(s *Stats) {
+		if s.UserServerCount != 1 {
+			t.Errorf("user servers: %d, expected 1", s.UserServerCount)
+		}
+	}
+	s.statsCh <- f
+
+	s.Shutdown()
 }

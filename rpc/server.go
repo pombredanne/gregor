@@ -3,7 +3,9 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
+	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -43,6 +45,12 @@ type PerUIDServer struct {
 	sendBroadcastCh chan broadcastArgs
 }
 
+type Stats struct {
+	UserServerCount int
+}
+
+type StatsReporter func(s *Stats)
+
 type Server struct {
 	nii   gregor.NetworkInterfaceIncoming
 	auth  Authenticator
@@ -53,6 +61,24 @@ type Server struct {
 
 	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
+	statsCh         chan StatsReporter
+	closeCh         chan struct{}
+	wg              sync.WaitGroup
+}
+
+func NewServer() *Server {
+	s := &Server{
+		clock:           clockwork.NewRealClock(),
+		users:           make(map[string]*PerUIDServer),
+		newConnectionCh: make(chan *connection),
+		statsCh:         make(chan StatsReporter),
+		closeCh:         make(chan struct{}),
+	}
+
+	s.wg.Add(1)
+	go s.process()
+
+	return s
 }
 
 func (s *Server) newConnection(c net.Conn) *connection {
@@ -111,6 +137,38 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
 	return nil, nil
 }
 
+func (s *Server) addUIDConnection(c *connection) {
+	usrv, err := s.getPerUIDServer(c.uid)
+	if err != nil {
+		log.Printf("getPerUIDServer error: %s", err)
+		return
+	}
+
+	if usrv == nil {
+	}
+}
+
+func (s *Server) reportStats(f StatsReporter) {
+	stats := &Stats{
+		UserServerCount: len(s.users),
+	}
+	f(stats)
+}
+
+func (s *Server) process() {
+	defer s.wg.Done()
+	for {
+		select {
+		case c := <-s.newConnectionCh:
+			s.addUIDConnection(c)
+		case f := <-s.statsCh:
+			s.reportStats(f)
+		case <-s.closeCh:
+			return
+		}
+	}
+}
+
 func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	tm, ok := m.(protocol.Message)
 	if !ok {
@@ -165,6 +223,11 @@ func (s *Server) ListenLoop(l net.Listener) error {
 		go s.handleNewConnection(c)
 	}
 	return nil
+}
+
+func (s *Server) Shutdown() {
+	close(s.closeCh)
+	s.wg.Wait()
 }
 
 var _ gregor.NetworkInterfaceOutgoing = (*Server)(nil)
