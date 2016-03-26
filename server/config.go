@@ -102,34 +102,33 @@ func readEnvOrFile(name string) (string, error) {
 	return string(res), nil
 }
 
-func (o *TLSOptions) Parse(raw *rawOpts) (bool, error) {
+func parseTLSOptions(raw *rawOpts) (*TLSOptions, error) {
 	// Don't use TLS
 	if (raw.tlsCert == "") != (raw.tlsKey == "") {
-		return false, badUsage("you must provide a TLS Key and a TLS cert, or neither")
+		return nil, badUsage("you must provide a TLS Key and a TLS cert, or neither")
 	}
 	if raw.tlsCert == "" || raw.tlsKey == "" {
-		return false, nil
+		return nil, nil
 	}
 	if (raw.awsRegion == "") != (raw.configBucket == "") {
-		return false, badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
+		return nil, badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
 	}
 	if raw.awsRegion != "" {
-		stuff, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsKey, raw.tlsCert)
+		buckets, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsKey, raw.tlsCert)
 		if err != nil {
-			return false, badConfig("error fetching TLS from S3: %s", err)
+			return nil, badConfig("error fetching TLS from S3: %s", err)
 		}
-		o.Key = stuff[0]
-		o.Cert = stuff[1]
-		return true, nil
+		return &TLSOptions{Key: buckets[0], Cert: buckets[1]}, nil
 	}
 	var err error
-	if o.Key, err = readEnvOrFile(raw.tlsKey); err != nil {
-		return false, err
+	var key, cert string
+	if key, err = readEnvOrFile(raw.tlsKey); err != nil {
+		return nil, err
 	}
-	if o.Cert, err = readEnvOrFile(raw.tlsCert); err != nil {
-		return false, err
+	if cert, err = readEnvOrFile(raw.tlsCert); err != nil {
+		return nil, err
 	}
-	return true, nil
+	return &TLSOptions{Key: key, Cert: cert}, nil
 }
 
 func (o *Options) Parse(raw *rawOpts) error {
@@ -167,12 +166,10 @@ func (o *Options) Parse(raw *rawOpts) error {
 		}
 	}
 
-	var tlsOpts TLSOptions
-	if used, err := tlsOpts.Parse(raw); err != nil {
+	if o.TLSOptions, err = parseTLSOptions(raw); err != nil {
 		return err
-	} else if used {
-		o.TLSOptions = &tlsOpts
 	}
+
 	return nil
 }
 
