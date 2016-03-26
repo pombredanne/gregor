@@ -24,7 +24,7 @@ type Options struct {
 	BindAddress   string
 	MysqlDSN      *url.URL
 	Debug         bool
-	TLSOptions    TLSOptions
+	TLSOptions    *TLSOptions
 }
 
 const usageStr = `Usage:
@@ -101,38 +101,34 @@ func readEnvOrFile(name string) (string, error) {
 	return string(res), nil
 }
 
-func (o *TLSOptions) Parse(raw *rawOpts) error {
+func (o *TLSOptions) Parse(raw *rawOpts) (bool, error) {
 	// Don't use TLS
 	if (raw.tlsCert == "") != (raw.tlsKey == "") {
-		return badUsage("you must provide a TLS Key and a TLS cert, or neither")
+		return false, badUsage("you must provide a TLS Key and a TLS cert, or neither")
 	}
 	if raw.tlsCert == "" || raw.tlsKey == "" {
-		return nil
+		return false, nil
 	}
 	if (raw.awsRegion == "") != (raw.configBucket == "") {
-		return badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
+		return false, badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
 	}
 	if raw.awsRegion != "" {
 		stuff, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsKey, raw.tlsCert)
 		if err != nil {
-			return badConfig("error fetching TLS from S3: %s", err)
+			return false, badConfig("error fetching TLS from S3: %s", err)
 		}
 		o.Key = stuff[0]
 		o.Cert = stuff[1]
-		return nil
+		return true, nil
 	}
 	var err error
 	if o.Key, err = readEnvOrFile(raw.tlsKey); err != nil {
-		return err
+		return false, err
 	}
 	if o.Cert, err = readEnvOrFile(raw.tlsCert); err != nil {
-		return err
+		return false, err
 	}
-	return nil
-}
-
-func (o *Options) UseTLS() bool {
-	return o.TLSOptions.Cert != "" && o.TLSOptions.Key != ""
+	return true, nil
 }
 
 func (o *Options) Parse(raw *rawOpts) error {
@@ -166,10 +162,12 @@ func (o *Options) Parse(raw *rawOpts) error {
 		}
 	}
 
-	if err := o.TLSOptions.Parse(raw); err != nil {
+	var tlsOpts TLSOptions
+	if used, err := tlsOpts.Parse(raw); err != nil {
 		return err
+	} else if used {
+		o.TLSOptions = &tlsOpts
 	}
-
 	return nil
 }
 

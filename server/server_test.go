@@ -4,11 +4,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"github.com/stretchr/testify/require"
-	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -17,8 +15,7 @@ func writeTmp(d string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	src := strings.NewReader(d)
-	_, err = io.Copy(f, src)
+	_, err = f.WriteString(d)
 	return f.Name(), err
 
 }
@@ -149,7 +146,7 @@ type testMainLoop struct {
 	doneCh  chan struct{}
 }
 
-func (t *testMainLoop) MainLoop(n net.Listener) error {
+func (t *testMainLoop) Serve(n net.Listener) error {
 	t.readyCh <- struct{}{}
 	for {
 		c, err := n.Accept()
@@ -194,7 +191,7 @@ func TestRunTLS(t *testing.T) {
 	srv := newMainServer(opts, &mainLoop)
 	srv.stopCh = make(chan struct{})
 	go func() {
-		err := srv.run()
+		err := srv.listenAndServe()
 		require.Nil(t, err, "no error")
 	}()
 	<-readyCh
@@ -237,7 +234,7 @@ func TestRunTCP(t *testing.T) {
 	srv := newMainServer(opts, &mainLoop)
 	srv.stopCh = make(chan struct{})
 	go func() {
-		err := srv.run()
+		err := srv.listenAndServe()
 		require.Nil(t, err, "no error")
 	}()
 	<-readyCh

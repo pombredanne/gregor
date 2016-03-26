@@ -165,7 +165,7 @@ type NetworkInterface interface {
 }
 
 type MainLoopServer interface {
-	MainLoop(n net.Listener) error
+	Serve(n net.Listener) error
 }
 
 func UIDFromMessage(m Message) UID {

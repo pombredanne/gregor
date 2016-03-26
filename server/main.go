@@ -7,7 +7,7 @@ import (
 
 type dummy struct{}
 
-func (d dummy) MainLoop(l net.Listener) error {
+func (d dummy) Serve(l net.Listener) error {
 	return nil
 }
 
@@ -17,7 +17,7 @@ func main() {
 		errorf("%s\n", err)
 		os.Exit(2)
 	}
-	err = newMainServer(opts, dummy{}).run()
+	err = newMainServer(opts, dummy{}).listenAndServe()
 	if err != nil {
 		errorf("%s\n", err)
 		os.Exit(2)

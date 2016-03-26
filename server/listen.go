@@ -15,7 +15,7 @@ func (m *mainServer) listenTLS() (net.Listener, error) {
 }
 
 func (m *mainServer) listen() (net.Listener, error) {
-	if m.opts.UseTLS() {
+	if m.opts.TLSOptions != nil {
 		return m.listenTLS()
 	}
 	return net.Listen("tcp", m.opts.BindAddress)
