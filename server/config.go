@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"errors"
 	"flag"
 	"fmt"
@@ -15,17 +16,12 @@ import (
 	"time"
 )
 
-type TLSOptions struct {
-	Key  string
-	Cert string
-}
-
 type Options struct {
 	SessionServer *url.URL
 	BindAddress   string
 	MysqlDSN      *url.URL
 	Debug         bool
-	TLSOptions    *TLSOptions
+	TLSConfig     *tls.Config
 }
 
 const usageStr = `Usage:
@@ -102,7 +98,16 @@ func readEnvOrFile(name string) (string, error) {
 	return string(res), nil
 }
 
-func parseTLSOptions(raw *rawOpts) (*TLSOptions, error) {
+func makeTLSConfig(cert string, key string) (*tls.Config, error) {
+	x509kp, err := tls.X509KeyPair([]byte(cert), []byte(key))
+	if err != nil {
+		return nil, err
+	}
+	config := tls.Config{Certificates: []tls.Certificate{x509kp}}
+	return &config, nil
+}
+
+func parseTLSConfig(raw *rawOpts) (*tls.Config, error) {
 	// Don't use TLS
 	if (raw.tlsCert == "") != (raw.tlsKey == "") {
 		return nil, badUsage("you must provide a TLS Key and a TLS cert, or neither")
@@ -114,21 +119,21 @@ func parseTLSOptions(raw *rawOpts) (*TLSOptions, error) {
 		return nil, badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
 	}
 	if raw.awsRegion != "" {
-		buckets, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsKey, raw.tlsCert)
+		buckets, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsCert, raw.tlsKey)
 		if err != nil {
 			return nil, badConfig("error fetching TLS from S3: %s", err)
 		}
-		return &TLSOptions{Key: buckets[0], Cert: buckets[1]}, nil
+		return makeTLSConfig(buckets[0], buckets[1])
 	}
 	var err error
 	var key, cert string
-	if key, err = readEnvOrFile(raw.tlsKey); err != nil {
-		return nil, err
-	}
 	if cert, err = readEnvOrFile(raw.tlsCert); err != nil {
 		return nil, err
 	}
-	return &TLSOptions{Key: key, Cert: cert}, nil
+	if key, err = readEnvOrFile(raw.tlsKey); err != nil {
+		return nil, err
+	}
+	return makeTLSConfig(cert, key)
 }
 
 func (o *Options) Parse(raw *rawOpts) error {
@@ -166,7 +171,7 @@ func (o *Options) Parse(raw *rawOpts) error {
 		}
 	}
 
-	if o.TLSOptions, err = parseTLSOptions(raw); err != nil {
+	if o.TLSConfig, err = parseTLSConfig(raw); err != nil {
 		return err
 	}
 
