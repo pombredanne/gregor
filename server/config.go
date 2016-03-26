@@ -145,7 +145,7 @@ func (o *Options) Parse(raw *rawOpts) error {
 	if _, port, err := net.SplitHostPort(raw.bindAddress); err != nil {
 		return badUsage("bad bind-address: %s", err)
 	} else if _, err = strconv.Atoi(port); err != nil {
-		return badUsage("bad port in bind-address: %s", err)
+		return badUsage("bad port (%q) in bind-address: %s", port, err)
 	}
 
 	o.BindAddress = raw.bindAddress

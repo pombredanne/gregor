@@ -23,7 +23,7 @@ func TestUsage(t *testing.T) {
 	ebu := ErrBadUsage("")
 	testBadUsage(t, []string{"gregor"}, ebu, "No valid bind-address specified")
 	testBadUsage(t, []string{"gregor", "--bind-address", "aabb"}, ebu, "bad bind-address")
-	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:aabb", "--session-server", "localhost"}, ebu, "bad port in bind-address")
+	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:aabb", "--session-server", "localhost"}, ebu, "bad port (\"aabb\") in bind-address")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ebu, "No session-server URI specified")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi"},
 		ebu, "you must provide a TLS Key and a TLS cert, or neither")
