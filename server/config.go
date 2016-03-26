@@ -7,24 +7,12 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
 	"io/ioutil"
+	"net"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 )
-
-func getEnvInt(s string, bad int) int {
-	raw := os.Getenv(s)
-	if raw == "" {
-		return bad
-	}
-	i, err := strconv.ParseInt(raw, 10, 64)
-	if err != nil {
-		return bad
-	}
-	return int(i)
-}
 
 type TLSOptions struct {
 	Key  string
@@ -33,15 +21,14 @@ type TLSOptions struct {
 
 type Options struct {
 	SessionServer *url.URL
-	Port          int
-	BindHost      string
+	BindAddress   string
 	MysqlDSN      *url.URL
 	Debug         bool
 	TLSOptions    TLSOptions
 }
 
 const usageStr = `Usage:
-gregord [-session-server=<uri>] [-port=<port>] [-mysql-dsn=<user:pw@host/dbname>] [-debug]
+gregord -session-server=<uri> -bind-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
 
 Configuring TLS
@@ -148,27 +135,21 @@ func (o *Options) UseTLS() bool {
 	return o.TLSOptions.Cert != "" && o.TLSOptions.Key != ""
 }
 
-func (o *Options) BindAddr() string {
-	var ret string
-	if o.BindHost != "" {
-		ret = o.BindHost
-	}
-	ret += ":"
-	ret += fmt.Sprintf("%d", o.Port)
-	return ret
-}
-
 func (o *Options) Parse(raw *rawOpts) error {
 	if raw.helpExtended {
 		usage()
 		return ErrExitOnHelp
 	}
 
-	if raw.port == 0 {
-		return badUsage("No valid listen port specified")
+	if raw.bindAddress == "" {
+		return badUsage("No valid bind-address specified")
 	}
-	o.Port = raw.port
+
 	var err error
+	if _, _, err = net.SplitHostPort(raw.bindAddress); err != nil {
+		return badUsage("bad bind-address: %s", err)
+	}
+	o.BindAddress = raw.bindAddress
 
 	if raw.sessionServerURI == "" {
 		return badUsage("No session-server URI specified")
@@ -184,8 +165,6 @@ func (o *Options) Parse(raw *rawOpts) error {
 			return badUsage("Error parsing mysql DSN: %s", err)
 		}
 	}
-
-	o.BindHost = raw.bindHost
 
 	if err := o.TLSOptions.Parse(raw); err != nil {
 		return err
@@ -225,8 +204,7 @@ func readFromS3Config(region string, bucket string, fileNames ...string) ([]stri
 
 type rawOpts struct {
 	sessionServerURI string
-	port             int
-	bindHost         string
+	bindAddress      string
 	mysqlDSN         string
 	debug            bool
 	tlsKey           string
@@ -253,8 +231,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 	var raw rawOpts
 	fs.StringVar(&raw.sessionServerURI, "session-server", os.Getenv("SESSION_SERVER"), "host:port of the session server")
-	fs.IntVar(&raw.port, "port", getEnvInt("PORT", 0), "port to listen on")
-	fs.StringVar(&raw.bindHost, "bind-host", os.Getenv("BIND_HOST"), "hostname to bind to")
+	fs.StringVar(&raw.bindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&raw.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "user:pw@host/dbname for MySQL")
 	fs.BoolVar(&raw.debug, "debug", false, "turn on debugging")
 	fs.StringVar(&raw.tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")

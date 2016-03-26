@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -14,18 +13,30 @@ func testBadUsage(t *testing.T, args []string, wantedErr error, msg string) {
 	require.Contains(t, err.Error(), msg, "bad msg")
 }
 
+func testGoodUsage(t *testing.T, args []string) {
+	opts, err := ParseOptionsQuiet(args)
+	require.NotNil(t, opts, "opts came back")
+	require.Nil(t, err, "no error")
+}
+
 func TestUsage(t *testing.T) {
-	testBadUsage(t, []string{"gregor"}, ErrBadUsage(""), "No valid listen port")
-	testBadUsage(t, []string{"gregor", "--port", "aabb"}, errors.New(""), "invalid syntax")
-	testBadUsage(t, []string{"gregor", "--port", "4000"}, ErrBadUsage(""), "No session-server URI specified")
-	testBadUsage(t, []string{"gregor", "--port", "4000", "--session-server", "localhost", "--tls-key", "hi"},
+	ebu := ErrBadUsage("")
+	testBadUsage(t, []string{"gregor"}, ebu, "No valid bind-address specified")
+	testBadUsage(t, []string{"gregor", "--bind-address", "aabb"}, ebu, "bad bind-address")
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ErrBadUsage(""), "No session-server URI specified")
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi"},
 		ErrBadUsage(""), "you must provide a TLS Key and a TLS cert, or neither")
-	testBadUsage(t, []string{"gregor", "--port", "4000", "--session-server", "localhost", "--tls-cert", "hi"},
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-cert", "hi"},
 		ErrBadUsage(""), "you must provide a TLS Key and a TLS cert, or neither")
-	testBadUsage(t, []string{"gregor", "--port", "4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
 		"--tls-cert", "bye", "--aws-region", "foo"}, ErrBadUsage(""), "you must provide an AWS Region and a Config bucket")
-	testBadUsage(t, []string{"gregor", "--port", "4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
 		"--tls-cert", "bye", "--s3-config-bucket", "foo"}, ErrBadUsage(""), "you must provide an AWS Region and a Config bucket")
-	testBadUsage(t, []string{"gregor", "--port", "4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
 		"--tls-cert", "file:///does/not/exist"}, ErrBadConfig(""), "no such file or directory")
+
+	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", ":4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "127.0.0.1:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "0.0.0.0:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "localhost:4000"})
 }

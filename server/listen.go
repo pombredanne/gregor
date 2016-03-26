@@ -11,12 +11,12 @@ func (m *mainServer) listenTLS() (net.Listener, error) {
 		return nil, err
 	}
 	conf := tls.Config{Certificates: []tls.Certificate{cert}}
-	return tls.Listen("tcp", m.opts.BindAddr(), &conf)
+	return tls.Listen("tcp", m.opts.BindAddress, &conf)
 }
 
 func (m *mainServer) listen() (net.Listener, error) {
 	if m.opts.UseTLS() {
 		return m.listenTLS()
 	}
-	return net.Listen("tcp", m.opts.BindAddr())
+	return net.Listen("tcp", m.opts.BindAddress)
 }

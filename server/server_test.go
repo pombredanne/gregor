@@ -175,11 +175,11 @@ func TestRunTLS(t *testing.T) {
 		defer os.Remove(key)
 	}
 	require.Nil(t, err, "no error")
-	testPort := "39999"
+	bindAddress := "localhost:39999"
 
 	opts, err := ParseOptions([]string{
 		"gregor",
-		"--port", testPort,
+		"--bind-address", bindAddress,
 		"--session-server", "localhost:30000",
 		"--tls-key", ("file://" + key),
 		"--tls-cert", ("file://" + crt),
@@ -208,7 +208,7 @@ func TestRunTLS(t *testing.T) {
 
 	tries := 4
 	for i := 0; i < tries; i++ {
-		con, err := tls.Dial("tcp", "localhost:"+testPort, &tlsConfig)
+		con, err := tls.Dial("tcp", bindAddress, &tlsConfig)
 		buf, err := ioutil.ReadAll(con)
 		require.Nil(t, err, "no error")
 		require.Equal(t, "ping", string(buf), "right payload")
@@ -220,11 +220,11 @@ func TestRunTLS(t *testing.T) {
 }
 
 func TestRunTCP(t *testing.T) {
-	testPort := "39999"
+	bindAddress := "localhost:39999"
 
 	opts, err := ParseOptions([]string{
 		"gregor",
-		"--port", testPort,
+		"--bind-address", bindAddress,
 		"--session-server", "localhost:30000",
 	})
 	require.Nil(t, err, "no error")
@@ -244,7 +244,7 @@ func TestRunTCP(t *testing.T) {
 
 	tries := 4
 	for i := 0; i < tries; i++ {
-		con, err := net.Dial("tcp", "localhost:"+testPort)
+		con, err := net.Dial("tcp", bindAddress)
 		buf, err := ioutil.ReadAll(con)
 		require.Nil(t, err, "no error")
 		require.Equal(t, "ping", string(buf), "right payload")

@@ -2,8 +2,8 @@ package gregor
 
 import (
 	context "golang.org/x/net/context"
-	"time"
 	"net"
+	"time"
 )
 
 type InBandMsgType int
@@ -121,7 +121,6 @@ type MessageConsumer interface {
 // server and client infrastructure will implement various parts of this interface,
 // to ensure that the state machine can be replicated, and that it can be queried.
 type StateMachine interface {
-
 	MessageConsumer
 
 	// State returns the state for the user u on device d at time t.
