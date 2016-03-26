@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -45,7 +46,7 @@ Environment Variables
 
   All of the above flags have environment variable equivalents:
 
-    -port or PORT
+    -bind-address or BIND_ADDRESS
     -session-server or SESSION_SERVER
     -mysql-dsn or MYSQL_DSN
     -debug or DEBUG
@@ -141,15 +142,19 @@ func (o *Options) Parse(raw *rawOpts) error {
 		return badUsage("No valid bind-address specified")
 	}
 
-	var err error
-	if _, _, err = net.SplitHostPort(raw.bindAddress); err != nil {
+	if _, port, err := net.SplitHostPort(raw.bindAddress); err != nil {
 		return badUsage("bad bind-address: %s", err)
+	} else if _, err = strconv.Atoi(port); err != nil {
+		return badUsage("bad port in bind-address: %s", err)
 	}
+
 	o.BindAddress = raw.bindAddress
 
 	if raw.sessionServerURI == "" {
 		return badUsage("No session-server URI specified")
 	}
+
+	var err error
 	if o.SessionServer, err = url.Parse(raw.sessionServerURI); err != nil {
 		return badUsage("Error parsing session-server: %s", err)
 	}

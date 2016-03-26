@@ -23,15 +23,16 @@ func TestUsage(t *testing.T) {
 	ebu := ErrBadUsage("")
 	testBadUsage(t, []string{"gregor"}, ebu, "No valid bind-address specified")
 	testBadUsage(t, []string{"gregor", "--bind-address", "aabb"}, ebu, "bad bind-address")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ErrBadUsage(""), "No session-server URI specified")
+	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:aabb", "--session-server", "localhost"}, ebu, "bad port in bind-address")
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ebu, "No session-server URI specified")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi"},
-		ErrBadUsage(""), "you must provide a TLS Key and a TLS cert, or neither")
+		ebu, "you must provide a TLS Key and a TLS cert, or neither")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-cert", "hi"},
-		ErrBadUsage(""), "you must provide a TLS Key and a TLS cert, or neither")
+		ebu, "you must provide a TLS Key and a TLS cert, or neither")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
-		"--tls-cert", "bye", "--aws-region", "foo"}, ErrBadUsage(""), "you must provide an AWS Region and a Config bucket")
+		"--tls-cert", "bye", "--aws-region", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
-		"--tls-cert", "bye", "--s3-config-bucket", "foo"}, ErrBadUsage(""), "you must provide an AWS Region and a Config bucket")
+		"--tls-cert", "bye", "--s3-config-bucket", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
 		"--tls-cert", "file:///does/not/exist"}, ErrBadConfig(""), "no such file or directory")
 
