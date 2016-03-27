@@ -2,6 +2,7 @@ package gregor
 
 import (
 	context "golang.org/x/net/context"
+	"net"
 	"time"
 )
 
@@ -120,7 +121,6 @@ type MessageConsumer interface {
 // server and client infrastructure will implement various parts of this interface,
 // to ensure that the state machine can be replicated, and that it can be queried.
 type StateMachine interface {
-
 	MessageConsumer
 
 	// State returns the state for the user u on device d at time t.
@@ -164,8 +164,8 @@ type NetworkInterface interface {
 	Serve(i NetworkInterfaceIncoming) error
 }
 
-type Server interface {
-	TriggerNotification(m InBandMessage) error
+type MainLoopServer interface {
+	Serve(n net.Listener) error
 }
 
 func UIDFromMessage(m Message) UID {

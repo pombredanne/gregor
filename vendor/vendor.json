@@ -9,6 +9,16 @@
 			"revisionTime": "2016-01-20T15:54:18+01:00"
 		},
 		{
+			"path": "github.com/goamz/goamz/aws",
+			"revision": "1d57d6d101ac4b69c12d54e7b5567192fcb87df5",
+			"revisionTime": "2016-03-25T20:55:43+01:00"
+		},
+		{
+			"path": "github.com/goamz/goamz/s3",
+			"revision": "1d57d6d101ac4b69c12d54e7b5567192fcb87df5",
+			"revisionTime": "2016-03-25T20:55:43+01:00"
+		},
+		{
 			"checksumSHA1": "irxwCucfzk0o745pGL995YofeTM=",
 			"path": "github.com/jonboulle/clockwork",
 			"revision": "ed104f61ea4877bea08af6f759805674861e968d",
@@ -43,6 +53,11 @@
 			"path": "github.com/ugorji/go/codec",
 			"revision": "821cda7e48749cacf7cad2c6ed01e96457ca7e9d",
 			"revisionTime": "2015-05-15T07:49:16-04:00"
+		},
+		{
+			"path": "github.com/vaughan0/go-ini",
+			"revision": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1",
+			"revisionTime": "2013-09-23T16:52:12+02:00"
 		},
 		{
 			"checksumSHA1": "5ARrN3Zq+E9zazFb/N+b08Serys=",
