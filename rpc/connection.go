@@ -50,14 +50,9 @@ func (c *connection) Authenticate(ctx context.Context, tok protocol.AuthToken) e
 	return err
 }
 
-func (c *connection) BroadcastMessage(ctx context.Context, m protocol.Message) error {
-	log.Printf("BroadcastMessage: %+v", m)
-	return nil
-}
-
 func (c *connection) ConsumeMessage(ctx context.Context, m protocol.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
-	return nil
+	return c.parent.consume(ctx, m)
 }
 
 func (c *connection) startRPCServer() error {

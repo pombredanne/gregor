@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor"
 	protocol "github.com/keybase/gregor/protocol/go"
 	"golang.org/x/net/context"
 )
@@ -28,10 +29,11 @@ func (m mockAuth) Authenticate(_ context.Context, tok protocol.AuthToken) (proto
 	return protocol.UID{}, protocol.SessionID(""), errors.New("invalid token")
 }
 
-func startTestServer() (*Server, net.Listener) {
+func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener) {
 	s := NewServer()
 	s.auth = mockAuth{}
 	l := newLocalListener()
+	go s.Serve(x)
 	go s.ListenLoop(l)
 	return s, l
 }
@@ -82,7 +84,7 @@ func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error
 }
 
 func TestAuthentication(t *testing.T) {
-	_, l := startTestServer()
+	_, l := startTestServer(nil)
 	defer l.Close()
 
 	c := newClient(l.Addr())
@@ -97,7 +99,7 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestCreatePerUIDServer(t *testing.T) {
-	s, l := startTestServer()
+	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -126,7 +128,7 @@ func newOOBMessage(uid protocol.UID, system protocol.System, body protocol.Body)
 }
 
 func TestBroadcast(t *testing.T) {
-	s, l := startTestServer()
+	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 

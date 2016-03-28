@@ -19,7 +19,7 @@ type PerUIDServer struct {
 
 	shutdownCh      <-chan protocol.UID
 	newConnectionCh chan *connection
-	sendBroadcastCh chan broadcastArgs
+	sendBroadcastCh chan messageArgs
 	wg              sync.WaitGroup
 	nextConnID      ConnectionID
 }
@@ -29,7 +29,7 @@ func newPerUIDServer(uid protocol.UID) *PerUIDServer {
 		uid:             uid,
 		conns:           make(map[ConnectionID]*connection),
 		newConnectionCh: make(chan *connection),
-		sendBroadcastCh: make(chan broadcastArgs),
+		sendBroadcastCh: make(chan messageArgs),
 	}
 
 	s.wg.Add(1)
@@ -63,7 +63,7 @@ func (s *PerUIDServer) addConn(c *connection) error {
 	return nil
 }
 
-func (s *PerUIDServer) broadcast(a broadcastArgs) {
+func (s *PerUIDServer) broadcast(a messageArgs) {
 	var errMsgs []string
 	for id, conn := range s.conns {
 		log.Printf("uid %x broadcast to %d", s.uid, id)

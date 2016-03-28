@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log"
 	"net"
-	"sync"
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
@@ -16,7 +15,7 @@ import (
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
 var ErrBadUID = errors.New("bad UID on channel")
 
-type broadcastArgs struct {
+type messageArgs struct {
 	c     context.Context
 	m     protocol.Message
 	retCh chan<- error
@@ -37,8 +36,8 @@ type Server struct {
 	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
 	statsCh         chan chan *Stats
+	consumeCh       chan messageArgs
 	closeCh         chan struct{}
-	wg              sync.WaitGroup
 }
 
 func NewServer() *Server {
@@ -49,9 +48,6 @@ func NewServer() *Server {
 		statsCh:         make(chan chan *Stats),
 		closeCh:         make(chan struct{}),
 	}
-
-	s.wg.Add(1)
-	go s.process()
 
 	return s
 }
@@ -117,20 +113,6 @@ func (s *Server) logError(prefix string, err error) {
 	log.Printf("%s error: %s", prefix, err)
 }
 
-func (s *Server) process() {
-	defer s.wg.Done()
-	for {
-		select {
-		case c := <-s.newConnectionCh:
-			s.logError("addUIDConnection", s.addUIDConnection(c))
-		case c := <-s.statsCh:
-			s.reportStats(c)
-		case <-s.closeCh:
-			return
-		}
-	}
-}
-
 func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	tm, ok := m.(protocol.Message)
 	if !ok {
@@ -145,16 +127,32 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 		return nil
 	}
 	retCh := make(chan error)
-	args := broadcastArgs{c, tm, retCh}
+	args := messageArgs{c, tm, retCh}
 	srv.sendBroadcastCh <- args
-	err = <-retCh
-	return err
+	return <-retCh
+}
+
+func (s *Server) consume(c context.Context, m protocol.Message) error {
+	retCh := make(chan error)
+	args := messageArgs{c, m, retCh}
+	s.consumeCh <- args
+	return <-retCh
 }
 
 func (s *Server) serve() error {
-	// listen for incoming RPCs on all of the PerUIDServers, and when we get
-	// one, forward down to s.nii
-	return nil
+	for {
+		select {
+		case c := <-s.newConnectionCh:
+			s.logError("addUIDConnection", s.addUIDConnection(c))
+		case a := <-s.consumeCh:
+			err := s.nii.ConsumeMessage(a.c, a.m)
+			a.retCh <- err
+		case c := <-s.statsCh:
+			s.reportStats(c)
+		case <-s.closeCh:
+			return nil
+		}
+	}
 }
 
 func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
@@ -187,12 +185,10 @@ func (s *Server) ListenLoop(l net.Listener) error {
 
 		go s.handleNewConnection(c)
 	}
-	return nil
 }
 
 func (s *Server) Shutdown() {
 	close(s.closeCh)
-	s.wg.Wait()
 }
 
 var _ gregor.NetworkInterfaceOutgoing = (*Server)(nil)
