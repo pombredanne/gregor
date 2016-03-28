@@ -36,26 +36,9 @@ type connection struct {
 	authCh     chan error
 }
 
-type PerUIDServer struct {
-	uid   protocol.UID
-	conns map[ConnectionID](*connection)
-
-	shutdownCh      <-chan protocol.UID
-	newConnectionCh chan rpc.Transporter
-	sendBroadcastCh chan broadcastArgs
-}
-
-func newPerUIDServer(uid protocol.UID) *PerUIDServer {
-	return &PerUIDServer{
-		uid: uid,
-	}
-}
-
 type Stats struct {
 	UserServerCount int
 }
-
-type StatsReporter func(s *Stats)
 
 type Server struct {
 	nii   gregor.NetworkInterfaceIncoming
@@ -67,7 +50,7 @@ type Server struct {
 
 	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
-	statsCh         chan StatsReporter
+	statsCh         chan chan *Stats
 	closeCh         chan struct{}
 	wg              sync.WaitGroup
 }
@@ -77,7 +60,7 @@ func NewServer() *Server {
 		clock:           clockwork.NewRealClock(),
 		users:           make(map[string]*PerUIDServer),
 		newConnectionCh: make(chan *connection),
-		statsCh:         make(chan StatsReporter),
+		statsCh:         make(chan chan *Stats),
 		closeCh:         make(chan struct{}),
 	}
 
@@ -159,27 +142,35 @@ func (s *Server) setPerUIDServer(u gregor.UID, usrv *PerUIDServer) error {
 	return nil
 }
 
-func (s *Server) addUIDConnection(c *connection) {
+func (s *Server) addUIDConnection(c *connection) error {
 	usrv, err := s.getPerUIDServer(c.uid)
 	if err != nil {
-		log.Printf("getPerUIDServer error: %s", err)
-		return
+		return err
 	}
 
 	if usrv == nil {
 		usrv = newPerUIDServer(c.uid)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
-			log.Printf("setPerUIDServer error: %s", err)
-			return
+			return err
 		}
 	}
+
+	usrv.newConnectionCh <- c
+	return nil
 }
 
-func (s *Server) reportStats(f StatsReporter) {
+func (s *Server) reportStats(c chan *Stats) {
 	stats := &Stats{
 		UserServerCount: len(s.users),
 	}
-	f(stats)
+	c <- stats
+}
+
+func (s *Server) logError(prefix string, err error) {
+	if err == nil {
+		return
+	}
+	log.Printf("%s error: %s", prefix, err)
 }
 
 func (s *Server) process() {
@@ -187,9 +178,9 @@ func (s *Server) process() {
 	for {
 		select {
 		case c := <-s.newConnectionCh:
-			s.addUIDConnection(c)
-		case f := <-s.statsCh:
-			s.reportStats(f)
+			s.logError("addUIDConnection", s.addUIDConnection(c))
+		case c := <-s.statsCh:
+			s.reportStats(c)
 		case <-s.closeCh:
 			return
 		}

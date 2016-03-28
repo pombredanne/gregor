@@ -66,6 +66,7 @@ func TestAuthentication(t *testing.T) {
 func TestCreatePerUIDServer(t *testing.T) {
 	s, l := startTestServer()
 	defer l.Close()
+	defer s.Shutdown()
 
 	ac := protocol.AuthClient{Cli: newClient(l.Addr())}
 
@@ -73,12 +74,10 @@ func TestCreatePerUIDServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f := func(s *Stats) {
-		if s.UserServerCount != 1 {
-			t.Errorf("user servers: %d, expected 1", s.UserServerCount)
-		}
+	c := make(chan *Stats)
+	s.statsCh <- c
+	stats := <-c
+	if stats.UserServerCount != 1 {
+		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
-	s.statsCh <- f
-
-	s.Shutdown()
 }
