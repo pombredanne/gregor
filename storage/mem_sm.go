@@ -13,7 +13,7 @@ import (
 // all incoming messages in a hash table, with one entry per user. It doesn't
 // do anything fancy w/r/t indexing Items, so just iterates over all of them
 // every time a dismissal or a state dump comes in. Used mainly for testing
-// which SQLite isn't available.
+// when SQLite isn't available.
 type MemEngine struct {
 	sync.Mutex
 	objFactory gregor.ObjFactory
