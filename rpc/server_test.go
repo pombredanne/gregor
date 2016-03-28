@@ -29,6 +29,15 @@ func (m mockAuth) Authenticate(_ context.Context, tok protocol.AuthToken) (proto
 	return protocol.UID{}, protocol.SessionID(""), errors.New("invalid token")
 }
 
+type mockConsumer struct {
+	consumed []gregor.Message
+}
+
+func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) error {
+	m.consumed = append(m.consumed, msg)
+	return nil
+}
+
 func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener) {
 	s := NewServer()
 	s.auth = mockAuth{}
@@ -76,6 +85,10 @@ func newClient(addr net.Addr) *client {
 
 func (c *client) AuthClient() protocol.AuthClient {
 	return protocol.AuthClient{Cli: c.cli}
+}
+
+func (c *client) IncomingClient() protocol.IncomingClient {
+	return protocol.IncomingClient{Cli: c.cli}
 }
 
 func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error {
@@ -127,6 +140,19 @@ func newOOBMessage(uid protocol.UID, system protocol.System, body protocol.Body)
 	}
 }
 
+func newUpdateMessage(uid protocol.UID) protocol.Message {
+	return protocol.Message{
+		Ibm_: &protocol.InBandMessage{
+			StateUpdate_: &protocol.StateUpdateMessage{
+				Md_: protocol.Metadata{
+					Uid_: uid,
+				},
+			},
+		},
+	}
+
+}
+
 func TestBroadcast(t *testing.T) {
 	s, l := startTestServer(nil)
 	defer l.Close()
@@ -144,5 +170,25 @@ func TestBroadcast(t *testing.T) {
 
 	if len(c.broadcasts) != 1 {
 		t.Errorf("client broadcasts received: %d, expected 1", len(c.broadcasts))
+	}
+}
+
+func TestConsume(t *testing.T) {
+	mc := &mockConsumer{}
+	s, l := startTestServer(mc)
+	defer l.Close()
+	defer s.Shutdown()
+
+	c := newClient(l.Addr())
+	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(mc.consumed) != 1 {
+		t.Errorf("consumer messages received: %d, expected 1", len(mc.consumed))
 	}
 }

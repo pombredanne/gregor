@@ -46,6 +46,7 @@ func NewServer() *Server {
 		users:           make(map[string]*PerUIDServer),
 		newConnectionCh: make(chan *connection),
 		statsCh:         make(chan chan *Stats),
+		consumeCh:       make(chan messageArgs),
 		closeCh:         make(chan struct{}),
 	}
 
@@ -118,6 +119,9 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
+
+	// XXX fix this, race here:
+
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
 	if err != nil {
 		return err
