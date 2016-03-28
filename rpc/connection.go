@@ -66,7 +66,6 @@ func (c *connection) startRPCServer() error {
 
 	prots := []rpc.Protocol{
 		protocol.AuthProtocol(c),
-		protocol.OutgoingProtocol(c),
 		protocol.IncomingProtocol(c),
 	}
 	for _, prot := range prots {

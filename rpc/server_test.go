@@ -46,26 +46,52 @@ func newLocalListener() net.Listener {
 	return l
 }
 
-func newClient(addr net.Addr) *rpc.Client {
+type client struct {
+	tr         rpc.Transporter
+	cli        *rpc.Client
+	broadcasts []protocol.Message
+}
+
+func newClient(addr net.Addr) *client {
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test server: %s", err))
 	}
 	t := rpc.NewTransport(c, nil, nil)
-	return rpc.NewClient(t, nil)
+
+	x := &client{
+		tr:  t,
+		cli: rpc.NewClient(t, nil),
+	}
+
+	srv := rpc.NewServer(t, nil)
+	if err := srv.Register(protocol.OutgoingProtocol(x)); err != nil {
+		panic(err.Error())
+	}
+
+	return x
+}
+
+func (c *client) AuthClient() protocol.AuthClient {
+	return protocol.AuthClient{Cli: c.cli}
+}
+
+func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error {
+	c.broadcasts = append(c.broadcasts, m)
+	return nil
 }
 
 func TestAuthentication(t *testing.T) {
 	_, l := startTestServer()
 	defer l.Close()
 
-	ac := protocol.AuthClient{Cli: newClient(l.Addr())}
+	c := newClient(l.Addr())
 
-	if err := ac.Authenticate(context.TODO(), goodToken); err != nil {
+	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := ac.Authenticate(context.TODO(), badToken); err == nil {
+	if err := c.AuthClient().Authenticate(context.TODO(), badToken); err == nil {
 		t.Fatal("badtoken passed authentication")
 	}
 }
@@ -75,15 +101,15 @@ func TestCreatePerUIDServer(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	ac := protocol.AuthClient{Cli: newClient(l.Addr())}
+	c := newClient(l.Addr())
 
-	if err := ac.Authenticate(context.TODO(), goodToken); err != nil {
+	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
-	c := make(chan *Stats)
-	s.statsCh <- c
-	stats := <-c
+	ch := make(chan *Stats)
+	s.statsCh <- ch
+	stats := <-ch
 	if stats.UserServerCount != 1 {
 		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
@@ -104,14 +130,17 @@ func TestBroadcast(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	cli := newClient(l.Addr())
-	ac := protocol.AuthClient{Cli: cli}
-	if err := ac.Authenticate(context.TODO(), goodToken); err != nil {
+	c := newClient(l.Addr())
+	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
 	m := newOOBMessage(goodUID, "sys", nil)
 	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
 		t.Fatal(err)
+	}
+
+	if len(c.broadcasts) != 1 {
+		t.Errorf("client broadcasts received: %d, expected 1", len(c.broadcasts))
 	}
 }
