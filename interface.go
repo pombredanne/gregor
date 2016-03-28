@@ -1,9 +1,10 @@
 package gregor
 
 import (
-	context "golang.org/x/net/context"
 	"net"
 	"time"
+
+	context "golang.org/x/net/context"
 )
 
 type InBandMsgType int
@@ -169,10 +170,9 @@ type MainLoopServer interface {
 }
 
 func UIDFromMessage(m Message) UID {
-	if ibm := m.ToInBandMessage(); ibm == nil {
-		return nil
-	} else if md := ibm.Metadata(); md != nil {
-		return md.UID()
+	ibm := m.ToInBandMessage()
+	if ibm != nil && ibm.Metadata() != nil {
+		return ibm.Metadata().UID()
 	}
 	if oobm := m.ToOutOfBandMessage(); oobm != nil {
 		return oobm.UID()

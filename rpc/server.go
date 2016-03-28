@@ -6,10 +6,8 @@ import (
 	"log"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/jonboulle/clockwork"
-	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	gregor "github.com/keybase/gregor"
 	protocol "github.com/keybase/gregor/protocol/go"
 	context "golang.org/x/net/context"
@@ -18,22 +16,10 @@ import (
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
 var ErrBadUID = errors.New("bad UID on channel")
 
-type ConnectionID int
-
 type broadcastArgs struct {
 	c     context.Context
 	m     protocol.Message
 	retCh chan<- error
-}
-
-type connection struct {
-	c          net.Conn
-	xprt       rpc.Transporter
-	uid        protocol.UID
-	session    protocol.SessionID
-	lastAuthed time.Time
-	parent     *Server
-	authCh     chan error
 }
 
 type Stats struct {
@@ -70,52 +56,10 @@ func NewServer() *Server {
 	return s
 }
 
-func (s *Server) newConnection(c net.Conn) *connection {
-	// TODO: logging and error wrapping mechanisms.
-	xprt := rpc.NewTransport(c, nil, nil)
-	return &connection{c: c, xprt: xprt, parent: s}
-}
-
-func (c *connection) Authenticate(ctx context.Context, tok protocol.AuthToken) error {
-	uid, sess, err := c.parent.auth.Authenticate(ctx, tok)
-	if err == nil {
-		c.uid = uid
-		c.session = sess
-		c.lastAuthed = c.parent.clock.Now()
-	}
-	c.authCh <- err
-	return err
-}
-
-func (c *connection) startAuthentication() error {
-	// TODO: error wrapping mechanism
-	srv := rpc.NewServer(c.xprt, nil)
-	prot := protocol.AuthProtocol(c)
-	c.authCh = make(chan error, 100)
-	if err := srv.Register(prot); err != nil {
-		return err
-	}
-	if err := srv.Run(true /* async */); err != nil {
-		return err
-	}
-	err := <-c.authCh
-	if err != nil {
-		return err
-	}
-	if c.uid == nil {
-		return ErrBadUID
-	}
-	return nil
-}
-
-func (c *connection) close() {
-	close(c.authCh)
-	c.c.Close()
-}
-
 func (s *Server) uidKey(u gregor.UID) (string, error) {
 	tuid, ok := u.(protocol.UID)
 	if !ok {
+		log.Printf("can't cast %v (%T) to protocol.UID", u, u)
 		return "", ErrBadCast
 	}
 	return hex.EncodeToString(tuid), nil
@@ -219,7 +163,10 @@ func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
 }
 
 func (s *Server) handleNewConnection(c net.Conn) error {
-	nc := s.newConnection(c)
+	nc, err := newConnection(c, s)
+	if err != nil {
+		return err
+	}
 	if err := nc.startAuthentication(); err != nil {
 		nc.close()
 		return err
