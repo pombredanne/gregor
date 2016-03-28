@@ -45,6 +45,12 @@ type PerUIDServer struct {
 	sendBroadcastCh chan broadcastArgs
 }
 
+func newPerUIDServer(uid protocol.UID) *PerUIDServer {
+	return &PerUIDServer{
+		uid: uid,
+	}
+}
+
 type Stats struct {
 	UserServerCount int
 }
@@ -124,17 +130,33 @@ func (c *connection) close() {
 	c.c.Close()
 }
 
-func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
+func (s *Server) uidKey(u gregor.UID) (string, error) {
 	tuid, ok := u.(protocol.UID)
 	if !ok {
-		return nil, ErrBadCast
+		return "", ErrBadCast
 	}
-	k := hex.EncodeToString(tuid)
+	return hex.EncodeToString(tuid), nil
+}
+
+func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
+	k, err := s.uidKey(u)
+	if err != nil {
+		return nil, err
+	}
 	ret := s.users[k]
 	if ret != nil {
 		return ret, nil
 	}
 	return nil, nil
+}
+
+func (s *Server) setPerUIDServer(u gregor.UID, usrv *PerUIDServer) error {
+	k, err := s.uidKey(u)
+	if err != nil {
+		return err
+	}
+	s.users[k] = usrv
+	return nil
 }
 
 func (s *Server) addUIDConnection(c *connection) {
@@ -145,6 +167,11 @@ func (s *Server) addUIDConnection(c *connection) {
 	}
 
 	if usrv == nil {
+		usrv = newPerUIDServer(c.uid)
+		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
+			log.Printf("setPerUIDServer error: %s", err)
+			return
+		}
 	}
 }
 
