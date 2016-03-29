@@ -8,3 +8,7 @@ import "strings"
 func IsSocketClosedError(e error) bool {
 	return strings.HasSuffix(e.Error(), "use of closed network connection")
 }
+
+func IsDisconnectedError(e error) bool {
+	return strings.HasSuffix(e.Error(), "no connection to remote")
+}

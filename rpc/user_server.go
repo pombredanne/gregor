@@ -18,26 +18,26 @@ type PerUIDServer struct {
 	uid   protocol.UID
 	conns map[ConnectionID]*connection
 
-	shutdownCh      chan protocol.UID
-	newConnectionCh chan *connection
-	sendBroadcastCh chan messageArgs
-	tryShutdownCh   chan bool
-	wg              sync.WaitGroup
-	nextConnID      ConnectionID
+	parentShutdownCh chan protocol.UID
+	newConnectionCh  chan *connection
+	sendBroadcastCh  chan messageArgs
+	tryShutdownCh    chan bool
+	wg               sync.WaitGroup
+	nextConnID       ConnectionID
 }
 
 func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID) *PerUIDServer {
 	s := &PerUIDServer{
-		uid:             uid,
-		conns:           make(map[ConnectionID]*connection),
-		newConnectionCh: make(chan *connection),
-		sendBroadcastCh: make(chan messageArgs),
-		tryShutdownCh:   make(chan bool, 1),
-		shutdownCh:      parentShutdownCh,
+		uid:              uid,
+		conns:            make(map[ConnectionID]*connection),
+		newConnectionCh:  make(chan *connection),
+		sendBroadcastCh:  make(chan messageArgs),
+		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside process
+		parentShutdownCh: parentShutdownCh,
 	}
 
 	s.wg.Add(1)
-	go s.process()
+	go s.serve()
 
 	return s
 }
@@ -49,7 +49,7 @@ func (s *PerUIDServer) logError(prefix string, err error) {
 	log.Printf("[uid %x] %s error: %s", s.uid, prefix, err)
 }
 
-func (s *PerUIDServer) process() {
+func (s *PerUIDServer) serve() {
 	defer s.wg.Done()
 	for {
 		select {
@@ -61,7 +61,8 @@ func (s *PerUIDServer) process() {
 			// make sure no connections have been added
 			if len(s.conns) == 0 {
 				log.Printf("shutting down PerUIDServer for %x", s.uid)
-				s.shutdownCh <- s.uid
+				// tell parent that the server for this uid is shutting down
+				s.parentShutdownCh <- s.uid
 				return
 			} else {
 				log.Printf("try shutdown, but %d conns for %x", len(s.conns), s.uid)
@@ -84,7 +85,7 @@ func (s *PerUIDServer) broadcast(a messageArgs) {
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
 			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
 
-			if IsSocketClosedError(err) || err == io.EOF {
+			if s.isConnDown(err) {
 				conn.close()
 				delete(s.conns, id)
 			}
@@ -99,6 +100,19 @@ func (s *PerUIDServer) broadcast(a messageArgs) {
 	if len(s.conns) == 0 {
 		s.tryShutdownCh <- true
 	}
+}
+
+func (s *PerUIDServer) isConnDown(err error) bool {
+	if IsSocketClosedError(err) {
+		return true
+	}
+	if IsDisconnectedError(err) {
+		return true
+	}
+	if err == io.EOF {
+		return true
+	}
+	return false
 }
 
 func (s *PerUIDServer) Shutdown() {

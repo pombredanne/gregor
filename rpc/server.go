@@ -113,6 +113,7 @@ func (s *Server) removeUIDServer(uid gregor.UID) error {
 }
 
 func (s *Server) reportStats(c chan *Stats) {
+	log.Printf("reportStats")
 	stats := &Stats{
 		UserServerCount: len(s.users),
 	}
