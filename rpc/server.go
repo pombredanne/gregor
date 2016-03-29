@@ -37,6 +37,7 @@ type Server struct {
 	newConnectionCh chan *connection
 	statsCh         chan chan *Stats
 	consumeCh       chan messageArgs
+	broadcastCh     chan messageArgs
 	closeCh         chan struct{}
 }
 
@@ -47,6 +48,7 @@ func NewServer() *Server {
 		newConnectionCh: make(chan *connection),
 		statsCh:         make(chan chan *Stats),
 		consumeCh:       make(chan messageArgs),
+		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
 	}
 
@@ -119,9 +121,12 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
+	retCh := make(chan error)
+	s.broadcastCh <- messageArgs{c, tm, retCh}
+	return <-retCh
+}
 
-	// XXX fix this, race here:
-
+func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
 	if err != nil {
 		return err
@@ -131,8 +136,7 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 		return nil
 	}
 	retCh := make(chan error)
-	args := messageArgs{c, tm, retCh}
-	srv.sendBroadcastCh <- args
+	srv.sendBroadcastCh <- messageArgs{c, m, retCh}
 	return <-retCh
 }
 
@@ -150,6 +154,9 @@ func (s *Server) serve() error {
 			s.logError("addUIDConnection", s.addUIDConnection(c))
 		case a := <-s.consumeCh:
 			err := s.nii.ConsumeMessage(a.c, a.m)
+			a.retCh <- err
+		case a := <-s.broadcastCh:
+			err := s.sendBroadcast(a.c, a.m)
 			a.retCh <- err
 		case c := <-s.statsCh:
 			s.reportStats(c)
