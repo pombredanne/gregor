@@ -3,6 +3,7 @@ package rpc
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"strings"
 	"sync"
@@ -17,19 +18,22 @@ type PerUIDServer struct {
 	uid   protocol.UID
 	conns map[ConnectionID]*connection
 
-	shutdownCh      <-chan protocol.UID
+	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
 	sendBroadcastCh chan messageArgs
+	tryShutdownCh   chan bool
 	wg              sync.WaitGroup
 	nextConnID      ConnectionID
 }
 
-func newPerUIDServer(uid protocol.UID) *PerUIDServer {
+func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID) *PerUIDServer {
 	s := &PerUIDServer{
 		uid:             uid,
 		conns:           make(map[ConnectionID]*connection),
 		newConnectionCh: make(chan *connection),
 		sendBroadcastCh: make(chan messageArgs),
+		tryShutdownCh:   make(chan bool, 1),
+		shutdownCh:      parentShutdownCh,
 	}
 
 	s.wg.Add(1)
@@ -53,6 +57,15 @@ func (s *PerUIDServer) process() {
 			s.logError("addConn", s.addConn(c))
 		case a := <-s.sendBroadcastCh:
 			s.broadcast(a)
+		case <-s.tryShutdownCh:
+			// make sure no connections have been added
+			if len(s.conns) == 0 {
+				log.Printf("shutting down PerUIDServer for %x", s.uid)
+				s.shutdownCh <- s.uid
+				return
+			} else {
+				log.Printf("try shutdown, but %d conns for %x", len(s.conns), s.uid)
+			}
 		}
 	}
 }
@@ -71,7 +84,10 @@ func (s *PerUIDServer) broadcast(a messageArgs) {
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
 			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
 
-			// TODO check for closed connection error
+			if IsSocketClosedError(err) || err == io.EOF {
+				conn.close()
+				delete(s.conns, id)
+			}
 		}
 	}
 
@@ -79,6 +95,10 @@ func (s *PerUIDServer) broadcast(a messageArgs) {
 		a.retCh <- nil
 	}
 	a.retCh <- errors.New(strings.Join(errMsgs, ", "))
+
+	if len(s.conns) == 0 {
+		s.tryShutdownCh <- true
+	}
 }
 
 func (s *PerUIDServer) Shutdown() {

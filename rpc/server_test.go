@@ -63,7 +63,7 @@ type client struct {
 	broadcasts []protocol.Message
 }
 
-func newClient(addr net.Addr) *client {
+func newClient(addr net.Addr) (net.Conn, *client) {
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test server: %s", err))
@@ -80,7 +80,7 @@ func newClient(addr net.Addr) *client {
 		panic(err.Error())
 	}
 
-	return x
+	return c, x
 }
 
 func (c *client) AuthClient() protocol.AuthClient {
@@ -100,7 +100,7 @@ func TestAuthentication(t *testing.T) {
 	_, l := startTestServer(nil)
 	defer l.Close()
 
-	c := newClient(l.Addr())
+	_, c := newClient(l.Addr())
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestCreatePerUIDServer(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	c := newClient(l.Addr())
+	_, c := newClient(l.Addr())
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestBroadcast(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	c := newClient(l.Addr())
+	_, c := newClient(l.Addr())
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +179,7 @@ func TestConsume(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	c := newClient(l.Addr())
+	_, c := newClient(l.Addr())
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -190,5 +190,45 @@ func TestConsume(t *testing.T) {
 
 	if len(mc.consumed) != 1 {
 		t.Errorf("consumer messages received: %d, expected 1", len(mc.consumed))
+	}
+}
+
+func TestClose(t *testing.T) {
+	s, l := startTestServer(nil)
+	defer l.Close()
+	defer s.Shutdown()
+
+	conn, c := newClient(l.Addr())
+
+	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	ch := make(chan *Stats)
+	s.statsCh <- ch
+	stats := <-ch
+	if stats.UserServerCount != 1 {
+		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	}
+
+	conn.Close()
+
+	s.statsCh <- ch
+	stats = <-ch
+	if stats.UserServerCount != 1 {
+		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	}
+
+	// this should cause it to realize the connection is closed:
+	m := newOOBMessage(goodUID, "sys", nil)
+	if err := s.BroadcastMessage(context.TODO(), m); err == nil {
+		t.Fatal("broadcast had no errors")
+	}
+
+	// and now the user server should be deleted:
+	s.statsCh <- ch
+	stats = <-ch
+	if stats.UserServerCount != 0 {
+		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
 	}
 }

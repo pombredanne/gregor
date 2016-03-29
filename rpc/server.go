@@ -50,6 +50,7 @@ func NewServer() *Server {
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
+		shutdownCh:      make(chan protocol.UID),
 	}
 
 	return s
@@ -92,13 +93,22 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid)
+		usrv = newPerUIDServer(c.uid, s.shutdownCh)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}
 	}
 
 	usrv.newConnectionCh <- c
+	return nil
+}
+
+func (s *Server) removeUIDServer(uid gregor.UID) error {
+	k, err := s.uidKey(uid)
+	if err != nil {
+		return err
+	}
+	delete(s.users, k)
 	return nil
 }
 
@@ -160,6 +170,8 @@ func (s *Server) serve() error {
 			a.retCh <- err
 		case c := <-s.statsCh:
 			s.reportStats(c)
+		case uid := <-s.shutdownCh:
+			s.removeUIDServer(uid)
 		case <-s.closeCh:
 			return nil
 		}
