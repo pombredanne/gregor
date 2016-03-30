@@ -26,9 +26,10 @@ type perUIDServer struct {
 	sendBroadcastCh chan messageArgs
 	tryShutdownCh   chan bool
 	closeListenCh   chan error
+	shutdownCh      chan struct{}
 }
 
-func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs) *perUIDServer {
+func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}) *perUIDServer {
 	s := &perUIDServer{
 		uid:             uid,
 		conns:           make(map[connectionID]*connection),
@@ -37,6 +38,7 @@ func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownAr
 		tryShutdownCh:   make(chan bool, 1), // buffered so it can receive inside serve()
 		closeListenCh:   make(chan error),
 		parentConfirmCh: parentConfirmCh,
+		shutdownCh:      shutdownCh,
 	}
 
 	go s.serve()
@@ -67,6 +69,9 @@ func (s *perUIDServer) serve() {
 			if s.tryShutdown() {
 				return
 			}
+		case <-s.shutdownCh:
+			s.removeAllConns()
+			return
 		}
 	}
 }
@@ -154,4 +159,10 @@ func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
 	log.Printf("uid server %x: removing connection %d", s.uid, id)
 	conn.close()
 	delete(s.conns, id)
+}
+
+func (s *perUIDServer) removeAllConns() {
+	for id, conn := range s.conns {
+		s.removeConnection(conn, id)
+	}
 }

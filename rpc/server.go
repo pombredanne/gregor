@@ -113,7 +113,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.confirmCh)
+		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}
