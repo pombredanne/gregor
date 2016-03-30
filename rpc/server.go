@@ -16,10 +16,18 @@ import (
 // gregor to protocol.
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
 
+type connectionID int
+
 type messageArgs struct {
 	c     context.Context
 	m     protocol.Message
 	retCh chan<- error
+}
+
+type confirmUIDShutdownArgs struct {
+	uid        protocol.UID
+	lastConnID connectionID
+	ok         chan<- bool
 }
 
 // Stats contains information about the current state of the
@@ -38,12 +46,17 @@ type Server struct {
 	// key is the Hex-encoding of the binary UIDs
 	users map[string](*perUIDServer)
 
-	shutdownCh      chan protocol.UID
-	newConnectionCh chan *connection
-	statsCh         chan chan *Stats
-	consumeCh       chan messageArgs
-	broadcastCh     chan messageArgs
-	closeCh         chan struct{}
+	// last connection added per UID
+	lastConns map[string]connectionID
+
+	shutdownCh       chan protocol.UID
+	newConnectionCh  chan *connection
+	statsCh          chan chan *Stats
+	consumeCh        chan messageArgs
+	broadcastCh      chan messageArgs
+	closeCh          chan struct{}
+	confirmCh        chan confirmUIDShutdownArgs
+	nextConnectionID connectionID
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
@@ -52,11 +65,13 @@ func NewServer() *Server {
 	s := &Server{
 		clock:           clockwork.NewRealClock(),
 		users:           make(map[string]*perUIDServer),
+		lastConns:       make(map[string]connectionID),
 		newConnectionCh: make(chan *connection),
 		statsCh:         make(chan chan *Stats),
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
+		confirmCh:       make(chan confirmUIDShutdownArgs),
 		shutdownCh:      make(chan protocol.UID),
 	}
 
@@ -100,13 +115,19 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.shutdownCh)
+		usrv = newPerUIDServer(c.uid, s.shutdownCh, s.confirmCh)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}
 	}
 
-	usrv.newConnectionCh <- c
+	k, err := s.uidKey(c.uid)
+	if err != nil {
+		return err
+	}
+	s.lastConns[k] = s.nextConnectionID
+	usrv.newConnectionCh <- &connectionArgs{c: c, id: s.nextConnectionID}
+	s.nextConnectionID++
 	return nil
 }
 
@@ -116,7 +137,27 @@ func (s *Server) removeUIDServer(uid gregor.UID) error {
 		return err
 	}
 	delete(s.users, k)
+	delete(s.lastConns, k)
 	return nil
+}
+
+func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
+	k, err := s.uidKey(a.uid)
+	if err != nil {
+		log.Printf("confirmUIDShutdown, uidKey error: %s", err)
+		a.ok <- false
+		return
+	}
+	serverLast, ok := s.lastConns[k]
+	if !ok {
+		log.Printf("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
+		a.ok <- false
+		return
+	}
+
+	// it's ok to shutdown if the last connection that the server knows about
+	// matches the last connection in the perUIDServer
+	a.ok <- serverLast == a.lastConnID
 }
 
 func (s *Server) reportStats(c chan *Stats) {
@@ -181,6 +222,8 @@ func (s *Server) serve() error {
 			s.reportStats(c)
 		case uid := <-s.shutdownCh:
 			s.removeUIDServer(uid)
+		case a := <-s.confirmCh:
+			s.confirmUIDShutdown(a)
 		case <-s.closeCh:
 			return nil
 		}

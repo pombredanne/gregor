@@ -11,29 +11,34 @@ import (
 	protocol "github.com/keybase/gregor/protocol/go"
 )
 
-type connectionID int
+type connectionArgs struct {
+	c  *connection
+	id connectionID
+}
 
 type perUIDServer struct {
-	uid   protocol.UID
-	conns map[connectionID]*connection
+	uid        protocol.UID
+	conns      map[connectionID]*connection
+	lastConnID connectionID
 
 	parentShutdownCh chan protocol.UID
-	newConnectionCh  chan *connection
+	parentConfirmCh  chan confirmUIDShutdownArgs
+	newConnectionCh  chan *connectionArgs
 	sendBroadcastCh  chan messageArgs
 	tryShutdownCh    chan bool
 	closeListenCh    chan error
-	nextConnID       connectionID
 }
 
-func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID) *perUIDServer {
+func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
-		newConnectionCh:  make(chan *connection),
+		newConnectionCh:  make(chan *connectionArgs),
 		sendBroadcastCh:  make(chan messageArgs),
 		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside serve()
 		closeListenCh:    make(chan error),
 		parentShutdownCh: parentShutdownCh,
+		parentConfirmCh:  parentConfirmCh,
 	}
 
 	go s.serve()
@@ -51,8 +56,8 @@ func (s *perUIDServer) logError(prefix string, err error) {
 func (s *perUIDServer) serve() {
 	for {
 		select {
-		case c := <-s.newConnectionCh:
-			s.logError("addConn", s.addConn(c))
+		case a := <-s.newConnectionCh:
+			s.logError("addConn", s.addConn(a))
 		case a := <-s.sendBroadcastCh:
 			s.broadcast(a)
 		case <-s.closeListenCh:
@@ -68,10 +73,10 @@ func (s *perUIDServer) serve() {
 	}
 }
 
-func (s *perUIDServer) addConn(c *connection) error {
-	c.xprt.AddCloseListener(s.closeListenCh)
-	s.conns[s.nextConnID] = c
-	s.nextConnID++
+func (s *perUIDServer) addConn(a *connectionArgs) error {
+	a.c.xprt.AddCloseListener(s.closeListenCh)
+	s.conns[a.id] = a.c
+	s.lastConnID = a.id
 	return nil
 }
 
@@ -108,6 +113,20 @@ func (s *perUIDServer) tryShutdown() bool {
 		log.Printf("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
 		return false
 	}
+
+	// confirm with the server that it is ok to shutdown
+	ok := make(chan bool)
+	args := confirmUIDShutdownArgs{
+		uid:        s.uid,
+		lastConnID: s.lastConnID,
+		ok:         ok,
+	}
+	s.parentConfirmCh <- args
+	if <-ok == false {
+		log.Printf("tried shutdown, but parent server didn't allow it")
+		return false
+	}
+
 	log.Printf("shutting down perUIDServer for %x", s.uid)
 	// tell parent that the server for this uid is shutting down
 	s.parentShutdownCh <- s.uid

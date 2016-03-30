@@ -275,3 +275,74 @@ func TestCloseConnect(t *testing.T) {
 		t.Errorf("c2 broadcasts: %d, expected 1", len(c2.broadcasts))
 	}
 }
+
+func TestCloseConnect2(t *testing.T) {
+	s, l := startTestServer(nil)
+	defer l.Close()
+	defer s.Shutdown()
+
+	conn1, c1 := newClient(l.Addr())
+	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	// close the first connection
+	conn1.Close()
+
+	// broadcast a message to goodUID
+	m := newOOBMessage(goodUID, "sys", nil)
+	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
+		// an error here is ok, as it could be about conn1 being closed:
+		t.Logf("broadcast error: %s", err)
+	}
+
+	_, c2 := newClient(l.Addr())
+	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	// the user server should exist due to c2:
+	ch := make(chan *Stats)
+	s.statsCh <- ch
+	stats := <-ch
+	if stats.UserServerCount != 1 {
+		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
+	}
+
+	// c1 shouldn't have received the broadcast:
+	if len(c1.broadcasts) != 0 {
+		t.Errorf("c1 broadcasts: %d, expected 0", len(c1.broadcasts))
+	}
+
+	// c2 shouldn't have received the broadcast:
+	if len(c2.broadcasts) != 0 {
+		t.Errorf("c2 broadcasts: %d, expected 0", len(c2.broadcasts))
+	}
+}
+
+func TestCloseConnect3(t *testing.T) {
+	s, l := startTestServer(nil)
+	defer l.Close()
+	defer s.Shutdown()
+
+	conn1, c1 := newClient(l.Addr())
+	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	// close the first connection
+	conn1.Close()
+
+	_, c2 := newClient(l.Addr())
+	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	// the user server should exist due to c2:
+	ch := make(chan *Stats)
+	s.statsCh <- ch
+	stats := <-ch
+	if stats.UserServerCount != 1 {
+		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
+	}
+}
