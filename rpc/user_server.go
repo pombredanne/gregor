@@ -58,14 +58,8 @@ func (s *PerUIDServer) serve() {
 		case a := <-s.sendBroadcastCh:
 			s.broadcast(a)
 		case <-s.tryShutdownCh:
-			// make sure no connections have been added
-			if len(s.conns) == 0 {
-				log.Printf("shutting down PerUIDServer for %x", s.uid)
-				// tell parent that the server for this uid is shutting down
-				s.parentShutdownCh <- s.uid
+			if s.tryShutdown() {
 				return
-			} else {
-				log.Printf("try shutdown, but %d conns for %x", len(s.conns), s.uid)
 			}
 		}
 	}
@@ -100,6 +94,20 @@ func (s *PerUIDServer) broadcast(a messageArgs) {
 	if len(s.conns) == 0 {
 		s.tryShutdownCh <- true
 	}
+}
+
+// tryShutdown checks if it is ok to shutdown.  Returns true if it
+// is ok.
+func (s *PerUIDServer) tryShutdown() bool {
+	// make sure no connections have been added
+	if len(s.conns) != 0 {
+		log.Printf("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
+		return false
+	}
+	log.Printf("shutting down PerUIDServer for %x", s.uid)
+	// tell parent that the server for this uid is shutting down
+	s.parentShutdownCh <- s.uid
+	return true
 }
 
 func (s *PerUIDServer) isConnDown(err error) bool {
