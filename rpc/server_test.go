@@ -3,7 +3,6 @@ package rpc
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"testing"
 
@@ -212,25 +211,21 @@ func TestCloseOne(t *testing.T) {
 		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
 
-	log.Printf("closing conn")
 	conn.Close()
 
-	// server doesn't know the connection is closed yet:
-	s.statsCh <- ch
-	stats = <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
-	}
-
-	// this should cause it to realize the connection is closed:
+	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
-	if err := s.BroadcastMessage(context.TODO(), m); err == nil {
-		t.Fatal("broadcast had no errors")
-	} else {
-		t.Logf("broadcast error (expected): %s (%T)", err, err)
+	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
+		// an error here is ok, as it could be about conn being closed:
+		t.Logf("broadcast error: %s", err)
 	}
 
-	// and now the user server should be deleted:
+	// make sure it didn't receive the broadcast
+	if len(c.broadcasts) != 0 {
+		t.Errorf("c broadcasts: %d, expected 0", len(c.broadcasts))
+	}
+
+	// and the user server should be deleted:
 	s.statsCh <- ch
 	stats = <-ch
 	if stats.UserServerCount != 0 {
@@ -255,13 +250,14 @@ func TestCloseConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// this will notice that conn1 is closed.
+	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
-	if err := s.BroadcastMessage(context.TODO(), m); err == nil {
-		t.Fatal("broadcast had no errors")
+	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
+		// an error here is ok, as it could be about conn1 being closed:
+		t.Logf("broadcast error: %s", err)
 	}
 
-	// but the user server should still exist due to c2:
+	// the user server should still exist due to c2:
 	ch := make(chan *Stats)
 	s.statsCh <- ch
 	stats := <-ch

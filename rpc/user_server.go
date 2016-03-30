@@ -21,6 +21,7 @@ type perUIDServer struct {
 	newConnectionCh  chan *connection
 	sendBroadcastCh  chan messageArgs
 	tryShutdownCh    chan bool
+	closeListenCh    chan error
 	nextConnID       connectionID
 }
 
@@ -30,7 +31,8 @@ func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID) *perU
 		conns:            make(map[connectionID]*connection),
 		newConnectionCh:  make(chan *connection),
 		sendBroadcastCh:  make(chan messageArgs),
-		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside process
+		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error),
 		parentShutdownCh: parentShutdownCh,
 	}
 
@@ -53,6 +55,11 @@ func (s *perUIDServer) serve() {
 			s.logError("addConn", s.addConn(c))
 		case a := <-s.sendBroadcastCh:
 			s.broadcast(a)
+		case <-s.closeListenCh:
+			s.checkClosed()
+			if s.tryShutdown() {
+				return
+			}
 		case <-s.tryShutdownCh:
 			if s.tryShutdown() {
 				return
@@ -62,6 +69,7 @@ func (s *perUIDServer) serve() {
 }
 
 func (s *perUIDServer) addConn(c *connection) error {
+	c.xprt.AddCloseListener(s.closeListenCh)
 	s.conns[s.nextConnID] = c
 	s.nextConnID++
 	return nil
@@ -76,14 +84,14 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
 
 			if s.isConnDown(err) {
-				conn.close()
-				delete(s.conns, id)
+				s.removeConnection(conn, id)
 			}
 		}
 	}
 
 	if len(errMsgs) == 0 {
 		a.retCh <- nil
+		return
 	}
 	a.retCh <- errors.New(strings.Join(errMsgs, ", "))
 
@@ -106,6 +114,17 @@ func (s *perUIDServer) tryShutdown() bool {
 	return true
 }
 
+func (s *perUIDServer) checkClosed() {
+	log.Printf("uid server %x: received connection closed message, checking all connections", s.uid)
+	for id, conn := range s.conns {
+		if conn.xprt.IsConnected() {
+			continue
+		}
+		log.Printf("uid server %x: connection %d closed", s.uid, id)
+		s.removeConnection(conn, id)
+	}
+}
+
 func (s *perUIDServer) isConnDown(err error) bool {
 	if IsSocketClosedError(err) {
 		return true
@@ -114,4 +133,10 @@ func (s *perUIDServer) isConnDown(err error) bool {
 		return true
 	}
 	return false
+}
+
+func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
+	log.Printf("uid server %x: removing connection %d", s.uid, id)
+	conn.close()
+	delete(s.conns, id)
 }
