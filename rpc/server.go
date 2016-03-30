@@ -49,7 +49,6 @@ type Server struct {
 	// last connection added per UID
 	lastConns map[string]connectionID
 
-	shutdownCh       chan protocol.UID
 	newConnectionCh  chan *connection
 	statsCh          chan chan *Stats
 	consumeCh        chan messageArgs
@@ -67,12 +66,11 @@ func NewServer() *Server {
 		users:           make(map[string]*perUIDServer),
 		lastConns:       make(map[string]connectionID),
 		newConnectionCh: make(chan *connection),
-		statsCh:         make(chan chan *Stats),
+		statsCh:         make(chan chan *Stats, 1),
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
 		confirmCh:       make(chan confirmUIDShutdownArgs),
-		shutdownCh:      make(chan protocol.UID),
 	}
 
 	return s
@@ -115,7 +113,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.shutdownCh, s.confirmCh)
+		usrv = newPerUIDServer(c.uid, s.confirmCh)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}
@@ -128,16 +126,6 @@ func (s *Server) addUIDConnection(c *connection) error {
 	s.lastConns[k] = s.nextConnectionID
 	usrv.newConnectionCh <- &connectionArgs{c: c, id: s.nextConnectionID}
 	s.nextConnectionID++
-	return nil
-}
-
-func (s *Server) removeUIDServer(uid gregor.UID) error {
-	k, err := s.uidKey(uid)
-	if err != nil {
-		return err
-	}
-	delete(s.users, k)
-	delete(s.lastConns, k)
 	return nil
 }
 
@@ -157,7 +145,15 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 
 	// it's ok to shutdown if the last connection that the server knows about
 	// matches the last connection in the perUIDServer
-	a.ok <- serverLast == a.lastConnID
+	if serverLast == a.lastConnID {
+		// remove the perUIDServer from users, lastConns
+		delete(s.users, k)
+		delete(s.lastConns, k)
+		a.ok <- true
+		return
+	}
+
+	a.ok <- false
 }
 
 func (s *Server) reportStats(c chan *Stats) {
@@ -220,8 +216,6 @@ func (s *Server) serve() error {
 			a.retCh <- err
 		case c := <-s.statsCh:
 			s.reportStats(c)
-		case uid := <-s.shutdownCh:
-			s.removeUIDServer(uid)
 		case a := <-s.confirmCh:
 			s.confirmUIDShutdown(a)
 		case <-s.closeCh:

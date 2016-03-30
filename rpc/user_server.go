@@ -21,24 +21,22 @@ type perUIDServer struct {
 	conns      map[connectionID]*connection
 	lastConnID connectionID
 
-	parentShutdownCh chan protocol.UID
-	parentConfirmCh  chan confirmUIDShutdownArgs
-	newConnectionCh  chan *connectionArgs
-	sendBroadcastCh  chan messageArgs
-	tryShutdownCh    chan bool
-	closeListenCh    chan error
+	parentConfirmCh chan confirmUIDShutdownArgs
+	newConnectionCh chan *connectionArgs
+	sendBroadcastCh chan messageArgs
+	tryShutdownCh   chan bool
+	closeListenCh   chan error
 }
 
-func newPerUIDServer(uid protocol.UID, parentShutdownCh chan protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs) *perUIDServer {
+func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs) *perUIDServer {
 	s := &perUIDServer{
-		uid:              uid,
-		conns:            make(map[connectionID]*connection),
-		newConnectionCh:  make(chan *connectionArgs),
-		sendBroadcastCh:  make(chan messageArgs),
-		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error),
-		parentShutdownCh: parentShutdownCh,
-		parentConfirmCh:  parentConfirmCh,
+		uid:             uid,
+		conns:           make(map[connectionID]*connection),
+		newConnectionCh: make(chan *connectionArgs),
+		sendBroadcastCh: make(chan messageArgs),
+		tryShutdownCh:   make(chan bool, 1), // buffered so it can receive inside serve()
+		closeListenCh:   make(chan error),
+		parentConfirmCh: parentConfirmCh,
 	}
 
 	go s.serve()
@@ -128,8 +126,6 @@ func (s *perUIDServer) tryShutdown() bool {
 	}
 
 	log.Printf("shutting down perUIDServer for %x", s.uid)
-	// tell parent that the server for this uid is shutting down
-	s.parentShutdownCh <- s.uid
 	return true
 }
 

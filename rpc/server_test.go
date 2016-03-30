@@ -3,6 +3,7 @@ package rpc
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"testing"
 
@@ -58,12 +59,14 @@ func newLocalListener() net.Listener {
 }
 
 type client struct {
+	conn       net.Conn
 	tr         rpc.Transporter
 	cli        *rpc.Client
 	broadcasts []protocol.Message
+	shutdown   bool
 }
 
-func newClient(addr net.Addr) (net.Conn, *client) {
+func newClient(addr net.Addr) *client {
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test server: %s", err))
@@ -71,8 +74,9 @@ func newClient(addr net.Addr) (net.Conn, *client) {
 	t := rpc.NewTransport(c, nil, nil)
 
 	x := &client{
-		tr:  t,
-		cli: rpc.NewClient(t, nil),
+		conn: c,
+		tr:   t,
+		cli:  rpc.NewClient(t, nil),
 	}
 
 	srv := rpc.NewServer(t, nil)
@@ -80,7 +84,14 @@ func newClient(addr net.Addr) (net.Conn, *client) {
 		panic(err.Error())
 	}
 
-	return c, x
+	return x
+}
+
+func (c *client) Shutdown() {
+	c.conn.Close()
+	// this is required as closing the connection only closes one direction
+	// and there is a race in figuring out that the whole connection is closed.
+	c.shutdown = true
 }
 
 func (c *client) AuthClient() protocol.AuthClient {
@@ -92,6 +103,9 @@ func (c *client) IncomingClient() protocol.IncomingClient {
 }
 
 func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error {
+	if c.shutdown {
+		return io.EOF
+	}
 	c.broadcasts = append(c.broadcasts, m)
 	return nil
 }
@@ -100,7 +114,8 @@ func TestAuthentication(t *testing.T) {
 	_, l := startTestServer(nil)
 	defer l.Close()
 
-	_, c := newClient(l.Addr())
+	c := newClient(l.Addr())
+	defer c.Shutdown()
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
@@ -116,7 +131,8 @@ func TestCreatePerUIDServer(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	_, c := newClient(l.Addr())
+	c := newClient(l.Addr())
+	defer c.Shutdown()
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
@@ -158,7 +174,8 @@ func TestBroadcast(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	_, c := newClient(l.Addr())
+	c := newClient(l.Addr())
+	defer c.Shutdown()
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +196,8 @@ func TestConsume(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	_, c := newClient(l.Addr())
+	c := newClient(l.Addr())
+	defer c.Shutdown()
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +216,7 @@ func TestCloseOne(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	conn, c := newClient(l.Addr())
+	c := newClient(l.Addr())
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
@@ -211,7 +229,7 @@ func TestCloseOne(t *testing.T) {
 		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
 
-	conn.Close()
+	c.Shutdown()
 
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
@@ -238,14 +256,15 @@ func TestCloseConnect(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	conn1, c1 := newClient(l.Addr())
+	c1 := newClient(l.Addr())
 	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
 	// close the first connection, start a new connection
-	conn1.Close()
-	_, c2 := newClient(l.Addr())
+	c1.Shutdown()
+	c2 := newClient(l.Addr())
+	defer c2.Shutdown()
 	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -281,13 +300,13 @@ func TestCloseConnect2(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	conn1, c1 := newClient(l.Addr())
+	c1 := newClient(l.Addr())
 	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
 	// close the first connection
-	conn1.Close()
+	c1.Shutdown()
 
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
@@ -296,7 +315,8 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
-	_, c2 := newClient(l.Addr())
+	c2 := newClient(l.Addr())
+	defer c2.Shutdown()
 	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
@@ -325,15 +345,16 @@ func TestCloseConnect3(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
-	conn1, c1 := newClient(l.Addr())
+	c1 := newClient(l.Addr())
 	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
 	// close the first connection
-	conn1.Close()
+	c1.Shutdown()
 
-	_, c2 := newClient(l.Addr())
+	c2 := newClient(l.Addr())
+	defer c2.Shutdown()
 	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
