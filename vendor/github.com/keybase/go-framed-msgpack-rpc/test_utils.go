@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"reflect"
-	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -49,6 +47,7 @@ type testProtocol struct {
 	c              net.Conn
 	constants      Constants
 	longCallResult int
+	debugTags      CtxRpcTags
 	notifyCh       chan struct{}
 }
 
@@ -66,20 +65,9 @@ func (a *testProtocol) Add(args *AddArgs) (ret int, err error) {
 	return
 }
 
-func (a *testProtocol) DivMod(args *DivModArgs) (ret *DivModRes, err error) {
-	ret = &DivModRes{}
-	if args.B == 0 {
-		err = errors.New("Cannot divide by 0")
-	} else {
-		ret.Q = args.A / args.B
-		ret.R = args.A % args.B
-	}
-	return
-}
-
 func (a *testProtocol) UpdateConstants(args *Constants) error {
 	a.constants = *args
-	a.notifyCh <- struct{}{}
+	close(a.notifyCh)
 	return nil
 }
 
@@ -90,8 +78,10 @@ func (a *testProtocol) GetConstants() (*Constants, error) {
 
 func (a *testProtocol) LongCall(ctx context.Context) (int, error) {
 	defer func() {
-		a.notifyCh <- struct{}{}
+		close(a.notifyCh)
 	}()
+	tags, _ := RpcTagsFromContext(ctx)
+	a.debugTags = tags
 	a.longCallResult = 0
 	for i := 0; i < 100; i++ {
 		select {
@@ -111,6 +101,10 @@ func (a *testProtocol) LongCallResult(ctx context.Context) (int, error) {
 	return a.longCallResult, nil
 }
 
+func (a *testProtocol) LongCallDebugTags(ctx context.Context) (CtxRpcTags, error) {
+	return a.debugTags, nil
+}
+
 //---------------------------------------------------------------
 // begin autogen code
 
@@ -119,27 +113,17 @@ type AddArgs struct {
 	B int
 }
 
-type DivModArgs struct {
-	A int
-	B int
-}
-
-type DivModRes struct {
-	Q int
-	R int
-}
-
 type Constants struct {
 	Pi int
 }
 
 type TestInterface interface {
 	Add(*AddArgs) (int, error)
-	DivMod(*DivModArgs) (*DivModRes, error)
 	UpdateConstants(*Constants) error
 	GetConstants() (*Constants, error)
 	LongCall(context.Context) (int, error)
 	LongCallResult(context.Context) (int, error)
+	LongCallDebugTags(context.Context) (CtxRpcTags, error)
 }
 
 func createTestProtocol(i TestInterface) Protocol {
@@ -156,19 +140,6 @@ func createTestProtocol(i TestInterface) Protocol {
 						return nil, NewTypeError((*AddArgs)(nil), args)
 					}
 					return i.Add(addArgs)
-				},
-				MethodType: MethodCall,
-			},
-			"divMod": {
-				MakeArg: func() interface{} {
-					return new(DivModArgs)
-				},
-				Handler: func(_ context.Context, args interface{}) (interface{}, error) {
-					divModArgs, ok := args.(*DivModArgs)
-					if !ok {
-						return nil, NewTypeError((*DivModArgs)(nil), args)
-					}
-					return i.DivMod(divModArgs)
 				},
 				MethodType: MethodCall,
 			},
@@ -213,6 +184,15 @@ func createTestProtocol(i TestInterface) Protocol {
 				},
 				MethodType: MethodCall,
 			},
+			"LongCallDebugTags": {
+				MakeArg: func() interface{} {
+					return new(interface{})
+				},
+				Handler: func(ctx context.Context, _ interface{}) (interface{}, error) {
+					return i.LongCallDebugTags(ctx)
+				},
+				MethodType: MethodCall,
+			},
 		},
 	}
 }
@@ -223,11 +203,6 @@ func createTestProtocol(i TestInterface) Protocol {
 //---------------------------------------------------------------------
 // Client
 
-type GenericClient interface {
-	Call(ctx context.Context, method string, arg interface{}, res interface{}) error
-	Notify(ctx context.Context, method string, arg interface{}) error
-}
-
 type TestClient struct {
 	GenericClient
 }
@@ -237,8 +212,13 @@ func (a TestClient) Add(ctx context.Context, arg AddArgs) (ret int, err error) {
 	return
 }
 
-func (a TestClient) Broken() (err error) {
-	err = a.Call(nil, "test.1.testp.broken", nil, nil)
+func (a TestClient) BrokenMethod() (err error) {
+	err = a.Call(context.Background(), "test.1.testp.broken", nil, nil)
+	return
+}
+
+func (a TestClient) BrokenProtocol() (err error) {
+	err = a.Call(context.Background(), "test.2.testp.broken", nil, nil)
 	return
 }
 
@@ -262,99 +242,7 @@ func (a TestClient) LongCallResult(ctx context.Context) (ret int, err error) {
 	return
 }
 
-// mockCodec uses a slice instead of a simple channel wrapper because
-// we need to be able to peek at the head element without removing it
-type mockCodec struct {
-	elems []interface{}
-	mtx   sync.Mutex
-}
-
-func newMockCodec(elems ...interface{}) *mockCodec {
-	md := &mockCodec{
-		elems: make([]interface{}, 0, 32),
-	}
-	for _, i := range elems {
-		md.elems = append(md.elems, i)
-	}
-	return md
-}
-
-func (md *mockCodec) Decode(i interface{}) error {
-	return md.decode(i)
-}
-
-func (md *mockCodec) ReadByte() (b byte, err error) {
-	err = md.Decode(&b)
-	return b, err
-}
-
-func (md *mockCodec) Encode(i interface{}) error {
-	return md.encode(i, nil)
-}
-
-func (md *mockCodec) encode(i interface{}, ch chan struct{}) error {
-	v := reflect.ValueOf(i)
-	if v.Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			e := v.Index(i).Interface()
-			md.mtx.Lock()
-			md.elems = append(md.elems, e)
-			md.mtx.Unlock()
-			if ch != nil {
-				ch <- struct{}{}
-			}
-		}
-		return nil
-	}
-	return errors.New("only support encoding slices")
-}
-
-func (md *mockCodec) decode(i interface{}) error {
-	md.mtx.Lock()
-	defer md.mtx.Unlock()
-	if len(md.elems) == 0 {
-		return errors.New("Tried to decode too many elements")
-	}
-	v := reflect.ValueOf(i).Elem()
-	d := reflect.ValueOf(md.elems[0])
-	if d.IsValid() {
-		if !d.Type().AssignableTo(v.Type()) {
-			return fmt.Errorf("Tried to decode incorrect type. Expected: %v, actual: %v", v.Type(), d.Type())
-		}
-		v.Set(d)
-	}
-	md.elems = md.elems[1:]
-	return nil
-}
-
-type blockingMockCodec struct {
-	mockCodec
-	ch chan struct{}
-}
-
-func newBlockingMockCodec(elems ...interface{}) *blockingMockCodec {
-	md := newMockCodec(elems...)
-	return &blockingMockCodec{
-		mockCodec: *md,
-		ch:        make(chan struct{}),
-	}
-}
-
-func (md *blockingMockCodec) Decode(i interface{}) error {
-	<-md.ch
-	return md.decode(i)
-}
-
-func (md *blockingMockCodec) Encode(i interface{}) error {
-	return md.encode(i, md.ch)
-}
-
-type mockErrorUnwrapper struct{}
-
-func (eu *mockErrorUnwrapper) MakeArg() interface{} {
-	return new(int)
-}
-
-func (eu *mockErrorUnwrapper) UnwrapError(i interface{}) (appErr error, dispatchErr error) {
-	return nil, nil
+func (a TestClient) LongCallDebugTags(ctx context.Context) (ret CtxRpcTags, err error) {
+	err = a.Call(ctx, "test.1.testp.LongCallDebugTags", nil, &ret)
+	return
 }
