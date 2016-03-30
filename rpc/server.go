@@ -12,8 +12,9 @@ import (
 	context "golang.org/x/net/context"
 )
 
+// ErrBadCast occurs when there is a problem casting a type from
+// gregor to protocol.
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
-var ErrBadUID = errors.New("bad UID on channel")
 
 type messageArgs struct {
 	c     context.Context
@@ -21,17 +22,21 @@ type messageArgs struct {
 	retCh chan<- error
 }
 
+// Stats contains information about the current state of the
+// server.
 type Stats struct {
 	UserServerCount int
 }
 
+// Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
+// and gregor.NetworkInterface.
 type Server struct {
 	nii   gregor.NetworkInterfaceIncoming
 	auth  Authenticator
 	clock clockwork.Clock
 
 	// key is the Hex-encoding of the binary UIDs
-	users map[string](*PerUIDServer)
+	users map[string](*perUIDServer)
 
 	shutdownCh      chan protocol.UID
 	newConnectionCh chan *connection
@@ -41,10 +46,12 @@ type Server struct {
 	closeCh         chan struct{}
 }
 
+// NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
+// for it to be functional.
 func NewServer() *Server {
 	s := &Server{
 		clock:           clockwork.NewRealClock(),
-		users:           make(map[string]*PerUIDServer),
+		users:           make(map[string]*perUIDServer),
 		newConnectionCh: make(chan *connection),
 		statsCh:         make(chan chan *Stats),
 		consumeCh:       make(chan messageArgs),
@@ -65,7 +72,7 @@ func (s *Server) uidKey(u gregor.UID) (string, error) {
 	return hex.EncodeToString(tuid), nil
 }
 
-func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
+func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 	k, err := s.uidKey(u)
 	if err != nil {
 		return nil, err
@@ -77,7 +84,7 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*PerUIDServer, error) {
 	return nil, nil
 }
 
-func (s *Server) setPerUIDServer(u gregor.UID, usrv *PerUIDServer) error {
+func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
 	k, err := s.uidKey(u)
 	if err != nil {
 		return err
@@ -127,6 +134,7 @@ func (s *Server) logError(prefix string, err error) {
 	log.Printf("%s error: %s", prefix, err)
 }
 
+// BroadcastMessage implements gregor.NetworkInterfaceOutgoing.
 func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	tm, ok := m.(protocol.Message)
 	if !ok {
@@ -179,6 +187,7 @@ func (s *Server) serve() error {
 	}
 }
 
+// Serve starts the serve loop for Server.
 func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
 	s.nii = i
 	return s.serve()
@@ -197,6 +206,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 	return nil
 }
 
+// ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
 	for {
 		c, err := l.Accept()
@@ -211,6 +221,7 @@ func (s *Server) ListenLoop(l net.Listener) error {
 	}
 }
 
+// Shutdown tells the server to stop its Serve loop.
 func (s *Server) Shutdown() {
 	close(s.closeCh)
 }

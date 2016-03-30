@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"errors"
 	"log"
 	"net"
 	"time"
@@ -9,6 +10,9 @@ import (
 	protocol "github.com/keybase/gregor/protocol/go"
 	context "golang.org/x/net/context"
 )
+
+// ErrBadUID occurs when there is a bad UID on the auth channel.
+var ErrBadUID = errors.New("bad UID on channel")
 
 type connection struct {
 	c          net.Conn
