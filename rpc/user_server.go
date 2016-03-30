@@ -106,9 +106,6 @@ func (s *PerUIDServer) isConnDown(err error) bool {
 	if IsSocketClosedError(err) {
 		return true
 	}
-	if IsDisconnectedError(err) {
-		return true
-	}
 	if err == io.EOF {
 		return true
 	}
