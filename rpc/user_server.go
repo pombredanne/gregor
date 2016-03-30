@@ -33,8 +33,8 @@ func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownAr
 	s := &perUIDServer{
 		uid:             uid,
 		conns:           make(map[connectionID]*connection),
-		newConnectionCh: make(chan *connectionArgs),
-		sendBroadcastCh: make(chan messageArgs),
+		newConnectionCh: make(chan *connectionArgs, 1),
+		sendBroadcastCh: make(chan messageArgs, 1),
 		tryShutdownCh:   make(chan bool, 1), // buffered so it can receive inside serve()
 		closeListenCh:   make(chan error),
 		parentConfirmCh: parentConfirmCh,
@@ -99,9 +99,9 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 
 	if len(errMsgs) == 0 {
 		a.retCh <- nil
-		return
+	} else {
+		a.retCh <- errors.New(strings.Join(errMsgs, ", "))
 	}
-	a.retCh <- errors.New(strings.Join(errMsgs, ", "))
 
 	if len(s.conns) == 0 {
 		s.tryShutdownCh <- true
@@ -125,7 +125,8 @@ func (s *perUIDServer) tryShutdown() bool {
 		ok:         ok,
 	}
 	s.parentConfirmCh <- args
-	if <-ok == false {
+	confirmed := <-ok
+	if !confirmed {
 		log.Printf("tried shutdown, but parent server didn't allow it")
 		return false
 	}
