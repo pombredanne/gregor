@@ -95,6 +95,7 @@ type MsgRange interface {
 type Dismissal interface {
 	MsgIDsToDismiss() []MsgID
 	RangesToDismiss() []MsgRange
+	CTime() time.Time
 }
 
 type State interface {

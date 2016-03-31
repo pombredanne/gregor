@@ -3,8 +3,9 @@ package gregor1
 import (
 	"errors"
 	"fmt"
-	gregor "github.com/keybase/gregor"
 	"time"
+
+	gregor "github.com/keybase/gregor"
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
@@ -57,6 +58,10 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 		ret = append(ret, m)
 	}
 	return ret
+}
+
+func (d Dismissal) CTime() time.Time {
+	return FromTime(d.Ctime_)
 }
 
 type ItemAndMetadata struct {

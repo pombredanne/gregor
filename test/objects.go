@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 type testUID []byte
@@ -217,6 +218,10 @@ func (t *testDismissal) RangesToDismiss() []gregor.MsgRange {
 		ret = append(ret, gregor.MsgRange(r))
 	}
 	return ret
+}
+
+func (t *testDismissal) CTime() time.Time {
+	return time.Time{}
 }
 
 func (t testState) Items() ([]gregor.Item, error) {

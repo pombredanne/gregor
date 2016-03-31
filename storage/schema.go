@@ -42,6 +42,7 @@ var schema = []string{
 		uid   CHAR(16) NOT NULL,
 		msgid CHAR(16) NOT NULL,
 		dmsgid CHAR(16) NOT NULL, -- "the message IDs to dismiss",
+		ctime DATETIME(6) NOT NULL,
 		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid),
 		PRIMARY KEY(uid, msgid, dmsgid)
 	)`,

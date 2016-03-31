@@ -35,6 +35,10 @@ func (m mysqlTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too gregor.
 	b.Build("NULL")
 }
 
+func (m mysqlTimeWriter) TimeArg(t time.Time) interface{} {
+	return t
+}
+
 type sqliteTimeWriter struct{}
 
 // in microseconds since the epoch
@@ -72,4 +76,8 @@ func (m sqliteTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too gregor
 		return
 	}
 	b.Build("NULL")
+}
+
+func (m sqliteTimeWriter) TimeArg(t time.Time) interface{} {
+	return timeInUnix(t)
 }

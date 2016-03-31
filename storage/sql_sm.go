@@ -34,6 +34,7 @@ type builder interface {
 type sqlTimeWriter interface {
 	Now(b builder, cl clockwork.Clock)
 	TimeOrOffset(b builder, cl clockwork.Clock, too gregor.TimeOrOffset)
+	TimeArg(t time.Time) interface{}
 }
 
 type queryBuilder struct {
@@ -49,6 +50,10 @@ func (q *queryBuilder) Now() {
 
 func (q *queryBuilder) TimeOrOffset(too gregor.TimeOrOffset) {
 	q.stw.TimeOrOffset(q, q.clock, too)
+}
+
+func (q *queryBuilder) TimeArg(t time.Time) interface{} {
+	return q.stw.TimeArg(t)
 }
 
 func (q *queryBuilder) Build(f string, args ...interface{}) {
@@ -128,29 +133,33 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 	return nil
 }
 
-func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID) error {
-	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)")
+func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID, ctime time.Time) error {
+	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid, ctime) VALUES(?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer ins.Close()
-	qb := s.newQueryBuilder()
-	qb.Build("UPDATE items SET dtime=")
-	qb.Now()
-	qb.Build("WHERE uid=? AND msgid=?")
-	upd, err := tx.Prepare(qb.Query())
+	upd, err := tx.Prepare("UPDATE items SET dtime=? WHERE uid=? AND msgid=?")
 	if err != nil {
 		return err
 	}
 	defer upd.Close()
+
+	if ctime.IsZero() {
+		ctime = s.clock.Now()
+	}
+
+	qb := s.newQueryBuilder()
+	ctimeArg := qb.TimeArg(ctime)
+	hexUID := hexEnc(u)
+	hexMID := hexEnc(mid)
+
 	for _, dmid := range dmids {
-		_, err = ins.Exec(hexEnc(u), hexEnc(mid), hexEnc(dmid))
+		_, err = ins.Exec(hexUID, hexMID, hexEnc(dmid), ctimeArg)
 		if err != nil {
 			return err
 		}
-		qbc := qb.Clone()
-		qbc.Build("", hexEnc(u), hexEnc(dmid))
-		_, err = upd.Exec(qbc.Args()...)
+		_, err = upd.Exec(ctimeArg, hexUID, hexEnc(dmid))
 		if err != nil {
 			return err
 		}
@@ -246,32 +255,37 @@ func (s *SQLEngine) consumeInBandMessage(m gregor.InBandMessage) error {
 	}
 }
 
-func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) error {
+func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err error) {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
 	md := m.Metadata()
-	if err := s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
+	if err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
 		return err
 	}
 	if m.Creation() != nil {
-		if err := s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
+		if err = s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
 			return err
 		}
 	}
 	if m.Dismissal() != nil {
-		if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
+		if err = s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss(), m.Dismissal().CTime()); err != nil {
 			return err
 		}
-		if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
+		if err = s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
 			return err
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
 	return nil
 }
 
