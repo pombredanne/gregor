@@ -268,6 +268,9 @@ func (m *MemEngine) consumeCreation(u *user, now time.Time, i gregor.Item) (*ite
 
 func (m *MemEngine) consumeDismissal(u *user, now time.Time, d gregor.Dismissal) error {
 	if ids := d.MsgIDsToDismiss(); ids != nil {
+		if !d.CTime().IsZero() {
+			now = d.CTime()
+		}
 		u.dismissMsgIDs(now, ids)
 	}
 	if r := d.RangesToDismiss(); r != nil {
