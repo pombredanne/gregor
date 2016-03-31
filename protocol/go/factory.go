@@ -3,8 +3,9 @@ package gregor1
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/keybase/gregor"
 	"time"
+
+	"github.com/keybase/gregor"
 )
 
 type ObjFactory struct{}
@@ -65,7 +66,7 @@ func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid grego
 	return Metadata{
 		Uid_:           uid2,
 		MsgID_:         MsgID(msgid.Bytes()),
-		Ctime_:         timeToTimeOrOffset(&ctime),
+		Ctime_:         ToTime(ctime),
 		DeviceID_:      devid2,
 		InBandMsgType_: int(i),
 	}, nil

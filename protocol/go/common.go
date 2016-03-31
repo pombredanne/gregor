@@ -13,11 +13,11 @@ type TimeOrOffset struct {
 }
 
 type Metadata struct {
-	Uid_           UID          `codec:"uid" json:"uid"`
-	MsgID_         MsgID        `codec:"msgID" json:"msgID"`
-	Ctime_         TimeOrOffset `codec:"ctime" json:"ctime"`
-	DeviceID_      DeviceID     `codec:"deviceID" json:"deviceID"`
-	InBandMsgType_ int          `codec:"inBandMsgType" json:"inBandMsgType"`
+	Uid_           UID      `codec:"uid" json:"uid"`
+	MsgID_         MsgID    `codec:"msgID" json:"msgID"`
+	Ctime_         Time     `codec:"ctime" json:"ctime"`
+	DeviceID_      DeviceID `codec:"deviceID" json:"deviceID"`
+	InBandMsgType_ int      `codec:"inBandMsgType" json:"inBandMsgType"`
 }
 
 type InBandMessage struct {

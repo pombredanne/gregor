@@ -45,7 +45,7 @@ type testMetadata struct {
 	u gregor.UID
 	m gregor.MsgID
 	d gregor.DeviceID
-	t gregor.TimeOrOffset
+	t time.Time
 }
 
 type testSyncMessage testMetadata
@@ -135,7 +135,7 @@ func (f TestObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandM
 
 func newTestMetadata(u gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time) *testMetadata {
 	return &testMetadata{
-		u: u, m: msgid, d: devid, t: timeToTimeOrOffset(ctime),
+		u: u, m: msgid, d: devid, t: ctime,
 	}
 }
 
@@ -146,7 +146,8 @@ type testBody string
 func (t testBody) Bytes() []byte { return []byte(t) }
 
 func (t *testMetadata) MsgID() gregor.MsgID                 { return t.m }
-func (t *testMetadata) CTime() gregor.TimeOrOffset          { return t.t }
+func (t *testMetadata) CTime() time.Time                    { return t.t }
+func (t *testMetadata) SetCTime(x time.Time)                { t.t = x }
 func (t *testMetadata) DeviceID() gregor.DeviceID           { return t.d }
 func (t *testMetadata) UID() gregor.UID                     { return t.u }
 func (t *testMetadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgTypeUpdate }

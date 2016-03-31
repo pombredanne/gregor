@@ -10,7 +10,7 @@ protocol common {
 	record Metadata {
 		UID uid;
 		MsgID msgID;
-		TimeOrOffset ctime;
+		Time ctime;
 		DeviceID deviceID;
 		int inBandMsgType;
 	}

@@ -184,19 +184,3 @@ func (t timeScanner) TimeOrNil() *time.Time {
 func (t timeScanner) Time() time.Time {
 	return t.t
 }
-
-func (t timeScanner) TimeOrOffset() gregor.TimeOrOffset {
-	return timeWrap{t: t.t}
-}
-
-type timeWrap struct {
-	t time.Time
-}
-
-func (tw timeWrap) Time() *time.Time {
-	return &tw.t
-}
-
-func (tw timeWrap) Offset() *time.Duration {
-	return nil
-}

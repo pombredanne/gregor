@@ -93,7 +93,7 @@ func (i item) export(f gregor.ObjFactory) (gregor.Item, error) {
 
 // addItem adds an item for this user
 func (u *user) addItem(now time.Time, i gregor.Item) *item {
-	newItem := &item{item: i, ctime: toTime(now, i.Metadata().CTime())}
+	newItem := &item{item: i, ctime: nowIfZero(now, i.Metadata().CTime())}
 	u.items = append(u.items, newItem)
 	return newItem
 }
@@ -117,6 +117,13 @@ func (u *user) dismissMsgIDs(now time.Time, ids []gregor.MsgID) {
 			i.dtime = &now
 		}
 	}
+}
+
+func nowIfZero(now, t time.Time) time.Time {
+	if t.IsZero() {
+		return now
+	}
+	return t
 }
 
 func toTime(now time.Time, t gregor.TimeOrOffset) time.Time {
@@ -266,15 +273,13 @@ func (m *MemEngine) consumeCreation(u *user, now time.Time, i gregor.Item) (*ite
 	return newItem, nil
 }
 
-func (m *MemEngine) consumeDismissal(u *user, now time.Time, d gregor.Dismissal, ctime gregor.TimeOrOffset) error {
+func (m *MemEngine) consumeDismissal(u *user, now time.Time, d gregor.Dismissal, ctime time.Time) error {
+	dtime := nowIfZero(now, ctime)
 	if ids := d.MsgIDsToDismiss(); ids != nil {
-		if ctime != nil && ctime.Time() != nil {
-			now = *ctime.Time()
-		}
-		u.dismissMsgIDs(now, ids)
+		u.dismissMsgIDs(dtime, ids)
 	}
 	if r := d.RangesToDismiss(); r != nil {
-		u.dismissRanges(now, r)
+		u.dismissRanges(dtime, r)
 	}
 	return nil
 }
