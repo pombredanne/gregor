@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jonboulle/clockwork"
+	gregor "github.com/keybase/gregor"
 )
 
 func sqlWrapper(s string) string {
@@ -157,21 +158,40 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.
 	return err
 }
 
+func (s *SQLEngine) ctimeFromDismissalsByTime(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mr gregor.MsgRange) (gregor.TimeOrOffset, error) {
+	qb := s.newQueryBuilder()
+	qb.Build("SELECT ctime FROM dismissals_by_time WHERE uid=? AND msgid=? AND category=? AND dtime=", hexEnc(u), hexEnc(mid), mr.Category().String())
+	qb.TimeOrOffset(mr.EndTime())
+	row := tx.QueryRow(qb.Query(), qb.Args()...)
+	var ctime timeScanner
+	if err := row.Scan(&ctime); err != nil {
+		return nil, err
+	}
+	return ctime.TimeOrOffset(), nil
+}
+
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange) error {
 	for _, mr := range mrs {
-
 		qb := s.newQueryBuilder()
-		qb.Build("INSERT INTO dismissals_by_time(uid, msgid, category, dtime) VALUES(?,?,?,",
-			hexEnc(u), hexEnc(mid), mr.Category().String())
+		qb.Build("INSERT INTO dismissals_by_time(uid, msgid, category, dtime, ctime) VALUES (?,?,?,", hexEnc(u), hexEnc(mid), mr.Category().String())
 		qb.TimeOrOffset(mr.EndTime())
+		qb.Build(",")
+		qb.Now()
 		qb.Build(")")
 		if err := qb.Exec(tx); err != nil {
 			return err
 		}
 
+		// get ctime from the dismissal row
+		ctime, err := s.ctimeFromDismissalsByTime(tx, u, mid, mr)
+		if err != nil {
+			return err
+		}
+
+		// set the dtime of the items to the ctime of the dismissal row
 		qbu := s.newQueryBuilder()
 		qbu.Build("UPDATE items SET dtime=")
-		qbu.Now()
+		qbu.TimeOrOffset(ctime)
 		qbu.Build("WHERE uid=? AND category=? AND msgid IN (SELECT msgid FROM messages WHERE uid=? AND ctime<=",
 			hexEnc(u), mr.Category().String(), hexEnc(u))
 		qbu.TimeOrOffset(mr.EndTime())

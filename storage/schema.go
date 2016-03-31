@@ -51,6 +51,7 @@ var schema = []string{
 		msgid CHAR(16) NOT NULL,
 		category VARCHAR(128) NOT NULL,
 		dtime DATETIME(6) NOT NULL, -- "throw out matching events before dtime",
+		ctime DATETIME(6) NOT NULL,
 		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid),
 		PRIMARY KEY(uid, msgid, category, dtime)
 	)`,

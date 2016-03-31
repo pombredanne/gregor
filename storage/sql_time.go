@@ -1,9 +1,10 @@
 package storage
 
 import (
+	"time"
+
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
-	"time"
 )
 
 type mysqlTimeWriter struct{}

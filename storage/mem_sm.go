@@ -3,10 +3,11 @@ package storage
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
 	"sync"
 	"time"
+
+	"github.com/jonboulle/clockwork"
+	gregor "github.com/keybase/gregor"
 )
 
 // MemEngine is an implementation of a gregor StateMachine that just keeps
