@@ -43,7 +43,6 @@ type MsgRange struct {
 type Dismissal struct {
 	MsgIDs_ []MsgID    `codec:"msgIDs" json:"msgIDs"`
 	Ranges_ []MsgRange `codec:"ranges" json:"ranges"`
-	Ctime_  Time       `codec:"ctime" json:"ctime"`
 }
 
 type Item struct {

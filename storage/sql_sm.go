@@ -133,8 +133,8 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 	return nil
 }
 
-func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID, ctime time.Time) error {
-	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid, ctime) VALUES(?, ?, ?, ?)")
+func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID, ctime gregor.TimeOrOffset) error {
+	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)")
 	if err != nil {
 		return err
 	}
@@ -145,17 +145,20 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.
 	}
 	defer upd.Close()
 
-	if ctime.IsZero() {
-		ctime = s.clock.Now()
+	var ct time.Time
+	if ctime != nil && ctime.Time() != nil {
+		ct = *ctime.Time()
+	} else {
+		ct = s.clock.Now()
 	}
 
 	qb := s.newQueryBuilder()
-	ctimeArg := qb.TimeArg(ctime)
+	ctimeArg := qb.TimeArg(ct)
 	hexUID := hexEnc(u)
 	hexMID := hexEnc(mid)
 
 	for _, dmid := range dmids {
-		_, err = ins.Exec(hexUID, hexMID, hexEnc(dmid), ctimeArg)
+		_, err = ins.Exec(hexUID, hexMID, hexEnc(dmid))
 		if err != nil {
 			return err
 		}
@@ -278,7 +281,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err 
 		}
 	}
 	if m.Dismissal() != nil {
-		if err = s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss(), m.Dismissal().CTime()); err != nil {
+		if err = s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss(), md.CTime()); err != nil {
 			return err
 		}
 		if err = s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {

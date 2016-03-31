@@ -60,10 +60,6 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	return ret
 }
 
-func (d Dismissal) CTime() time.Time {
-	return FromTime(d.Ctime_)
-}
-
 type ItemAndMetadata struct {
 	md *Metadata
 	i  *Item

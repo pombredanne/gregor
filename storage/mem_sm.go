@@ -266,10 +266,10 @@ func (m *MemEngine) consumeCreation(u *user, now time.Time, i gregor.Item) (*ite
 	return newItem, nil
 }
 
-func (m *MemEngine) consumeDismissal(u *user, now time.Time, d gregor.Dismissal) error {
+func (m *MemEngine) consumeDismissal(u *user, now time.Time, d gregor.Dismissal, ctime gregor.TimeOrOffset) error {
 	if ids := d.MsgIDsToDismiss(); ids != nil {
-		if !d.CTime().IsZero() {
-			now = d.CTime()
+		if ctime != nil && ctime.Time() != nil {
+			now = *ctime.Time()
 		}
 		u.dismissMsgIDs(now, ids)
 	}
@@ -288,7 +288,8 @@ func (m *MemEngine) consumeStateUpdateMessage(u *user, now time.Time, msg gregor
 		}
 	}
 	if msg.Dismissal() != nil {
-		if err = m.consumeDismissal(u, now, msg.Dismissal()); err != nil {
+		md := msg.Metadata()
+		if err = m.consumeDismissal(u, now, msg.Dismissal(), md.CTime()); err != nil {
 			return nil, err
 		}
 	}

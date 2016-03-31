@@ -38,7 +38,6 @@ protocol common {
 	record Dismissal {
 		array<MsgID> msgIDs;
 		array<MsgRange> ranges;
-		Time ctime;
 	}
 
 	record Item {
