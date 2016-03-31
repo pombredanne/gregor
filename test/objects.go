@@ -221,10 +221,6 @@ func (t *testDismissal) RangesToDismiss() []gregor.MsgRange {
 	return ret
 }
 
-func (t *testDismissal) CTime() time.Time {
-	return time.Time{}
-}
-
 func (t testState) Items() ([]gregor.Item, error) {
 	return []gregor.Item(t), nil
 }

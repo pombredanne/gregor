@@ -66,16 +66,6 @@ func (q *queryBuilder) Build(f string, args ...interface{}) {
 	q.args = append(q.args, args...)
 }
 
-func (q *queryBuilder) Clone() *queryBuilder {
-	ret := &queryBuilder{
-		args: make([]interface{}, len(q.args)),
-		qry:  make([]string, len(q.qry)),
-	}
-	copy(ret.args, q.args)
-	copy(ret.qry, q.qry)
-	return ret
-}
-
 func (q *queryBuilder) Query() string       { return strings.Join(q.qry, " ") }
 func (q *queryBuilder) Args() []interface{} { return q.args }
 
@@ -150,8 +140,7 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.
 	}
 	defer upd.Close()
 
-	qb := s.newQueryBuilder()
-	ctimeArg := qb.TimeArg(ctime)
+	ctimeArg := s.newQueryBuilder().TimeArg(ctime)
 	hexUID := hexEnc(u)
 	hexMID := hexEnc(mid)
 
