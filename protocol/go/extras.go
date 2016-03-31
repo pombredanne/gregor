@@ -3,8 +3,9 @@ package gregor1
 import (
 	"errors"
 	"fmt"
-	gregor "github.com/keybase/gregor"
 	"time"
+
+	gregor "github.com/keybase/gregor"
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
@@ -143,7 +144,8 @@ func (i InBandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
 }
 
 func (m Metadata) MsgID() gregor.MsgID                 { return m.MsgID_ }
-func (m Metadata) CTime() gregor.TimeOrOffset          { return m.Ctime_ }
+func (m Metadata) CTime() time.Time                    { return FromTime(m.Ctime_) }
+func (m Metadata) SetCTime(t time.Time)                { m.Ctime_ = ToTime(t) }
 func (m Metadata) DeviceID() gregor.DeviceID           { return m.DeviceID_ }
 func (m Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
 

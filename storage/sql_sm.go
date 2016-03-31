@@ -4,11 +4,12 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jonboulle/clockwork"
+	gregor "github.com/keybase/gregor"
 )
 
 func sqlWrapper(s string) string {
@@ -33,6 +34,7 @@ type builder interface {
 type sqlTimeWriter interface {
 	Now(b builder, cl clockwork.Clock)
 	TimeOrOffset(b builder, cl clockwork.Clock, too gregor.TimeOrOffset)
+	TimeArg(t time.Time) interface{}
 }
 
 type queryBuilder struct {
@@ -50,19 +52,18 @@ func (q *queryBuilder) TimeOrOffset(too gregor.TimeOrOffset) {
 	q.stw.TimeOrOffset(q, q.clock, too)
 }
 
+func (q *queryBuilder) TimeArg(t time.Time) interface{} {
+	return q.stw.TimeArg(t)
+}
+
+func (q *queryBuilder) AddTime(t time.Time) {
+	q.qry = append(q.qry, "?")
+	q.args = append(q.args, q.TimeArg(t))
+}
+
 func (q *queryBuilder) Build(f string, args ...interface{}) {
 	q.qry = append(q.qry, f)
 	q.args = append(q.args, args...)
-}
-
-func (q *queryBuilder) Clone() *queryBuilder {
-	ret := &queryBuilder{
-		args: make([]interface{}, len(q.args)),
-		qry:  make([]string, len(q.qry)),
-	}
-	copy(ret.args, q.args)
-	copy(ret.qry, q.qry)
-	return ret
 }
 
 func (q *queryBuilder) Query() string       { return strings.Join(q.qry, " ") }
@@ -127,29 +128,28 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 	return nil
 }
 
-func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID) error {
+func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, dmids []gregor.MsgID, ctime time.Time) error {
 	ins, err := tx.Prepare("INSERT INTO dismissals_by_id(uid, msgid, dmsgid) VALUES(?, ?, ?)")
 	if err != nil {
 		return err
 	}
 	defer ins.Close()
-	qb := s.newQueryBuilder()
-	qb.Build("UPDATE items SET dtime=")
-	qb.Now()
-	qb.Build("WHERE uid=? AND msgid=?")
-	upd, err := tx.Prepare(qb.Query())
+	upd, err := tx.Prepare("UPDATE items SET dtime=? WHERE uid=? AND msgid=?")
 	if err != nil {
 		return err
 	}
 	defer upd.Close()
+
+	ctimeArg := s.newQueryBuilder().TimeArg(ctime)
+	hexUID := hexEnc(u)
+	hexMID := hexEnc(mid)
+
 	for _, dmid := range dmids {
-		_, err = ins.Exec(hexEnc(u), hexEnc(mid), hexEnc(dmid))
+		_, err = ins.Exec(hexUID, hexMID, hexEnc(dmid))
 		if err != nil {
 			return err
 		}
-		qbc := qb.Clone()
-		qbc.Build("", hexEnc(u), hexEnc(dmid))
-		_, err = upd.Exec(qbc.Args()...)
+		_, err = upd.Exec(ctimeArg, hexUID, hexEnc(dmid))
 		if err != nil {
 			return err
 		}
@@ -157,23 +157,29 @@ func (s *SQLEngine) consumeMsgIDsToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.
 	return err
 }
 
-func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange) error {
-	for _, mr := range mrs {
+func (s *SQLEngine) ctimeFromMessage(tx *sql.Tx, u gregor.UID, mid gregor.MsgID) (time.Time, error) {
+	row := tx.QueryRow("SELECT ctime FROM messages WHERE uid=? AND msgid=?", hexEnc(u), hexEnc(mid))
+	var ctime timeScanner
+	if err := row.Scan(&ctime); err != nil {
+		return time.Time{}, err
+	}
+	return ctime.Time(), nil
+}
 
+func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange, ctime time.Time) error {
+	for _, mr := range mrs {
 		qb := s.newQueryBuilder()
-		qb.Build("INSERT INTO dismissals_by_time(uid, msgid, category, dtime) VALUES(?,?,?,",
-			hexEnc(u), hexEnc(mid), mr.Category().String())
+		qb.Build("INSERT INTO dismissals_by_time(uid, msgid, category, dtime) VALUES (?,?,?,", hexEnc(u), hexEnc(mid), mr.Category().String())
 		qb.TimeOrOffset(mr.EndTime())
 		qb.Build(")")
 		if err := qb.Exec(tx); err != nil {
 			return err
 		}
 
+		// set dtime in items to the ctime of the dismissal message:
 		qbu := s.newQueryBuilder()
-		qbu.Build("UPDATE items SET dtime=")
-		qbu.Now()
-		qbu.Build("WHERE uid=? AND category=? AND msgid IN (SELECT msgid FROM messages WHERE uid=? AND ctime<=",
-			hexEnc(u), mr.Category().String(), hexEnc(u))
+		qbu.Build("UPDATE items SET dtime=? WHERE uid=? AND category=? AND msgid IN (SELECT msgid FROM messages WHERE uid=? AND ctime<=",
+			qbu.TimeArg(ctime), hexEnc(u), mr.Category().String(), hexEnc(u))
 		qbu.TimeOrOffset(mr.EndTime())
 		qbu.Build(")")
 		if err := qbu.Exec(tx); err != nil {
@@ -203,9 +209,28 @@ func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata,
 	qb := s.newQueryBuilder()
 	qb.Build("INSERT INTO messages(uid, msgid, mtype, devid, ctime) VALUES(?, ?, ?, ?,",
 		hexEnc(md.UID()), hexEnc(md.MsgID()), int(t), hexEncOrNull(md.DeviceID()))
-	qb.Now()
+	if md.CTime().IsZero() {
+		qb.Now()
+	} else {
+		qb.AddTime(md.CTime())
+	}
 	qb.Build(")")
-	return qb.Exec(tx)
+	if err := qb.Exec(tx); err != nil {
+		return err
+	}
+
+	if !md.CTime().IsZero() {
+		return nil
+	}
+
+	// get the inserted ctime
+	ctime, err := s.ctimeFromMessage(tx, md.UID(), md.MsgID())
+	if err != nil {
+		return err
+	}
+	md.SetCTime(ctime)
+
+	return nil
 }
 
 func (s *SQLEngine) ConsumeMessage(m gregor.Message) error {
@@ -226,32 +251,37 @@ func (s *SQLEngine) consumeInBandMessage(m gregor.InBandMessage) error {
 	}
 }
 
-func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) error {
+func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err error) {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		} else {
+			err = tx.Commit()
+		}
+	}()
+
 	md := m.Metadata()
-	if err := s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
+	if err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
 		return err
 	}
 	if m.Creation() != nil {
-		if err := s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
+		if err = s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
 			return err
 		}
 	}
 	if m.Dismissal() != nil {
-		if err := s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss()); err != nil {
+		if err = s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss(), md.CTime()); err != nil {
 			return err
 		}
-		if err := s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss()); err != nil {
+		if err = s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss(), md.CTime()); err != nil {
 			return err
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
 	return nil
 }
 

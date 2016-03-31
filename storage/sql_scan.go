@@ -3,8 +3,9 @@ package storage
 import (
 	"encoding/hex"
 	"errors"
-	gregor "github.com/keybase/gregor"
 	"time"
+
+	gregor "github.com/keybase/gregor"
 )
 
 var ErrBadScan = errors.New("bad scan of data type")

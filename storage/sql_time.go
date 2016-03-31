@@ -1,9 +1,10 @@
 package storage
 
 import (
+	"time"
+
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
-	"time"
 )
 
 type mysqlTimeWriter struct{}
@@ -32,6 +33,10 @@ func (m mysqlTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too gregor.
 		return
 	}
 	b.Build("NULL")
+}
+
+func (m mysqlTimeWriter) TimeArg(t time.Time) interface{} {
+	return t
 }
 
 type sqliteTimeWriter struct{}
@@ -71,4 +76,8 @@ func (m sqliteTimeWriter) TimeOrOffset(b builder, cl clockwork.Clock, too gregor
 		return
 	}
 	b.Build("NULL")
+}
+
+func (m sqliteTimeWriter) TimeArg(t time.Time) interface{} {
+	return timeInUnix(t)
 }

@@ -42,7 +42,8 @@ type Body interface {
 type Metadata interface {
 	UID() UID
 	MsgID() MsgID
-	CTime() TimeOrOffset
+	CTime() time.Time
+	SetCTime(time.Time)
 	DeviceID() DeviceID
 	InBandMsgType() InBandMsgType
 }
