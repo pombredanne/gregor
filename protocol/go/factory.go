@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/keybase/go-codec/codec"
 	"github.com/keybase/gregor"
 )
 
@@ -90,8 +91,8 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 		return nil, err
 	}
 	return ItemAndMetadata{
-		md: &md,
-		i:  &item,
+		MD:   &md,
+		Item: &item,
 	}, nil
 }
 
@@ -163,10 +164,20 @@ func (o ObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessa
 	}
 	return InBandMessage{
 		StateUpdate_: &StateUpdateMessage{
-			Md_:       *ourItem.md,
-			Creation_: ourItem.i,
+			Md_:       *ourItem.MD,
+			Creation_: ourItem.Item,
 		},
 	}, nil
+}
+
+func (o ObjFactory) UnmarshalState(b []byte) (gregor.State, error) {
+	var items []ItemAndMetadata
+	err := codec.NewDecoderBytes(b, new(codec.MsgpackHandle)).Decode(&items)
+	if err != nil {
+		return nil, err
+	}
+
+	return State{items}, nil
 }
 
 var _ gregor.ObjFactory = ObjFactory{}

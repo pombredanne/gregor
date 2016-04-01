@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/go-codec/codec"
+	"github.com/keybase/gregor"
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
@@ -61,18 +62,18 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 }
 
 type ItemAndMetadata struct {
-	md *Metadata
-	i  *Item
+	MD   *Metadata `codec:"md" json:"md"`
+	Item *Item     `codec:"item" json:"item"`
 }
 
 func (m Metadata) UID() gregor.UID                   { return m.Uid_ }
-func (i ItemAndMetadata) Metadata() gregor.Metadata  { return *i.md }
-func (i ItemAndMetadata) Body() gregor.Body          { return i.i.Body_ }
-func (i ItemAndMetadata) Category() gregor.Category  { return i.i.Category_ }
-func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.i.Dtime_ }
+func (i ItemAndMetadata) Metadata() gregor.Metadata  { return *i.MD }
+func (i ItemAndMetadata) Body() gregor.Body          { return i.Item.Body_ }
+func (i ItemAndMetadata) Category() gregor.Category  { return i.Item.Category_ }
+func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.Item.Dtime_ }
 func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
 	var ret []gregor.TimeOrOffset
-	for _, t := range i.i.NotifyTimes_ {
+	for _, t := range i.Item.NotifyTimes_ {
 		ret = append(ret, t)
 	}
 	return ret
@@ -83,7 +84,7 @@ func (s StateUpdateMessage) Creation() gregor.Item {
 	if s.Creation_ != nil {
 		return nil
 	}
-	return ItemAndMetadata{md: &s.Md_, i: s.Creation_}
+	return ItemAndMetadata{MD: &s.Md_, Item: s.Creation_}
 }
 func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
 	if s.Dismissal_ != nil {
@@ -179,8 +180,14 @@ func (s State) Items() ([]gregor.Item, error) {
 	return ret, nil
 }
 
+func (s State) Marshal() ([]byte, error) {
+	var b []byte
+	err := codec.NewEncoderBytes(&b, new(codec.MsgpackHandle)).Encode(s.items)
+	return b, err
+}
+
 func (i ItemAndMetadata) InCategory(c Category) bool {
-	return i.i.Category_.Eq(c)
+	return i.Item.Category_.Eq(c)
 }
 
 func (s State) ItemsInCategory(gc gregor.Category) ([]gregor.Item, error) {

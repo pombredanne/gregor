@@ -101,6 +101,7 @@ type Dismissal interface {
 type State interface {
 	Items() ([]Item, error)
 	ItemsInCategory(c Category) ([]Item, error)
+	Marshal() ([]byte, error)
 }
 
 type Message interface {
@@ -151,6 +152,7 @@ type ObjFactory interface {
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InBandMsgType) (Metadata, error)
 	MakeInBandMessageFromItem(i Item) (InBandMessage, error)
+	UnmarshalState([]byte) (State, error)
 }
 
 type NetworkInterfaceIncoming interface {
