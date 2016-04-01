@@ -1,8 +1,6 @@
 package client
 
-import (
-	"github.com/keybase/gregor"
-)
+import "github.com/keybase/gregor"
 
 type LocalStorageEngine interface {
 	Store(gregor.UID, []byte) error
@@ -28,7 +26,7 @@ func NewClient(user gregor.UID, device gregor.DeviceID, objFactory gregor.ObjFac
 }
 
 func (c *Client) Save() error {
-	c.sm.RemoveDismissed()
+	c.sm.RemoveDismissed(nil)
 	state, err := c.sm.State(c.user, c.device, nil)
 	if err != nil {
 		return err
@@ -39,7 +37,7 @@ func (c *Client) Save() error {
 		return err
 	}
 
-	return c.eng.Store(c.user, b)
+	return c.storage.Store(c.user, b)
 }
 
 func (c *Client) Restore() error {
