@@ -137,6 +137,10 @@ type StateMachine interface {
 	// all messages across all devices.  If d is a device, then we'll
 	// return global messages and per-device messages for that device.
 	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
+
+	// RemoveDismissed removes all messages from the internal state that
+	// were dimissed before the given TimeOrOffset. This can be a NOOP.
+	RemoveDismissed(t TimeOrOffset)
 }
 
 type ObjFactory interface {

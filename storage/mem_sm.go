@@ -315,3 +315,16 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	msg := user.replayLog(m.clock.Now(), d, t)
 	return msg, nil
 }
+
+func (m *MemEngine) RemoveDismissed(too gregor.TimeOrOffset) {
+	m.Lock()
+	defer m.Unlock()
+	t := toTime(time.Now(), too)
+	for _, u := range m.users {
+		for i := range u.items {
+			if u.items[i].dtime != nil && (*u.items[i].dtime).Before(t) {
+				u.items = append(u.items[:i], u.items[i+1:]...)
+			}
+		}
+	}
+}

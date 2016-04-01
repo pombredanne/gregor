@@ -477,4 +477,8 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	return ret, nil
 }
 
+func (s *SQLEngine) RemoveDismissed(too gregor.TimeOrOffset) {
+	// NOOP for now
+}
+
 var _ gregor.StateMachine = (*SQLEngine)(nil)
