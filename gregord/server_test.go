@@ -3,11 +3,12 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"net"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func writeTmp(d string) (string, error) {
@@ -146,7 +147,7 @@ type testMainLoop struct {
 	doneCh  chan struct{}
 }
 
-func (t *testMainLoop) Serve(n net.Listener) error {
+func (t *testMainLoop) ListenLoop(n net.Listener) error {
 	t.readyCh <- struct{}{}
 	for {
 		c, err := n.Accept()
