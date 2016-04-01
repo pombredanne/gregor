@@ -132,6 +132,10 @@ type StateMachine interface {
 	// at the given time.
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
 
+	// AddState iterates through the given State's Items adding all
+	// unique MsgIDs, selecting the Items with the oldest dtimes.
+	AddState(s State) error
+
 	// InBandMessagesSince returns all messages since the given time
 	// for the user u on device d.  If d is nil, then we'll return
 	// all messages across all devices.  If d is a device, then we'll

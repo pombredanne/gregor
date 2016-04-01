@@ -56,13 +56,13 @@ type loggedMsg struct {
 // user consists of a list of items (some of which might be dismissed) and
 // and an unpruned log of all incoming messages.
 type user struct {
-	items [](*item)
+	items map[string](*item)
 	log   []loggedMsg
 }
 
 func newUser() *user {
 	return &user{
-		items: make([](*item), 0),
+		items: make(map[string](*item)),
 	}
 }
 
@@ -94,7 +94,7 @@ func (i item) export(f gregor.ObjFactory) (gregor.Item, error) {
 // addItem adds an item for this user
 func (u *user) addItem(now time.Time, i gregor.Item) *item {
 	newItem := &item{item: i, ctime: nowIfZero(now, i.Metadata().CTime())}
-	u.items = append(u.items, newItem)
+	u.items[msgIDString(i)] = newItem
 	return newItem
 }
 
@@ -107,13 +107,13 @@ func msgIDtoString(m gregor.MsgID) string {
 	return hex.EncodeToString(m.Bytes())
 }
 
+func msgIDString(i gregor.Item) string {
+	return msgIDtoString(i.Metadata().MsgID())
+}
+
 func (u *user) dismissMsgIDs(now time.Time, ids []gregor.MsgID) {
-	set := make(map[string]struct{})
-	for _, i := range ids {
-		set[msgIDtoString(i)] = struct{}{}
-	}
-	for _, i := range u.items {
-		if _, found := set[msgIDtoString(i.item.Metadata().MsgID())]; found {
+	for _, id := range ids {
+		if i, ok := u.items[msgIDtoString(id)]; ok {
 			i.dtime = &now
 		}
 	}
@@ -189,6 +189,21 @@ func (u *user) state(now time.Time, f gregor.ObjFactory, d gregor.DeviceID, t gr
 		items = append(items, exported)
 	}
 	return f.MakeState(items)
+}
+
+func dtimeBefore(i1, i2 gregor.Item) bool {
+	var tZero time.Time
+	t1 := toTime(tZero, i1.DTime())
+	t2 := toTime(tZero, i1.DTime())
+	return !t1.Equal(tZero) && (t2.Equal(tZero) || t1.Before(t2))
+}
+
+func (u *user) addItems(items []gregor.Item) {
+	for _, i1 := range items {
+		if i2, ok := u.items[msgIDString(i1)]; !ok || dtimeBefore(i1, i2.item) {
+			u.addItem(time.Now(), i1)
+		}
+	}
 }
 
 func isMessageForDevice(m gregor.InBandMessage, d gregor.DeviceID) bool {
@@ -308,6 +323,27 @@ func (m *MemEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	return user.state(m.clock.Now(), m.objFactory, d, t)
 }
 
+func (m *MemEngine) AddState(s gregor.State) error {
+	m.Lock()
+	defer m.Unlock()
+	userItems := make(map[*user][]gregor.Item)
+	items, err := s.Items()
+	if err != nil {
+		return err
+	}
+
+	for _, it := range items {
+		user := m.getUser(it.Metadata().UID())
+		userItems[user] = append(userItems[user], it)
+	}
+
+	for u, items := range userItems {
+		u.addItems(items)
+	}
+
+	return nil
+}
+
 func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
 	m.Lock()
 	defer m.Unlock()
@@ -321,9 +357,9 @@ func (m *MemEngine) RemoveDismissed(too gregor.TimeOrOffset) {
 	defer m.Unlock()
 	t := toTime(time.Now(), too)
 	for _, u := range m.users {
-		for i := range u.items {
-			if u.items[i].dtime != nil && (*u.items[i].dtime).Before(t) {
-				u.items = append(u.items[:i], u.items[i+1:]...)
+		for id := range u.items {
+			if u.items[id].dtime != nil && (*u.items[id].dtime).Before(t) {
+				delete(u.items, id)
 			}
 		}
 	}

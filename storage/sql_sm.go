@@ -426,6 +426,45 @@ func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InB
 	return nil, nil
 }
 
+func (s *SQLEngine) AddState(state gregor.State) error {
+	items, err := state.Items()
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.driver.Begin()
+	if err != nil {
+		return err
+	}
+
+	upd, err := tx.Prepare("UPDATE items SET dtime=? WHERE uid=? AND msgid=?")
+	if err != nil {
+		return err
+	}
+	defer upd.Close()
+
+	for _, i := range items {
+		u := i.Metadata().UID()
+		if !s.rowExists(tx, u, i.Metadata().MsgID()) {
+			if err := s.consumeCreation(tx, u, i); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (s *SQLEngine) rowExists(tx *sql.Tx, u gregor.UID, msgid gregor.MsgID) bool {
+	rows, err := tx.Query(`SELECT 1 WHERE uid=? AND msgid=?`, hexEnc(u), hexEnc(msgid))
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	return rows.Next()
+}
+
 func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
                i.category, i.body,
