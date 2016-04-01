@@ -133,6 +133,10 @@ func (f TestObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandM
 	return &testInBandMessage{m: ti.m, i: ti}, nil
 }
 
+func (f TestObjFactory) UnmarshalState(b []byte) (gregor.State, error) {
+	panic("UnmarshalState unimplemented for TestObjFactory")
+}
+
 func newTestMetadata(u gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time) *testMetadata {
 	return &testMetadata{
 		u: u, m: msgid, d: devid, t: ctime,
@@ -235,6 +239,11 @@ func (t testState) ItemsInCategory(c gregor.Category) ([]gregor.Item, error) {
 	return ret, nil
 }
 
+func (t testState) Marshal() ([]byte, error) {
+	panic("Unimplemented Marshal for testState")
+}
+
+var _ gregor.State = testState(nil)
 var _ gregor.Item = (*testItem)(nil)
 var _ gregor.InBandMessage = testInBandMessage{}
 
