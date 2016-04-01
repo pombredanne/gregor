@@ -1,15 +1,10 @@
 package main
 
 import (
-	"net"
 	"os"
+
+	"github.com/keybase/gregor/rpc"
 )
-
-type dummy struct{}
-
-func (d dummy) Serve(l net.Listener) error {
-	return nil
-}
 
 func main() {
 	opts, err := ParseOptions(os.Args)
@@ -17,7 +12,7 @@ func main() {
 		errorf("%s\n", err)
 		os.Exit(2)
 	}
-	err = newMainServer(opts, dummy{}).listenAndServe()
+	err = newMainServer(opts, rpc.NewServer()).listenAndServe()
 	if err != nil {
 		errorf("%s\n", err)
 		os.Exit(2)

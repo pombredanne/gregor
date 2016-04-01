@@ -1,10 +1,11 @@
 package main
 
 import (
-	gregor "github.com/keybase/gregor"
 	"os"
 	"os/signal"
 	"syscall"
+
+	gregor "github.com/keybase/gregor"
 )
 
 type mainServer struct {
@@ -24,7 +25,7 @@ func (m *mainServer) listenAndServe() error {
 	}
 	signalCh := make(chan os.Signal, 1)
 	go signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, os.Kill)
-	go m.mls.Serve(l)
+	go m.mls.ListenLoop(l)
 	select {
 	case <-signalCh:
 	case <-m.stopCh:
