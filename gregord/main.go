@@ -21,7 +21,7 @@ func main() {
 		os.Exit(2)
 	}
 	srv := rpc.NewServer()
-	srv.SetAuthenticator(&dummyauth{})
+	srv.SetAuthenticator(dummyauth{})
 	err = newMainServer(opts, srv).listenAndServe()
 	if err != nil {
 		errorf("%s\n", err)
