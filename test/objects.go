@@ -208,11 +208,14 @@ func (t *testDismissal) MsgIDsToDismiss() []gregor.MsgID { return t.ids }
 
 func (t testTimeOrOffset) Time() *time.Time       { return t.t }
 func (t testTimeOrOffset) Offset() *time.Duration { return t.d }
-func (t testUID) Bytes() []byte                   { return t }
-func (t testMsgID) Bytes() []byte                 { return t }
-func (t testDeviceID) Bytes() []byte              { return t }
-func (t testCategory) String() string             { return string(t) }
-func (t testSystem) String() string               { return string(t) }
+func (t testTimeOrOffset) Before(t2 time.Time) bool {
+	return t.Time() != nil && t.Time().Before(t2)
+}
+func (t testUID) Bytes() []byte       { return t }
+func (t testMsgID) Bytes() []byte     { return t }
+func (t testDeviceID) Bytes() []byte  { return t }
+func (t testCategory) String() string { return string(t) }
+func (t testSystem) String() string   { return string(t) }
 
 func (m testMessage) ToInBandMessage() gregor.InBandMessage       { return m.i }
 func (m testMessage) ToOutOfBandMessage() gregor.OutOfBandMessage { return nil }

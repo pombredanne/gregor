@@ -33,6 +33,10 @@ func (t TimeOrOffset) Offset() *time.Duration {
 	return &d
 }
 
+func (t TimeOrOffset) Before(t2 time.Time) bool {
+	return t.Time() != nil && t.Time().Before(t2)
+}
+
 func (s StateSyncMessage) Metadata() gregor.Metadata {
 	return s.Md_
 }

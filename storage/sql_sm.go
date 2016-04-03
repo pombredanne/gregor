@@ -99,7 +99,7 @@ func (s *SQLEngine) newQueryBuilder() *queryBuilder {
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) error {
 	md := i.Metadata()
 	qb := s.newQueryBuilder()
-	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
+	qb.Build(`REPLACE INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,`,
 		hexEnc(u),
 		hexEnc(md.MsgID()),
 		i.Category().String(),
@@ -117,7 +117,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("INSERT INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
+		nqb.Build("REPLACE INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -164,6 +164,15 @@ func (s *SQLEngine) ctimeFromMessage(tx *sql.Tx, u gregor.UID, mid gregor.MsgID)
 		return time.Time{}, err
 	}
 	return ctime.Time(), nil
+}
+
+func (s *SQLEngine) dtimeFromMessage(tx *sql.Tx, u gregor.UID, mid gregor.MsgID) (time.Time, error) {
+	row := tx.QueryRow("SELECT dtime FROM messages WHERE uid=? AND msgid=?", hexEnc(u), hexEnc(mid))
+	var dtime timeScanner
+	if err := row.Scan(&dtime); err != nil {
+		return time.Time{}, err
+	}
+	return dtime.Time(), nil
 }
 
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange, ctime time.Time) error {
@@ -436,16 +445,12 @@ func (s *SQLEngine) AddState(state gregor.State) error {
 	if err != nil {
 		return err
 	}
-
-	upd, err := tx.Prepare("UPDATE items SET dtime=? WHERE uid=? AND msgid=?")
-	if err != nil {
-		return err
-	}
-	defer upd.Close()
+	defer tx.Rollback()
 
 	for _, i := range items {
 		u := i.Metadata().UID()
-		if !s.rowExists(tx, u, i.Metadata().MsgID()) {
+		msgid := i.Metadata().MsgID()
+		if dtime, err := s.dtimeFromMessage(tx, u, msgid); err != nil || i.DTime().Before(dtime) {
 			if err := s.consumeCreation(tx, u, i); err != nil {
 				return err
 			}
@@ -453,16 +458,6 @@ func (s *SQLEngine) AddState(state gregor.State) error {
 	}
 
 	return tx.Commit()
-}
-
-func (s *SQLEngine) rowExists(tx *sql.Tx, u gregor.UID, msgid gregor.MsgID) bool {
-	rows, err := tx.Query(`SELECT 1 WHERE uid=? AND msgid=?`, hexEnc(u), hexEnc(msgid))
-	if err != nil {
-		return false
-	}
-	defer rows.Close()
-
-	return rows.Next()
 }
 
 func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {

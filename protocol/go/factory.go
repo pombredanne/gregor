@@ -43,15 +43,11 @@ func castItem(i gregor.Item) (ItemAndMetadata, error) {
 	return ret, nil
 }
 
-func timeToTimeOrOffset(timeIn *time.Time) TimeOrOffset {
-	var timeOut Time
-	if timeIn != nil && !timeIn.IsZero() {
-		timeOut = ToTime(*timeIn)
+func timeToTimeOrOffset(timeIn *time.Time) (too TimeOrOffset) {
+	if timeIn != nil {
+		too.Time_ = ToTime(*timeIn)
 	}
-	return TimeOrOffset{
-		Offset_: 0,
-		Time_:   timeOut,
-	}
+	return
 }
 
 func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, i gregor.InBandMsgType) (Metadata, error) {

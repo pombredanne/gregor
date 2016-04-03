@@ -158,6 +158,9 @@ func (t timeOrOffset) Time() *time.Time {
 	return &ret
 }
 func (t timeOrOffset) Offset() *time.Duration { return nil }
+func (t timeOrOffset) Before(t2 time.Time) bool {
+	return time.Time(t).Before(t2)
+}
 
 var _ gregor.TimeOrOffset = timeOrOffset{}
 
@@ -191,16 +194,9 @@ func (u *user) state(now time.Time, f gregor.ObjFactory, d gregor.DeviceID, t gr
 	return f.MakeState(items)
 }
 
-func dtimeBefore(i1, i2 gregor.Item) bool {
-	var tZero time.Time
-	t1 := toTime(tZero, i1.DTime())
-	t2 := toTime(tZero, i1.DTime())
-	return !t1.Equal(tZero) && (t2.Equal(tZero) || t1.Before(t2))
-}
-
 func (u *user) addItems(items []gregor.Item) {
 	for _, i1 := range items {
-		if i2, ok := u.items[msgIDString(i1)]; !ok || dtimeBefore(i1, i2.item) {
+		if i2, ok := u.items[msgIDString(i1)]; !ok || i1.DTime().Before(toTime(time.Now(), i2.item.DTime())) {
 			u.addItem(time.Now(), i1)
 		}
 	}
