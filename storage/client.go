@@ -1,4 +1,4 @@
-package client
+package storage
 
 import "github.com/keybase/gregor"
 

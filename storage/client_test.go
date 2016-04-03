@@ -1,4 +1,4 @@
-package client
+package storage
 
 import (
 	"io/ioutil"
@@ -7,7 +7,6 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	protocol "github.com/keybase/gregor/protocol/go"
-	"github.com/keybase/gregor/storage"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -28,7 +27,7 @@ func TestLevelDBClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sm := storage.NewMemEngine(objFactory, clockwork.NewFakeClock())
+	sm := NewMemEngine(objFactory, clockwork.NewFakeClock())
 	db, err := leveldb.OpenFile(fname, nil)
 	if err != nil {
 		t.Fatal(err)
