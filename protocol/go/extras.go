@@ -65,19 +65,14 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	return ret
 }
 
-type ItemAndMetadata struct {
-	MD   *Metadata `codec:"md" json:"md"`
-	Item *Item     `codec:"item" json:"item"`
-}
-
 func (m Metadata) UID() gregor.UID                   { return m.Uid_ }
-func (i ItemAndMetadata) Metadata() gregor.Metadata  { return *i.MD }
-func (i ItemAndMetadata) Body() gregor.Body          { return i.Item.Body_ }
-func (i ItemAndMetadata) Category() gregor.Category  { return i.Item.Category_ }
-func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.Item.Dtime_ }
+func (i ItemAndMetadata) Metadata() gregor.Metadata  { return i.Md_ }
+func (i ItemAndMetadata) Body() gregor.Body          { return i.Item_.Body_ }
+func (i ItemAndMetadata) Category() gregor.Category  { return i.Item_.Category_ }
+func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.Item_.Dtime_ }
 func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
 	var ret []gregor.TimeOrOffset
-	for _, t := range i.Item.NotifyTimes_ {
+	for _, t := range i.Item_.NotifyTimes_ {
 		ret = append(ret, t)
 	}
 	return ret
@@ -88,7 +83,7 @@ func (s StateUpdateMessage) Creation() gregor.Item {
 	if s.Creation_ != nil {
 		return nil
 	}
-	return ItemAndMetadata{MD: &s.Md_, Item: s.Creation_}
+	return ItemAndMetadata{Md_: &s.Md_, Item_: s.Creation_}
 }
 func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
 	if s.Dismissal_ != nil {
@@ -191,7 +186,7 @@ func (s State) Marshal() ([]byte, error) {
 }
 
 func (i ItemAndMetadata) InCategory(c Category) bool {
-	return i.Item.Category_.Eq(c)
+	return i.Item_.Category_.Eq(c)
 }
 
 func (s State) ItemsInCategory(gc gregor.Category) ([]gregor.Item, error) {

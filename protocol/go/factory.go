@@ -87,8 +87,8 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 		return nil, err
 	}
 	return ItemAndMetadata{
-		MD:   &md,
-		Item: &item,
+		Md_:   &md,
+		Item_: &item,
 	}, nil
 }
 
@@ -160,8 +160,8 @@ func (o ObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessa
 	}
 	return InBandMessage{
 		StateUpdate_: &StateUpdateMessage{
-			Md_:       *ourItem.MD,
-			Creation_: ourItem.Item,
+			Md_:       *ourItem.Md_,
+			Creation_: ourItem.Item_,
 		},
 	}, nil
 }
