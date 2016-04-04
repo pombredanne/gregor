@@ -5,8 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/goamz/goamz/aws"
-	"github.com/goamz/goamz/s3"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -14,10 +12,13 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/goamz/goamz/aws"
+	"github.com/goamz/goamz/s3"
 )
 
 type Options struct {
-	SessionServer *url.URL
+	SessionServer net.Addr
 	BindAddress   string
 	MysqlDSN      *url.URL
 	Debug         bool
@@ -154,12 +155,12 @@ func (o *Options) Parse(raw *rawOpts) error {
 
 	o.BindAddress = raw.bindAddress
 
-	if raw.sessionServerURI == "" {
+	if raw.sessionServerAddr == "" {
 		return badUsage("No session-server URI specified")
 	}
 
 	var err error
-	if o.SessionServer, err = url.Parse(raw.sessionServerURI); err != nil {
+	if o.SessionServer, err = net.ResolveTCPAddr(raw.sessionServerAddr); err != nil {
 		return badUsage("Error parsing session-server: %s", err)
 	}
 
@@ -208,15 +209,15 @@ func readFromS3Config(region string, bucket string, fileNames ...string) ([]stri
 }
 
 type rawOpts struct {
-	sessionServerURI string
-	bindAddress      string
-	mysqlDSN         string
-	debug            bool
-	tlsKey           string
-	tlsCert          string
-	awsRegion        string
-	configBucket     string
-	helpExtended     bool
+	sessionServerAddr string
+	bindAddress       string
+	mysqlDSN          string
+	debug             bool
+	tlsKey            string
+	tlsCert           string
+	awsRegion         string
+	configBucket      string
+	helpExtended      bool
 }
 
 func ParseOptions(argv []string) (*Options, error) {
@@ -235,7 +236,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		fs.SetOutput(ioutil.Discard)
 	}
 	var raw rawOpts
-	fs.StringVar(&raw.sessionServerURI, "session-server", os.Getenv("SESSION_SERVER"), "host:port of the session server")
+	fs.StringVar(&raw.sessionServerAddr, "session-server", os.Getenv("SESSION_SERVER"), "host:port of the session server")
 	fs.StringVar(&raw.bindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&raw.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "user:pw@host/dbname for MySQL")
 	fs.BoolVar(&raw.debug, "debug", false, "turn on debugging")
