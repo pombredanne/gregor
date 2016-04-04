@@ -76,6 +76,10 @@ func NewServer() *Server {
 	return s
 }
 
+func (s *Server) SetAuthenticator(a Authenticator) {
+	s.auth = a
+}
+
 func (s *Server) uidKey(u gregor.UID) (string, error) {
 	tuid, ok := u.(protocol.UID)
 	if !ok {
