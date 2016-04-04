@@ -8,7 +8,7 @@ import (
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	protocol "github.com/keybase/gregor/protocol/go"
-	context "golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
 // ErrBadUID occurs when there is a bad UID on the auth channel.

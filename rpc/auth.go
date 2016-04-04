@@ -2,7 +2,7 @@ package rpc
 
 import (
 	protocol "github.com/keybase/gregor/protocol/go"
-	context "golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
 // Authenticator is an interface for handling authentication.

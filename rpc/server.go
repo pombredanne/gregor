@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 	protocol "github.com/keybase/gregor/protocol/go"
-	context "golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
 // ErrBadCast occurs when there is a problem casting a type from

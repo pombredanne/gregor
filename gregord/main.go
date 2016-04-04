@@ -10,9 +10,11 @@ import (
 
 type dummyauth struct{}
 
-func (m dummyauth) Authenticate(_ context.Context, tok protocol.AuthToken) (protocol.UID, protocol.SessionID, error) {
+func (m dummyauth) Authenticate(_ context.Context, _ protocol.AuthToken) (protocol.UID, protocol.SessionID, error) {
 	return protocol.UID{}, protocol.SessionID(""), nil
 }
+
+var _ rpc.Authenticator = dummyauth{}
 
 func main() {
 	opts, err := ParseOptions(os.Args)

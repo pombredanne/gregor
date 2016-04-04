@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 )
 
 var ErrBadScan = errors.New("bad scan of data type")

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 )
 
 type mysqlTimeWriter struct{}
