@@ -132,9 +132,17 @@ func consumeMessage(t *testing.T, which string, sm gregor.StateMachine, m gregor
 	}
 }
 
-func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) gregor.UID {
+// advanceClock advances the given clock if it's a FakeClock.
+func advanceClock(cl clockwork.Clock, d time.Duration) {
+	if fc, ok := cl.(clockwork.FakeClock); ok {
+		fc.Advance(d)
+	}
+}
+
+func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID {
 	of := sm.ObjFactory()
-	t0 := fc.Now()
+	cl := sm.Clock()
+	t0 := cl.Now()
 	u1 := makeUID(of)
 	c1 := makeCategory(of, "foos")
 	c2 := makeCategory(of, "bars")
@@ -152,9 +160,9 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 	// Produce a new mesasge, with payload "f1"
 	m1 := makeMsgID(of)
 	consumeMessage(t, "m1", sm,
-		newCreation(of, u1, m1, nil, fc.Now(), c1, "f1", nil),
+		newCreation(of, u1, m1, nil, cl.Now(), c1, "f1", nil),
 	)
-	fc.Advance(time.Second)
+	advanceClock(cl, time.Second)
 	// Make an assertion: that there is 1 item in the StateMachine,
 	// and 1 item for the category "foos"
 	assert2 := func(too gregor.TimeOrOffset) {
@@ -167,29 +175,29 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 
 	// Produce a new *dismissal* message that dismisses the first message
 	// we added (m1)
-	consumeMessage(t, "d1", sm, newDismissalByIDs(of, u1, makeMsgID(of), nil, fc.Now(), []gregor.MsgID{m1}))
+	consumeMessage(t, "d1", sm, newDismissalByIDs(of, u1, makeMsgID(of), nil, cl.Now(), []gregor.MsgID{m1}))
 
 	// Make an assertion: that there are no items left in the StateMachine
 	assert3 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 0)
 		assertNItemsInCategory(t, sm, u1, nil, too, c1, 0)
 	}
-	tm3 := fc.Now()
+	tm3 := cl.Now()
 
 	// Do the assertion for "now" = nil
 	assert3(nil)
-	fc.Advance(time.Second)
+	advanceClock(cl, time.Second)
 
 	// Make and consume 3 new messages.
 	consumeMessage(t, "m2", sm,
-		newCreation(of, u1, makeMsgID(of), nil, fc.Now(), c1, "f2", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f2", nil),
 	)
-	dt4 := fc.Now().Add(3 * time.Second)
+	dt4 := cl.Now().Add(3 * time.Second)
 	consumeMessage(t, "m3", sm,
-		newCreation(of, u1, makeMsgID(of), nil, fc.Now(), c1, "f3", &dt4),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f3", &dt4),
 	)
 	consumeMessage(t, "m4", sm,
-		newCreation(of, u1, makeMsgID(of), nil, fc.Now(), c2, "b1", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b1", nil),
 	)
 
 	// Make an assertion: that the items wound up and in the right
@@ -200,8 +208,8 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 		assertNItemsInCategory(t, sm, u1, nil, too, c2, 1)
 	}
 	assert4(nil)
-	tm4 := fc.Now()
-	fc.Advance(time.Duration(4) * time.Second)
+	tm4 := cl.Now()
+	advanceClock(cl, 4*time.Second)
 
 	// Make an assertion: that the dismissals worked as planned
 	assert5 := func(too gregor.TimeOrOffset) {
@@ -210,7 +218,7 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 		assertBodiesInCategory(t, sm, u1, nil, too, c1, []string{"f2"})
 		assertBodiesInCategory(t, sm, u1, nil, too, c2, []string{"b1"})
 	}
-	tm5 := fc.Now()
+	tm5 := cl.Now()
 	assert5(nil)
 
 	// Assert our previous checkpoint still works
@@ -218,15 +226,15 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 	assert4(timeToTimeOrOffset(of, tm4))
 
 	consumeMessage(t, "m5", sm,
-		newCreation(of, u1, makeMsgID(of), nil, fc.Now(), c2, "b3", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b3", nil),
 	)
-	fc.Advance(time.Duration(4) * time.Second)
+	advanceClock(cl, 4*time.Second)
 	consumeMessage(t, "m6", sm,
-		newCreation(of, u1, makeMsgID(of), nil, fc.Now(), c2, "b4", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b4", nil),
 	)
-	fc.Advance(time.Duration(1) * time.Second)
+	advanceClock(cl, time.Second)
 	consumeMessage(t, "d2", sm,
-		newDismissalByCategory(of, u1, makeMsgID(of), nil, fc.Now(), c2, tm5),
+		newDismissalByCategory(of, u1, makeMsgID(of), nil, cl.Now(), c2, tm5),
 	)
 	assert6 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
@@ -255,8 +263,9 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwo
 	return u1
 }
 
-func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) (gregor.UID, gregor.DeviceID) {
+func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID, gregor.DeviceID) {
 	of := sm.ObjFactory()
+	cl := sm.Clock()
 	u1 := makeUID(of)
 	c1 := makeCategory(of, "foos")
 	d1 := makeDeviceID(of)
@@ -267,7 +276,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwor
 	assert1(nil)
 	m1 := makeMsgID(of)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m1, d1, fc.Now(), c1, "f1", nil),
+		newCreation(of, u1, m1, d1, cl.Now(), c1, "f1", nil),
 	)
 	assert2 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, d1, too, 1)
@@ -277,7 +286,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwor
 	m2 := makeMsgID(of)
 	d2 := makeDeviceID(of)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m2, d2, fc.Now(), c1, "f2", nil),
+		newCreation(of, u1, m2, d2, cl.Now(), c1, "f2", nil),
 	)
 	assert3 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
@@ -286,7 +295,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwor
 	}
 	assert3(nil)
 	sm.ConsumeMessage(
-		newDismissalByIDs(of, u1, makeMsgID(of), nil, fc.Now(), []gregor.MsgID{m1}),
+		newDismissalByIDs(of, u1, makeMsgID(of), nil, cl.Now(), []gregor.MsgID{m1}),
 	)
 	assert4 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 1)
@@ -298,9 +307,9 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwor
 	// Make sure that "global" notifications are all picked-up if querying per-device;
 	// Advance the clock so that they will be ordered consistently.
 	m3 := makeMsgID(of)
-	fc.Advance(time.Duration(1) * time.Second)
+	advanceClock(cl, time.Second)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m3, nil, fc.Now(), c1, "f3", nil),
+		newCreation(of, u1, m3, nil, cl.Now(), c1, "f3", nil),
 	)
 	assert5 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)

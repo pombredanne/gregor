@@ -486,4 +486,8 @@ func (s *SQLEngine) ObjFactory() gregor.ObjFactory {
 	return s.objFactory
 }
 
+func (s *SQLEngine) Clock() clockwork.Clock {
+	return s.clock
+}
+
 var _ gregor.StateMachine = (*SQLEngine)(nil)

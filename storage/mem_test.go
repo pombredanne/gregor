@@ -12,6 +12,6 @@ func TestMemEngine(t *testing.T) {
 	cl := clockwork.NewFakeClock()
 	of := protocol.ObjFactory{}
 	eng := NewMemEngine(of, cl)
-	test.TestStateMachineAllDevices(t, eng, cl)
-	test.TestStateMachinePerDevice(t, eng, cl)
+	test.TestStateMachineAllDevices(t, eng)
+	test.TestStateMachinePerDevice(t, eng)
 }

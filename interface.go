@@ -4,6 +4,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	context "golang.org/x/net/context"
 )
 
@@ -148,6 +149,9 @@ type StateMachine interface {
 
 	// ObjFactory returns the ObjFactory used by this StateMachine.
 	ObjFactory() ObjFactory
+
+	// Clock returns the clockwork.Clock used by this StateMachine.
+	Clock() clockwork.Clock
 }
 
 type ObjFactory interface {

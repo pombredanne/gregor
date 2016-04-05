@@ -348,3 +348,7 @@ func (m *MemEngine) InitState(s gregor.State) error {
 func (m *MemEngine) ObjFactory() gregor.ObjFactory {
 	return m.objFactory
 }
+
+func (m *MemEngine) Clock() clockwork.Clock {
+	return m.clock
+}

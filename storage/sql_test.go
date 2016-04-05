@@ -46,8 +46,8 @@ func testEngine(t *testing.T, engine string, name string, w sqlTimeWriter) {
 	cl := clockwork.NewFakeClock()
 	var of protocol.ObjFactory
 	eng := NewSQLEngine(db, of, w, cl)
-	test.TestStateMachineAllDevices(t, eng, cl)
-	test.TestStateMachinePerDevice(t, eng, cl)
+	test.TestStateMachineAllDevices(t, eng)
+	test.TestStateMachinePerDevice(t, eng)
 }
 
 func TestSqliteEngine(t *testing.T) {

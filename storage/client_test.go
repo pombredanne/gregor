@@ -22,7 +22,7 @@ func TestLevelDBClient(t *testing.T) {
 
 	fc := clockwork.NewFakeClock()
 	sm := NewMemEngine(of, fc)
-	user, device := test.TestStateMachinePerDevice(t, sm, fc)
+	user, device := test.TestStateMachinePerDevice(t, sm)
 	db, err := leveldb.OpenFile(fname, nil)
 	if err != nil {
 		t.Fatal(err)
