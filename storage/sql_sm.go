@@ -87,7 +87,7 @@ type byter interface {
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
 func hexEncOrNull(b byter) interface{} {
-	if b == nil || b.Bytes() == nil {
+	if b == nil {
 		return nil
 	}
 	return hexEnc(b)

@@ -24,7 +24,6 @@ func (t TimeOrOffset) Time() *time.Time {
 	ret := FromTime(t.Time_)
 	return &ret
 }
-
 func (t TimeOrOffset) Offset() *time.Duration {
 	if t.Offset_ == 0 {
 		return nil
@@ -40,7 +39,6 @@ func (s StateSyncMessage) Metadata() gregor.Metadata {
 func (m MsgRange) EndTime() gregor.TimeOrOffset {
 	return m.EndTime_
 }
-
 func (m MsgRange) Category() gregor.Category {
 	return m.Category_
 }
@@ -61,10 +59,46 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	return ret
 }
 
-func (m Metadata) UID() gregor.UID                  { return m.Uid_ }
-func (i ItemAndMetadata) Metadata() gregor.Metadata { return i.Md_ }
-func (i ItemAndMetadata) Body() gregor.Body         { return i.Item_.Body_ }
-func (i ItemAndMetadata) Category() gregor.Category { return i.Item_.Category_ }
+func (m Metadata) CTime() time.Time     { return FromTime(m.Ctime_) }
+func (m Metadata) SetCTime(t time.Time) { m.Ctime_ = ToTime(t) }
+func (m Metadata) UID() gregor.UID {
+	if m.Uid_ == nil {
+		return nil
+	}
+	return m.Uid_
+}
+func (m Metadata) MsgID() gregor.MsgID {
+	if m.MsgID_ == nil {
+		return nil
+	}
+	return m.MsgID_
+}
+func (m Metadata) DeviceID() gregor.DeviceID {
+	if m.DeviceID_ == nil {
+		return nil
+	}
+	return m.DeviceID_
+}
+func (m Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
+
+func (i ItemAndMetadata) Metadata() gregor.Metadata {
+	if i.Md_ == nil {
+		return nil
+	}
+	return i.Md_
+}
+func (i ItemAndMetadata) Body() gregor.Body {
+	if i.Item_.Body_ == nil {
+		return nil
+	}
+	return i.Item_.Body_
+}
+func (i ItemAndMetadata) Category() gregor.Category {
+	if i.Item_.Category_ == "" {
+		return nil
+	}
+	return i.Item_.Category_
+}
 func (i ItemAndMetadata) DTime() gregor.TimeOrOffset {
 	var unset TimeOrOffset
 	if i.Item_.Dtime_ == unset {
@@ -145,15 +179,24 @@ func (i InBandMessage) ToStateUpdateMessage() gregor.StateUpdateMessage {
 	return i.StateUpdate_
 }
 
-func (m Metadata) MsgID() gregor.MsgID                 { return m.MsgID_ }
-func (m Metadata) CTime() time.Time                    { return FromTime(m.Ctime_) }
-func (m Metadata) SetCTime(t time.Time)                { m.Ctime_ = ToTime(t) }
-func (m Metadata) DeviceID() gregor.DeviceID           { return m.DeviceID_ }
-func (m Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
-
-func (o OutOfBandMessage) Body() gregor.Body     { return o.Body_ }
-func (o OutOfBandMessage) System() gregor.System { return o.System_ }
-func (o OutOfBandMessage) UID() gregor.UID       { return o.Uid_ }
+func (o OutOfBandMessage) Body() gregor.Body {
+	if o.Body_ == nil {
+		return nil
+	}
+	return o.Body_
+}
+func (o OutOfBandMessage) System() gregor.System {
+	if o.System_ == "" {
+		return nil
+	}
+	return o.System_
+}
+func (o OutOfBandMessage) UID() gregor.UID {
+	if o.Uid_ == nil {
+		return nil
+	}
+	return o.Uid_
+}
 
 func (m Message) ToInBandMessage() gregor.InBandMessage {
 	if m.Ibm_ == nil {
