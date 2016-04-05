@@ -60,10 +60,6 @@ type user struct {
 	log   []loggedMsg
 }
 
-func newUser() *user {
-	return new(user)
-}
-
 // isDismissedAt returns true if item i is dismissed at time t
 func (i item) isDismissedAt(t time.Time) bool {
 	if i.dtime != nil && isBeforeOrSame(*i.dtime, t) {
@@ -271,7 +267,7 @@ func (m *MemEngine) getUser(uid gregor.UID) *user {
 	if u, ok := m.users[uidHex]; ok {
 		return u
 	}
-	u := newUser()
+	u := new(user)
 	m.users[uidHex] = u
 	return u
 }
