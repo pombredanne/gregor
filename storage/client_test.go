@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/test"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
@@ -19,19 +20,14 @@ func TestLevelDBClient(t *testing.T) {
 	}
 	defer os.Remove(fname)
 
-	user, err := objFactory.MakeUID([]byte("user"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	device, err := objFactory.MakeDeviceID([]byte("device"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sm := NewMemEngine(objFactory, clockwork.NewFakeClock())
+	fc := clockwork.NewFakeClock()
+	sm := NewMemEngine(objFactory, fc)
+	user, device := test.TestStateMachinePerDevice(t, sm, fc)
 	db, err := leveldb.OpenFile(fname, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	c := NewClient(user, device, objFactory, sm, &LevelDBStorageEngine{db})
 
 	if err := c.Save(); err != nil {

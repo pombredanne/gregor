@@ -98,6 +98,12 @@ func (u *user) addItem(now time.Time, i gregor.Item) *item {
 	return newItem
 }
 
+func (u *user) addItems(items []gregor.Item) {
+	for _, it := range items {
+		u.addItem(time.Now(), it)
+	}
+}
+
 // logMessage logs a message for this user and potentially associates an item
 func (u *user) logMessage(t time.Time, m gregor.InBandMessage, i *item) {
 	u.log = append(u.log, loggedMsg{m, t, i})
@@ -176,7 +182,8 @@ func (u *user) state(now time.Time, f gregor.ObjFactory, d gregor.DeviceID, t gr
 	for _, i := range u.items {
 		md := i.item.Metadata()
 		did := md.DeviceID()
-		if d != nil && did != nil && !bytes.Equal(did.Bytes(), d.Bytes()) {
+		if d != nil && did != nil && len(d.Bytes()) != 0 && len(did.Bytes()) != 0 &&
+			!bytes.Equal(did.Bytes(), d.Bytes()) {
 			continue
 		}
 		if toTime(now, t).Before(i.ctime) {
@@ -192,14 +199,6 @@ func (u *user) state(now time.Time, f gregor.ObjFactory, d gregor.DeviceID, t gr
 		items = append(items, exported)
 	}
 	return f.MakeState(items)
-}
-
-func (u *user) addItems(items []gregor.Item) {
-	for _, i1 := range items {
-		if i2, ok := u.items[msgIDString(i1)]; !ok || i1.DTime().Before(toTime(time.Now(), i2.item.DTime())) {
-			u.addItem(time.Now(), i1)
-		}
-	}
 }
 
 func isMessageForDevice(m gregor.InBandMessage, d gregor.DeviceID) bool {
@@ -319,7 +318,19 @@ func (m *MemEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	return user.state(m.clock.Now(), m.objFactory, d, t)
 }
 
-func (m *MemEngine) AddState(s gregor.State) error {
+func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
+	m.Lock()
+	defer m.Unlock()
+	user := m.getUser(u)
+	msg := user.replayLog(m.clock.Now(), d, t)
+	return msg, nil
+}
+
+func (m *MemEngine) IsEphemeral() bool {
+	return true
+}
+
+func (m *MemEngine) InitState(s gregor.State) error {
 	m.Lock()
 	defer m.Unlock()
 	userItems := make(map[*user][]gregor.Item)
@@ -340,21 +351,12 @@ func (m *MemEngine) AddState(s gregor.State) error {
 	return nil
 }
 
-func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
-	m.Lock()
-	defer m.Unlock()
-	user := m.getUser(u)
-	msg := user.replayLog(m.clock.Now(), d, t)
-	return msg, nil
-}
-
 func (m *MemEngine) RemoveDismissed(too gregor.TimeOrOffset) {
 	m.Lock()
 	defer m.Unlock()
-	t := toTime(time.Now(), too)
 	for _, u := range m.users {
 		for id := range u.items {
-			if u.items[id].dtime != nil && (*u.items[id].dtime).Before(t) {
+			if u.items[id].dtime != nil {
 				delete(u.items, id)
 			}
 		}

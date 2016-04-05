@@ -33,10 +33,6 @@ func (t TimeOrOffset) Offset() *time.Duration {
 	return &d
 }
 
-func (t TimeOrOffset) Before(t2 time.Time) bool {
-	return t.Time() != nil && t.Time().Before(t2)
-}
-
 func (s StateSyncMessage) Metadata() gregor.Metadata {
 	return s.Md_
 }
@@ -65,11 +61,17 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	return ret
 }
 
-func (m Metadata) UID() gregor.UID                   { return m.Uid_ }
-func (i ItemAndMetadata) Metadata() gregor.Metadata  { return i.Md_ }
-func (i ItemAndMetadata) Body() gregor.Body          { return i.Item_.Body_ }
-func (i ItemAndMetadata) Category() gregor.Category  { return i.Item_.Category_ }
-func (i ItemAndMetadata) DTime() gregor.TimeOrOffset { return i.Item_.Dtime_ }
+func (m Metadata) UID() gregor.UID                  { return m.Uid_ }
+func (i ItemAndMetadata) Metadata() gregor.Metadata { return i.Md_ }
+func (i ItemAndMetadata) Body() gregor.Body         { return i.Item_.Body_ }
+func (i ItemAndMetadata) Category() gregor.Category { return i.Item_.Category_ }
+func (i ItemAndMetadata) DTime() gregor.TimeOrOffset {
+	var unset TimeOrOffset
+	if i.Item_.Dtime_ == unset {
+		return nil
+	}
+	return i.Item_.Dtime_
+}
 func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
 	var ret []gregor.TimeOrOffset
 	for _, t := range i.Item_.NotifyTimes_ {
@@ -80,13 +82,13 @@ func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
 
 func (s StateUpdateMessage) Metadata() gregor.Metadata { return s.Md_ }
 func (s StateUpdateMessage) Creation() gregor.Item {
-	if s.Creation_ != nil {
+	if s.Creation_ == nil {
 		return nil
 	}
 	return ItemAndMetadata{Md_: &s.Md_, Item_: s.Creation_}
 }
 func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
-	if s.Dismissal_ != nil {
+	if s.Dismissal_ == nil {
 		return nil
 	}
 	return s.Dismissal_

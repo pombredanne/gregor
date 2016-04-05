@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -82,7 +83,7 @@ func (q *queryBuilder) Exec(tx *sql.Tx) error {
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
 func hexEncOrNull(b byter) interface{} {
-	if b == nil {
+	if b == nil || len(b.Bytes()) == 0 {
 		return nil
 	}
 	return hexEnc(b)
@@ -99,7 +100,7 @@ func (s *SQLEngine) newQueryBuilder() *queryBuilder {
 func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) error {
 	md := i.Metadata()
 	qb := s.newQueryBuilder()
-	qb.Build(`REPLACE INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,`,
+	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
 		hexEnc(u),
 		hexEnc(md.MsgID()),
 		i.Category().String(),
@@ -117,7 +118,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("REPLACE INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
+		nqb.Build("INSERT INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -164,15 +165,6 @@ func (s *SQLEngine) ctimeFromMessage(tx *sql.Tx, u gregor.UID, mid gregor.MsgID)
 		return time.Time{}, err
 	}
 	return ctime.Time(), nil
-}
-
-func (s *SQLEngine) dtimeFromMessage(tx *sql.Tx, u gregor.UID, mid gregor.MsgID) (time.Time, error) {
-	row := tx.QueryRow("SELECT dtime FROM messages WHERE uid=? AND msgid=?", hexEnc(u), hexEnc(mid))
-	var dtime timeScanner
-	if err := row.Scan(&dtime); err != nil {
-		return time.Time{}, err
-	}
-	return dtime.Time(), nil
 }
 
 func (s *SQLEngine) consumeRangesToDismiss(tx *sql.Tx, u gregor.UID, mid gregor.MsgID, mrs []gregor.MsgRange, ctime time.Time) error {
@@ -435,31 +427,6 @@ func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InB
 	return nil, nil
 }
 
-func (s *SQLEngine) AddState(state gregor.State) error {
-	items, err := state.Items()
-	if err != nil {
-		return err
-	}
-
-	tx, err := s.driver.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	for _, i := range items {
-		u := i.Metadata().UID()
-		msgid := i.Metadata().MsgID()
-		if dtime, err := s.dtimeFromMessage(tx, u, msgid); err != nil || i.DTime().Before(dtime) {
-			if err := s.consumeCreation(tx, u, i); err != nil {
-				return err
-			}
-		}
-	}
-
-	return tx.Commit()
-}
-
 func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
                i.category, i.body,
@@ -511,8 +478,16 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	return ret, nil
 }
 
+func (s *SQLEngine) IsEphemeral() bool {
+	return false
+}
+
+func (s *SQLEngine) InitState(_ gregor.State) error {
+	return errors.New("attempting to initialize non-ephemeral StateMachine")
+}
+
 func (s *SQLEngine) RemoveDismissed(too gregor.TimeOrOffset) {
-	// NOOP for now
+	// NOOP
 }
 
 var _ gregor.StateMachine = (*SQLEngine)(nil)

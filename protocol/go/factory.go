@@ -2,7 +2,7 @@ package gregor1
 
 import (
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/keybase/go-codec/codec"
@@ -20,17 +20,23 @@ func (o ObjFactory) MakeBody(b []byte) (gregor.Body, error)         { return Bod
 func (o ObjFactory) MakeCategory(s string) (gregor.Category, error) { return Category(s), nil }
 
 func castUID(uid gregor.UID) (UID, error) {
+	if uid == nil {
+		return UID(nil), nil
+	}
 	ret, ok := uid.(UID)
 	if !ok {
-		return UID(""), fmt.Errorf("Bad UID; wrong type")
+		return UID(""), errors.New("bad UID; wrong type")
 	}
 	return ret, nil
 }
 
 func castDeviceID(d gregor.DeviceID) (DeviceID, error) {
+	if d == nil {
+		return DeviceID(nil), nil
+	}
 	ret, ok := d.(DeviceID)
 	if !ok {
-		return DeviceID(""), fmt.Errorf("Bad Device ID; wrong type")
+		return DeviceID(""), errors.New("bad Device ID; wrong type")
 	}
 	return ret, nil
 }
@@ -38,7 +44,7 @@ func castDeviceID(d gregor.DeviceID) (DeviceID, error) {
 func castItem(i gregor.Item) (ItemAndMetadata, error) {
 	ret, ok := i.(ItemAndMetadata)
 	if !ok {
-		return ItemAndMetadata{}, fmt.Errorf("Bad Item; wrong type")
+		return ItemAndMetadata{}, errors.New("bad Item; wrong type")
 	}
 	return ret, nil
 }

@@ -78,7 +78,6 @@ type OutOfBandMessage interface {
 type TimeOrOffset interface {
 	Time() *time.Time
 	Offset() *time.Duration
-	Before(t2 time.Time) bool
 }
 
 type Item interface {
@@ -133,9 +132,13 @@ type StateMachine interface {
 	// at the given time.
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
 
-	// AddState iterates through the given State's Items adding all
-	// unique MsgIDs, selecting the Items with the oldest dtimes.
-	AddState(s State) error
+	// IsEphemeral returns whether the backend storage needs to be saved/restored.
+	IsEphemeral() bool
+
+	// InitState iterates through the given State's Items, setting the
+	// StateMachine's storage. Note: This should only be called to
+	// initialize an ephemeral StateMachine.
+	InitState(s State) error
 
 	// InBandMessagesSince returns all messages since the given time
 	// for the user u on device d.  If d is nil, then we'll return

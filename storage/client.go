@@ -1,6 +1,10 @@
 package storage
 
-import "github.com/keybase/gregor"
+import (
+	"errors"
+
+	"github.com/keybase/gregor"
+)
 
 type LocalStorageEngine interface {
 	Store(gregor.UID, []byte) error
@@ -26,6 +30,10 @@ func NewClient(user gregor.UID, device gregor.DeviceID, objFactory gregor.ObjFac
 }
 
 func (c *Client) Save() error {
+	if !c.sm.IsEphemeral() {
+		return errors.New("state machine is non-ephemeral")
+	}
+
 	c.sm.RemoveDismissed(nil)
 	state, err := c.sm.State(c.user, c.device, nil)
 	if err != nil {
@@ -41,6 +49,10 @@ func (c *Client) Save() error {
 }
 
 func (c *Client) Restore() error {
+	if !c.sm.IsEphemeral() {
+		return errors.New("state machine is non-ephemeral")
+	}
+
 	value, err := c.storage.Load(c.user)
 	if err != nil {
 		return err
@@ -51,5 +63,5 @@ func (c *Client) Restore() error {
 		return err
 	}
 
-	return c.sm.AddState(state)
+	return c.sm.InitState(state)
 }
