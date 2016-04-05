@@ -34,7 +34,6 @@ func (c *Client) Save() error {
 		return errors.New("state machine is non-ephemeral")
 	}
 
-	c.sm.RemoveDismissed(nil)
 	state, err := c.sm.State(c.user, c.device, nil)
 	if err != nil {
 		return err

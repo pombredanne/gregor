@@ -350,15 +350,3 @@ func (m *MemEngine) InitState(s gregor.State) error {
 
 	return nil
 }
-
-func (m *MemEngine) RemoveDismissed(too gregor.TimeOrOffset) {
-	m.Lock()
-	defer m.Unlock()
-	for _, u := range m.users {
-		for id := range u.items {
-			if u.items[id].dtime != nil {
-				delete(u.items, id)
-			}
-		}
-	}
-}

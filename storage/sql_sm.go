@@ -486,8 +486,4 @@ func (s *SQLEngine) InitState(_ gregor.State) error {
 	return errors.New("attempting to initialize non-ephemeral StateMachine")
 }
 
-func (s *SQLEngine) RemoveDismissed(too gregor.TimeOrOffset) {
-	// NOOP
-}
-
 var _ gregor.StateMachine = (*SQLEngine)(nil)
