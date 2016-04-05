@@ -56,14 +56,12 @@ type loggedMsg struct {
 // user consists of a list of items (some of which might be dismissed) and
 // and an unpruned log of all incoming messages.
 type user struct {
-	items map[string](*item)
+	items [](*item)
 	log   []loggedMsg
 }
 
 func newUser() *user {
-	return &user{
-		items: make(map[string](*item)),
-	}
+	return new(user)
 }
 
 // isDismissedAt returns true if item i is dismissed at time t
@@ -94,7 +92,7 @@ func (i item) export(f gregor.ObjFactory) (gregor.Item, error) {
 // addItem adds an item for this user
 func (u *user) addItem(now time.Time, i gregor.Item) *item {
 	newItem := &item{item: i, ctime: nowIfZero(now, i.Metadata().CTime())}
-	u.items[msgIDString(i)] = newItem
+	u.items = append(u.items, newItem)
 	return newItem
 }
 
@@ -113,13 +111,13 @@ func msgIDtoString(m gregor.MsgID) string {
 	return hex.EncodeToString(m.Bytes())
 }
 
-func msgIDString(i gregor.Item) string {
-	return msgIDtoString(i.Metadata().MsgID())
-}
-
 func (u *user) dismissMsgIDs(now time.Time, ids []gregor.MsgID) {
-	for _, id := range ids {
-		if i, ok := u.items[msgIDtoString(id)]; ok {
+	set := make(map[string]bool)
+	for _, i := range ids {
+		set[msgIDtoString(i)] = true
+	}
+	for _, i := range u.items {
+		if _, found := set[msgIDtoString(i.item.Metadata().MsgID())]; found {
 			i.dtime = &now
 		}
 	}
