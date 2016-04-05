@@ -176,7 +176,7 @@ func (u *user) state(now time.Time, f gregor.ObjFactory, d gregor.DeviceID, t gr
 	for _, i := range u.items {
 		md := i.item.Metadata()
 		did := md.DeviceID()
-		if !isEmpty(d) && !isEmpty(did) &&
+		if d != nil && d.Bytes() != nil && did != nil && did.Bytes() != nil &&
 			!bytes.Equal(did.Bytes(), d.Bytes()) {
 			continue
 		}

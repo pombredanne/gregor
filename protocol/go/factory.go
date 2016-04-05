@@ -2,9 +2,10 @@ package gregor1
 
 import (
 	"errors"
+	"time"
+
 	"github.com/keybase/go-codec/codec"
 	"github.com/keybase/gregor"
-	"time"
 )
 
 type ObjFactory struct{}
@@ -15,42 +16,42 @@ func (o ObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) { return Dev
 func (o ObjFactory) MakeBody(b []byte) (gregor.Body, error)         { return Body(b), nil }
 func (o ObjFactory) MakeCategory(s string) (gregor.Category, error) { return Category(s), nil }
 
-func castUID(uid gregor.UID) (UID, error) {
+func castUID(uid gregor.UID) (ret UID, err error) {
 	if uid == nil {
-		return UID(nil), nil
+		return
 	}
 	ret, ok := uid.(UID)
 	if !ok {
-		return UID(""), errors.New("bad UID; wrong type")
+		err = errors.New("bad UID; wrong type")
 	}
-	return ret, nil
+	return
 }
 
-func castDeviceID(d gregor.DeviceID) (DeviceID, error) {
+func castDeviceID(d gregor.DeviceID) (ret DeviceID, err error) {
 	if d == nil {
-		return DeviceID(nil), nil
+		return
 	}
 	ret, ok := d.(DeviceID)
 	if !ok {
-		return DeviceID(""), errors.New("bad Device ID; wrong type")
+		err = errors.New("bad Device ID; wrong type")
 	}
-	return ret, nil
+	return
 }
 
-func castItem(i gregor.Item) (ItemAndMetadata, error) {
+func castItem(i gregor.Item) (ret ItemAndMetadata, err error) {
 	ret, ok := i.(ItemAndMetadata)
 	if !ok {
-		return ItemAndMetadata{}, errors.New("bad Item; wrong type")
+		err = errors.New("bad Item; wrong type")
 	}
-	return ret, nil
+	return
 }
 
-func castInBandMessage(i gregor.InBandMessage) (InBandMessage, error) {
+func castInBandMessage(i gregor.InBandMessage) (ret InBandMessage, err error) {
 	ret, ok := i.(InBandMessage)
 	if !ok {
-		return InBandMessage{}, errors.New("bad InBandMessage; wrong type")
+		err = errors.New("bad InBandMessage; wrong type")
 	}
-	return ret, nil
+	return
 }
 
 func timeToTimeOrOffset(timeIn *time.Time) (too TimeOrOffset) {
@@ -79,12 +80,12 @@ func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid grego
 	}, nil
 }
 
-func (o ObjFactory) makeItem(c gregor.Category, d *time.Time, b gregor.Body) (Item, error) {
-	return Item{
+func (o ObjFactory) makeItem(c gregor.Category, d *time.Time, b gregor.Body) *Item {
+	return &Item{
 		Dtime_:    timeToTimeOrOffset(d),
 		Category_: Category(c.String()),
 		Body_:     Body(b.Bytes()),
-	}, nil
+	}
 }
 
 func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.DeviceID, ctime time.Time, c gregor.Category, dtime *time.Time, body gregor.Body) (gregor.Item, error) {
@@ -92,13 +93,9 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 	if err != nil {
 		return nil, err
 	}
-	item, err := o.makeItem(c, dtime, body)
-	if err != nil {
-		return nil, err
-	}
 	return ItemAndMetadata{
 		Md_:   &md,
-		Item_: &item,
+		Item_: o.makeItem(c, dtime, body),
 	}, nil
 }
 
