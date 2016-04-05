@@ -83,14 +83,10 @@ func (q *queryBuilder) Exec(tx *sql.Tx) error {
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
 func hexEncOrNull(b byter) interface{} {
-	if b == nil || len(b.Bytes()) == 0 {
+	if isEmpty(b) {
 		return nil
 	}
 	return hexEnc(b)
-}
-
-type byter interface {
-	Bytes() []byte
 }
 
 func (s *SQLEngine) newQueryBuilder() *queryBuilder {
