@@ -1,33 +1,27 @@
 package main
 
 import (
+	"log"
+	"net"
 	"os"
 
-	protocol "github.com/keybase/gregor/protocol/go"
-	"github.com/keybase/gregor/rpc"
-	"golang.org/x/net/context"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	grpc "github.com/keybase/gregor/rpc"
 )
-
-type dummyauth struct{}
-
-func (m dummyauth) Authenticate(_ context.Context, _ protocol.AuthToken) (protocol.UID, protocol.SessionID, error) {
-	return protocol.UID{}, protocol.SessionID(""), nil
-}
-
-var _ rpc.Authenticator = dummyauth{}
 
 func main() {
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
-		errorf("%s\n", err)
-		os.Exit(2)
+		log.Fatal(err)
 	}
-	srv := rpc.NewServer()
-	srv.SetAuthenticator(dummyauth{})
-	err = newMainServer(opts, srv).listenAndServe()
+
+	srv := grpc.NewServer()
+	conn, err := net.Dial(opts.SessionServer.Network(), opts.SessionServer.String())
 	if err != nil {
-		errorf("%s\n", err)
-		os.Exit(2)
+		log.Fatal(err)
 	}
-	return
+
+	srv.SetAuthenticator(grpc.NewAuthClient(rpc.NewClient(rpc.NewTransport(conn, nil, nil), nil)))
+
+	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }

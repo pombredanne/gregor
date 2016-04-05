@@ -18,7 +18,7 @@ type connection struct {
 	c          net.Conn
 	xprt       rpc.Transporter
 	uid        protocol.UID
-	session    protocol.SessionID
+	session    string
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
@@ -39,7 +39,7 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) Authenticate(ctx context.Context, tok protocol.AuthToken) error {
+func (c *connection) Authenticate(ctx context.Context, tok string) error {
 	log.Printf("Authenticate: %+v", tok)
 	uid, sess, err := c.parent.auth.Authenticate(ctx, tok)
 	if err == nil {

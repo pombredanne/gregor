@@ -22,12 +22,12 @@ const (
 
 var goodUID = protocol.UID("gooduid")
 
-func (m mockAuth) Authenticate(_ context.Context, tok protocol.AuthToken) (protocol.UID, protocol.SessionID, error) {
+func (m mockAuth) Authenticate(_ context.Context, tok string) (protocol.UID, string, error) {
 	if tok == goodToken {
-		return goodUID, protocol.SessionID(""), nil
+		return goodUID, "", nil
 	}
 
-	return protocol.UID{}, protocol.SessionID(""), errors.New("invalid token")
+	return protocol.UID{}, "", errors.New("invalid token")
 }
 
 type mockConsumer struct {
