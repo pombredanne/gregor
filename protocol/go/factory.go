@@ -174,7 +174,8 @@ func (o ObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessa
 
 func (o ObjFactory) UnmarshalState(b []byte) (gregor.State, error) {
 	var items []ItemAndMetadata
-	err := codec.NewDecoderBytes(b, new(codec.MsgpackHandle)).Decode(&items)
+	err := codec.NewDecoderBytes(b, &codec.MsgpackHandle{WriteExt: true}).
+		Decode(&items)
 	if err != nil {
 		return nil, err
 	}

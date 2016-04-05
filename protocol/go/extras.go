@@ -183,7 +183,8 @@ func (s State) Items() ([]gregor.Item, error) {
 
 func (s State) Marshal() ([]byte, error) {
 	var b []byte
-	err := codec.NewEncoderBytes(&b, new(codec.MsgpackHandle)).Encode(s.items)
+	err := codec.NewEncoderBytes(&b, &codec.MsgpackHandle{WriteExt: true}).
+		Encode(s.items)
 	return b, err
 }
 
