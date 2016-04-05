@@ -415,7 +415,7 @@ func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InB
 	case dCategory.IsSet() && dTime.TimeOrNil() != nil:
 		return s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
 	case dMsgID.MsgID() != nil:
-		return s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
+		return s.objFactory.MakeDismissalByIDs(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), []gregor.MsgID{dMsgID.MsgID()})
 	case mtype.InBandMsgType() == gregor.InBandMsgTypeSync:
 		return s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
 	}

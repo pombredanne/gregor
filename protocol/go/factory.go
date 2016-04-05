@@ -1,21 +1,17 @@
 package gregor1
 
 import (
-	"encoding/hex"
 	"errors"
-	"time"
-
 	"github.com/keybase/go-codec/codec"
 	"github.com/keybase/gregor"
+	"time"
 )
 
 type ObjFactory struct{}
 
-func (o ObjFactory) MakeUID(b []byte) (gregor.UID, error)     { return UID(hex.EncodeToString(b)), nil }
-func (o ObjFactory) MakeMsgID(b []byte) (gregor.MsgID, error) { return MsgID(b), nil }
-func (o ObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) {
-	return DeviceID(hex.EncodeToString(b)), nil
-}
+func (o ObjFactory) MakeUID(b []byte) (gregor.UID, error)           { return UID(b), nil }
+func (o ObjFactory) MakeMsgID(b []byte) (gregor.MsgID, error)       { return MsgID(b), nil }
+func (o ObjFactory) MakeDeviceID(b []byte) (gregor.DeviceID, error) { return DeviceID(b), nil }
 func (o ObjFactory) MakeBody(b []byte) (gregor.Body, error)         { return Body(b), nil }
 func (o ObjFactory) MakeCategory(s string) (gregor.Category, error) { return Category(s), nil }
 
@@ -45,6 +41,14 @@ func castItem(i gregor.Item) (ItemAndMetadata, error) {
 	ret, ok := i.(ItemAndMetadata)
 	if !ok {
 		return ItemAndMetadata{}, errors.New("bad Item; wrong type")
+	}
+	return ret, nil
+}
+
+func castInBandMessage(i gregor.InBandMessage) (InBandMessage, error) {
+	ret, ok := i.(InBandMessage)
+	if !ok {
+		return InBandMessage{}, errors.New("bad InBandMessage; wrong type")
 	}
 	return ret, nil
 }
@@ -116,16 +120,20 @@ func (o ObjFactory) MakeDismissalByRange(uid gregor.UID, msgid gregor.MsgID, dev
 	}, nil
 }
 
-func (o ObjFactory) MakeDismissalByID(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, d gregor.MsgID) (gregor.InBandMessage, error) {
+func (o ObjFactory) MakeDismissalByIDs(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, ids []gregor.MsgID) (gregor.InBandMessage, error) {
 	md, err := o.makeMetadata(uid, msgid, devid, ctime, gregor.InBandMsgTypeUpdate)
 	if err != nil {
 		return nil, err
+	}
+	ourIds := make([]MsgID, len(ids), len(ids))
+	for i, id := range ids {
+		ourIds[i] = MsgID(id.Bytes())
 	}
 	return InBandMessage{
 		StateUpdate_: &StateUpdateMessage{
 			Md_: md,
 			Dismissal_: &Dismissal{
-				MsgIDs_: []MsgID{MsgID(d.Bytes())},
+				MsgIDs_: ourIds,
 			},
 		},
 	}, nil
@@ -172,6 +180,16 @@ func (o ObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessa
 	}, nil
 }
 
+func (o ObjFactory) MakeMessageFromInBandMessage(i gregor.InBandMessage) (gregor.Message, error) {
+	ourInBandMessage, err := castInBandMessage(i)
+	if err != nil {
+		return nil, err
+	}
+	return Message{
+		Ibm_: &ourInBandMessage,
+	}, nil
+}
+
 func (o ObjFactory) UnmarshalState(b []byte) (gregor.State, error) {
 	var items []ItemAndMetadata
 	err := codec.NewDecoderBytes(b, &codec.MsgpackHandle{WriteExt: true}).
@@ -181,6 +199,10 @@ func (o ObjFactory) UnmarshalState(b []byte) (gregor.State, error) {
 	}
 
 	return State{items}, nil
+}
+
+func (o ObjFactory) MakeTimeOrOffsetFromTime(t time.Time) (gregor.TimeOrOffset, error) {
+	return timeToTimeOrOffset(&t), nil
 }
 
 var _ gregor.ObjFactory = ObjFactory{}

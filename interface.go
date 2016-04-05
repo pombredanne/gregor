@@ -155,11 +155,13 @@ type ObjFactory interface {
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
 	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error)
-	MakeDismissalByID(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d MsgID) (InBandMessage, error)
+	MakeDismissalByIDs(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d []MsgID) (InBandMessage, error)
 	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error)
 	MakeState(i []Item) (State, error)
 	MakeMetadata(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, i InBandMsgType) (Metadata, error)
 	MakeInBandMessageFromItem(i Item) (InBandMessage, error)
+	MakeMessageFromInBandMessage(i InBandMessage) (Message, error)
+	MakeTimeOrOffsetFromTime(t time.Time) (TimeOrOffset, error)
 	UnmarshalState([]byte) (State, error)
 }
 
