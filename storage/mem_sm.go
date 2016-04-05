@@ -60,12 +60,6 @@ type user struct {
 	log   []loggedMsg
 }
 
-func newUser() *user {
-	return &user{
-		items: make([](*item), 0),
-	}
-}
-
 // isDismissedAt returns true if item i is dismissed at time t
 func (i item) isDismissedAt(t time.Time) bool {
 	if i.dtime != nil && isBeforeOrSame(*i.dtime, t) {
@@ -98,6 +92,12 @@ func (u *user) addItem(now time.Time, i gregor.Item) *item {
 	return newItem
 }
 
+func (u *user) addItems(items []gregor.Item) {
+	for _, it := range items {
+		u.addItem(time.Now(), it)
+	}
+}
+
 // logMessage logs a message for this user and potentially associates an item
 func (u *user) logMessage(t time.Time, m gregor.InBandMessage, i *item) {
 	u.log = append(u.log, loggedMsg{m, t, i})
@@ -108,9 +108,9 @@ func msgIDtoString(m gregor.MsgID) string {
 }
 
 func (u *user) dismissMsgIDs(now time.Time, ids []gregor.MsgID) {
-	set := make(map[string]struct{})
+	set := make(map[string]bool)
 	for _, i := range ids {
-		set[msgIDtoString(i)] = struct{}{}
+		set[msgIDtoString(i)] = true
 	}
 	for _, i := range u.items {
 		if _, found := set[msgIDtoString(i.item.Metadata().MsgID())]; found {
@@ -158,6 +158,9 @@ func (t timeOrOffset) Time() *time.Time {
 	return &ret
 }
 func (t timeOrOffset) Offset() *time.Duration { return nil }
+func (t timeOrOffset) Before(t2 time.Time) bool {
+	return time.Time(t).Before(t2)
+}
 
 var _ gregor.TimeOrOffset = timeOrOffset{}
 
@@ -263,7 +266,7 @@ func (m *MemEngine) getUser(uid gregor.UID) *user {
 	if u, ok := m.users[uidHex]; ok {
 		return u
 	}
-	u := newUser()
+	u := new(user)
 	m.users[uidHex] = u
 	return u
 }
@@ -314,4 +317,37 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	user := m.getUser(u)
 	msg := user.replayLog(m.clock.Now(), d, t)
 	return msg, nil
+}
+
+func (m *MemEngine) IsEphemeral() bool {
+	return true
+}
+
+func (m *MemEngine) InitState(s gregor.State) error {
+	m.Lock()
+	defer m.Unlock()
+	userItems := make(map[*user][]gregor.Item)
+	items, err := s.Items()
+	if err != nil {
+		return err
+	}
+
+	for _, it := range items {
+		user := m.getUser(it.Metadata().UID())
+		userItems[user] = append(userItems[user], it)
+	}
+
+	for u, items := range userItems {
+		u.addItems(items)
+	}
+
+	return nil
+}
+
+func (m *MemEngine) ObjFactory() gregor.ObjFactory {
+	return m.objFactory
+}
+
+func (m *MemEngine) Clock() clockwork.Clock {
+	return m.clock
 }

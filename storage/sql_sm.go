@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -79,6 +80,10 @@ func (q *queryBuilder) Exec(tx *sql.Tx) error {
 	return err
 }
 
+type byter interface {
+	Bytes() []byte
+}
+
 func hexEnc(b byter) string { return hex.EncodeToString(b.Bytes()) }
 
 func hexEncOrNull(b byter) interface{} {
@@ -86,10 +91,6 @@ func hexEncOrNull(b byter) interface{} {
 		return nil
 	}
 	return hexEnc(b)
-}
-
-type byter interface {
-	Bytes() []byte
 }
 
 func (s *SQLEngine) newQueryBuilder() *queryBuilder {
@@ -418,7 +419,7 @@ func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InB
 	case dCategory.IsSet() && dTime.TimeOrNil() != nil:
 		return s.objFactory.MakeDismissalByRange(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dCategory.Category(), dTime.Time())
 	case dMsgID.MsgID() != nil:
-		return s.objFactory.MakeDismissalByID(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), dMsgID.MsgID())
+		return s.objFactory.MakeDismissalByIDs(u, msgID.MsgID(), devID.DeviceID(), ctime.Time(), []gregor.MsgID{dMsgID.MsgID()})
 	case mtype.InBandMsgType() == gregor.InBandMsgTypeSync:
 		return s.objFactory.MakeStateSyncMessage(u, msgID.MsgID(), devID.DeviceID(), ctime.Time())
 	}
@@ -475,6 +476,22 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 		}
 	}
 	return ret, nil
+}
+
+func (s *SQLEngine) IsEphemeral() bool {
+	return false
+}
+
+func (s *SQLEngine) InitState(_ gregor.State) error {
+	return errors.New("attempting to initialize non-ephemeral StateMachine")
+}
+
+func (s *SQLEngine) ObjFactory() gregor.ObjFactory {
+	return s.objFactory
+}
+
+func (s *SQLEngine) Clock() clockwork.Clock {
+	return s.clock
 }
 
 var _ gregor.StateMachine = (*SQLEngine)(nil)

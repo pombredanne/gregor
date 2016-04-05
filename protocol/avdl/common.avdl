@@ -47,6 +47,11 @@ protocol common {
 		Body body;
 	}
 
+	record ItemAndMetadata {
+		union { null, Metadata } md;
+		union { null, Item } item;
+	}
+
 	record OutOfBandMessage {
 		UID uid;
 		System system;

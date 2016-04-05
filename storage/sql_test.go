@@ -2,13 +2,15 @@ package storage
 
 import (
 	"database/sql"
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jonboulle/clockwork"
-	test "github.com/keybase/gregor/test"
-	_ "github.com/mattn/go-sqlite3"
 	"net/url"
 	"os"
 	"testing"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jonboulle/clockwork"
+	protocol "github.com/keybase/gregor/protocol/go"
+	test "github.com/keybase/gregor/test"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func createDb(engine string, name string) (*sql.DB, error) {
@@ -42,9 +44,10 @@ func testEngine(t *testing.T, engine string, name string, w sqlTimeWriter) {
 		t.Fatal(err)
 	}
 	cl := clockwork.NewFakeClock()
-	eng := NewSQLEngine(db, test.TestObjFactory{}, w, cl)
-	test.TestStateMachineAllDevices(t, eng, cl)
-	test.TestStateMachinePerDevice(t, eng, cl)
+	var of protocol.ObjFactory
+	eng := NewSQLEngine(db, of, w, cl)
+	test.TestStateMachineAllDevices(t, eng)
+	test.TestStateMachinePerDevice(t, eng)
 }
 
 func TestSqliteEngine(t *testing.T) {

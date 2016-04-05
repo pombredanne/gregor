@@ -52,6 +52,11 @@ type Item struct {
 	Body_        Body           `codec:"body" json:"body"`
 }
 
+type ItemAndMetadata struct {
+	Md_   *Metadata `codec:"md,omitempty" json:"md,omitempty"`
+	Item_ *Item     `codec:"item,omitempty" json:"item,omitempty"`
+}
+
 type OutOfBandMessage struct {
 	Uid_    UID    `codec:"uid" json:"uid"`
 	System_ System `codec:"system" json:"system"`
