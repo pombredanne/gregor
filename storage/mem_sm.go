@@ -344,3 +344,7 @@ func (m *MemEngine) InitState(s gregor.State) error {
 
 	return nil
 }
+
+func (m *MemEngine) ObjFactory() gregor.ObjFactory {
+	return m.objFactory
+}

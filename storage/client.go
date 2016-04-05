@@ -12,20 +12,18 @@ type LocalStorageEngine interface {
 }
 
 type Client struct {
-	user       gregor.UID
-	device     gregor.DeviceID
-	objFactory gregor.ObjFactory
-	sm         gregor.StateMachine
-	storage    LocalStorageEngine
+	user    gregor.UID
+	device  gregor.DeviceID
+	sm      gregor.StateMachine
+	storage LocalStorageEngine
 }
 
-func NewClient(user gregor.UID, device gregor.DeviceID, objFactory gregor.ObjFactory, sm gregor.StateMachine, storage LocalStorageEngine) *Client {
+func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine, storage LocalStorageEngine) *Client {
 	return &Client{
-		user:       user,
-		device:     device,
-		objFactory: objFactory,
-		sm:         sm,
-		storage:    storage,
+		user:    user,
+		device:  device,
+		sm:      sm,
+		storage: storage,
 	}
 }
 
@@ -57,7 +55,7 @@ func (c *Client) Restore() error {
 		return err
 	}
 
-	state, err := c.objFactory.UnmarshalState(value)
+	state, err := c.sm.ObjFactory().UnmarshalState(value)
 	if err != nil {
 		return err
 	}

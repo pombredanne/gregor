@@ -11,7 +11,7 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var objFactory protocol.ObjFactory
+var of protocol.ObjFactory
 
 func TestLevelDBClient(t *testing.T) {
 	fname, err := ioutil.TempDir("", "gregor")
@@ -21,14 +21,14 @@ func TestLevelDBClient(t *testing.T) {
 	defer os.Remove(fname)
 
 	fc := clockwork.NewFakeClock()
-	sm := NewMemEngine(objFactory, fc)
-	user, device := test.TestStateMachinePerDevice(t, objFactory, sm, fc)
+	sm := NewMemEngine(of, fc)
+	user, device := test.TestStateMachinePerDevice(t, sm, fc)
 	db, err := leveldb.OpenFile(fname, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := NewClient(user, device, objFactory, sm, &LevelDBStorageEngine{db})
+	c := NewClient(user, device, sm, &LevelDBStorageEngine{db})
 
 	if err := c.Save(); err != nil {
 		t.Fatal(err)

@@ -145,6 +145,9 @@ type StateMachine interface {
 	// all messages across all devices.  If d is a device, then we'll
 	// return global messages and per-device messages for that device.
 	InBandMessagesSince(u UID, d DeviceID, t TimeOrOffset) ([]InBandMessage, error)
+
+	// ObjFactory returns the ObjFactory used by this StateMachine.
+	ObjFactory() ObjFactory
 }
 
 type ObjFactory interface {

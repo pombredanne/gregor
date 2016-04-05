@@ -2,11 +2,12 @@ package test
 
 import (
 	"crypto/rand"
+	"testing"
+	"time"
+
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func assertNItems(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, n int) {
@@ -131,7 +132,8 @@ func consumeMessage(t *testing.T, which string, sm gregor.StateMachine, m gregor
 	}
 }
 
-func TestStateMachineAllDevices(t *testing.T, of gregor.ObjFactory, sm gregor.StateMachine, fc clockwork.FakeClock) gregor.UID {
+func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) gregor.UID {
+	of := sm.ObjFactory()
 	t0 := fc.Now()
 	u1 := makeUID(of)
 	c1 := makeCategory(of, "foos")
@@ -253,7 +255,8 @@ func TestStateMachineAllDevices(t *testing.T, of gregor.ObjFactory, sm gregor.St
 	return u1
 }
 
-func TestStateMachinePerDevice(t *testing.T, of gregor.ObjFactory, sm gregor.StateMachine, fc clockwork.FakeClock) (gregor.UID, gregor.DeviceID) {
+func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine, fc clockwork.FakeClock) (gregor.UID, gregor.DeviceID) {
+	of := sm.ObjFactory()
 	u1 := makeUID(of)
 	c1 := makeCategory(of, "foos")
 	d1 := makeDeviceID(of)
