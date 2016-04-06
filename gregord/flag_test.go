@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func testBadUsage(t *testing.T, args []string, wantedErr error, msg string) {
@@ -27,19 +28,19 @@ func TestUsage(t *testing.T) {
 	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:65537", "--session-server", "localhost"}, ebu, "bad port (\"65537\") in bind-address")
 	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:-20", "--session-server", "localhost"}, ebu, "bad port (\"-20\") in bind-address")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ebu, "No session-server URI specified")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi"},
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi"},
 		ebu, "you must provide a TLS Key and a TLS cert, or neither")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-cert", "hi"},
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-cert", "hi"},
 		ebu, "you must provide a TLS Key and a TLS cert, or neither")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
 		"--tls-cert", "bye", "--aws-region", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
 		"--tls-cert", "bye", "--s3-config-bucket", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "localhost", "--tls-key", "hi",
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
 		"--tls-cert", "file:///does/not/exist"}, ErrBadConfig(""), "no such file or directory")
 
-	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", ":4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "127.0.0.1:4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "0.0.0.0:4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "localhost", "--bind-address", "localhost:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "127.0.0.1:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "0.0.0.0:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "localhost:4000"})
 }
