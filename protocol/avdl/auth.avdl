@@ -1,7 +1,0 @@
-@namespace("gregor.1")
-
-protocol auth {
-	@typedef("string") record AuthToken {}
-	@typedef("string") record SessionID {}
-	void authenticate(AuthToken t);
-}

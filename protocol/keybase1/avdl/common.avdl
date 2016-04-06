@@ -1,0 +1,10 @@
+@namespace("keybase.1")
+protocol Common {
+
+	@typedef("string")
+	record UID {}
+
+	@typedef("string")
+	record KID {}
+
+}

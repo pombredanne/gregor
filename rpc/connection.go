@@ -7,7 +7,7 @@ import (
 	"time"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
 
@@ -17,8 +17,7 @@ var ErrBadUID = errors.New("bad UID on channel")
 type connection struct {
 	c          net.Conn
 	xprt       rpc.Transporter
-	uid        protocol.UID
-	session    string
+	uid        gregor1.UID
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
@@ -39,19 +38,18 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) Authenticate(ctx context.Context, tok string) error {
+func (c *connection) Authenticate(ctx context.Context, tok string) (gregor1.UID, error) {
 	log.Printf("Authenticate: %+v", tok)
-	uid, sess, err := c.parent.auth.Authenticate(ctx, tok)
+	uid, err := c.parent.auth.Authenticate(ctx, tok)
 	if err == nil {
 		c.uid = uid
-		c.session = sess
 		c.lastAuthed = c.parent.clock.Now()
 	}
 	c.authCh <- err
-	return err
+	return uid, err
 }
 
-func (c *connection) ConsumeMessage(ctx context.Context, m protocol.Message) error {
+func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
 	return c.parent.consume(ctx, m)
 }
@@ -61,8 +59,8 @@ func (c *connection) startRPCServer() <-chan error {
 	srv := rpc.NewServer(c.xprt, nil)
 
 	prots := []rpc.Protocol{
-		protocol.AuthProtocol(c),
-		protocol.IncomingProtocol(c),
+		gregor1.AuthProtocol(c),
+		gregor1.IncomingProtocol(c),
 	}
 	for _, prot := range prots {
 		log.Printf("registering protocol %s", prot.Name)
@@ -91,3 +89,5 @@ func (c *connection) close() {
 	close(c.authCh)
 	c.c.Close()
 }
+
+var _ gregor1.AuthInterface = (*connection)(nil)

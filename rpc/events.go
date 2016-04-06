@@ -1,13 +1,13 @@
 package rpc
 
 import (
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 )
 
 type eventHandler interface {
-	connectionCreated(protocol.UID)
-	connectionDestroyed(protocol.UID)
-	uidServerCreated(protocol.UID)
-	uidServerDestroyed(protocol.UID)
-	broadcastSent(protocol.Message)
+	connectionCreated(gregor1.UID)
+	connectionDestroyed(gregor1.UID)
+	uidServerCreated(gregor1.UID)
+	uidServerDestroyed(gregor1.UID)
+	broadcastSent(gregor1.Message)
 }

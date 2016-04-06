@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/jonboulle/clockwork"
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/test"
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
-var of protocol.ObjFactory
+var of gregor1.ObjFactory
 
 func TestLevelDBClient(t *testing.T) {
 	fname, err := ioutil.TempDir("", "gregor")

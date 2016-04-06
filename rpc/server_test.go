@@ -9,7 +9,7 @@ import (
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
 
@@ -20,14 +20,14 @@ const (
 	badToken  = "badtoken"
 )
 
-var goodUID = protocol.UID("gooduid")
+var goodUID = gregor1.UID("gooduid")
 
-func (m mockAuth) Authenticate(_ context.Context, tok string) (protocol.UID, string, error) {
+func (m mockAuth) Authenticate(_ context.Context, tok string) (gregor1.UID, error) {
 	if tok == goodToken {
-		return goodUID, "", nil
+		return goodUID, nil
 	}
 
-	return protocol.UID{}, "", errors.New("invalid token")
+	return gregor1.UID{}, errors.New("invalid token")
 }
 
 type mockConsumer struct {
@@ -65,7 +65,7 @@ type client struct {
 	conn       net.Conn
 	tr         rpc.Transporter
 	cli        *rpc.Client
-	broadcasts []protocol.Message
+	broadcasts []gregor1.Message
 	shutdown   bool
 }
 
@@ -83,7 +83,7 @@ func newClient(addr net.Addr) *client {
 	}
 
 	srv := rpc.NewServer(t, nil)
-	if err := srv.Register(protocol.OutgoingProtocol(x)); err != nil {
+	if err := srv.Register(gregor1.OutgoingProtocol(x)); err != nil {
 		panic(err.Error())
 	}
 
@@ -97,15 +97,15 @@ func (c *client) Shutdown() {
 	c.shutdown = true
 }
 
-func (c *client) AuthClient() protocol.AuthClient {
-	return protocol.AuthClient{Cli: c.cli}
+func (c *client) AuthClient() gregor1.AuthClient {
+	return gregor1.AuthClient{Cli: c.cli}
 }
 
-func (c *client) IncomingClient() protocol.IncomingClient {
-	return protocol.IncomingClient{Cli: c.cli}
+func (c *client) IncomingClient() gregor1.IncomingClient {
+	return gregor1.IncomingClient{Cli: c.cli}
 }
 
-func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error {
+func (c *client) BroadcastMessage(ctx context.Context, m gregor1.Message) error {
 	if c.shutdown {
 		return io.EOF
 	}
@@ -120,11 +120,11 @@ func TestAuthentication(t *testing.T) {
 	c := newClient(l.Addr())
 	defer c.Shutdown()
 
-	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := c.AuthClient().Authenticate(context.TODO(), badToken); err == nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), badToken); err == nil {
 		t.Fatal("badtoken passed authentication")
 	}
 }
@@ -137,7 +137,7 @@ func TestCreatePerUIDServer(t *testing.T) {
 	c := newClient(l.Addr())
 	defer c.Shutdown()
 
-	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -152,9 +152,9 @@ func TestCreatePerUIDServer(t *testing.T) {
 	}
 }
 
-func newOOBMessage(uid protocol.UID, system protocol.System, body protocol.Body) protocol.Message {
-	return protocol.Message{
-		Oobm_: &protocol.OutOfBandMessage{
+func newOOBMessage(uid gregor1.UID, system gregor1.System, body gregor1.Body) gregor1.Message {
+	return gregor1.Message{
+		Oobm_: &gregor1.OutOfBandMessage{
 			Uid_:    uid,
 			System_: system,
 			Body_:   body,
@@ -162,11 +162,11 @@ func newOOBMessage(uid protocol.UID, system protocol.System, body protocol.Body)
 	}
 }
 
-func newUpdateMessage(uid protocol.UID) protocol.Message {
-	return protocol.Message{
-		Ibm_: &protocol.InBandMessage{
-			StateUpdate_: &protocol.StateUpdateMessage{
-				Md_: protocol.Metadata{
+func newUpdateMessage(uid gregor1.UID) gregor1.Message {
+	return gregor1.Message{
+		Ibm_: &gregor1.InBandMessage{
+			StateUpdate_: &gregor1.StateUpdateMessage{
+				Md_: gregor1.Metadata{
 					Uid_: uid,
 				},
 			},
@@ -182,7 +182,7 @@ func TestBroadcast(t *testing.T) {
 
 	c := newClient(l.Addr())
 	defer c.Shutdown()
-	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -209,7 +209,7 @@ func TestConsume(t *testing.T) {
 
 	c := newClient(l.Addr())
 	defer c.Shutdown()
-	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +229,7 @@ func TestCloseOne(t *testing.T) {
 
 	c := newClient(l.Addr())
 
-	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -273,7 +273,7 @@ func TestCloseConnect(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -281,7 +281,7 @@ func TestCloseConnect(t *testing.T) {
 	c1.Shutdown()
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +323,7 @@ func TestCloseConnect2(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,7 +344,7 @@ func TestCloseConnect2(t *testing.T) {
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +375,7 @@ func TestCloseConnect3(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -384,7 +384,7 @@ func TestCloseConnect3(t *testing.T) {
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 

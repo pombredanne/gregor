@@ -5,7 +5,7 @@ import (
 	"log"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 )
 
 type connectionArgs struct {
@@ -15,7 +15,7 @@ type connectionArgs struct {
 }
 
 type perUIDServer struct {
-	uid        protocol.UID
+	uid        gregor1.UID
 	conns      map[connectionID]*connection
 	lastConnID connectionID
 
@@ -29,7 +29,7 @@ type perUIDServer struct {
 	events           eventHandler
 }
 
-func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events eventHandler) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events eventHandler) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
@@ -102,7 +102,7 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 func (s *perUIDServer) broadcast(a messageArgs) {
 	for id, conn := range s.conns {
 		log.Printf("uid %x broadcast to %d", s.uid, id)
-		oc := protocol.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
+		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
 			log.Printf("[connection %d]: %s", id, err)
 
