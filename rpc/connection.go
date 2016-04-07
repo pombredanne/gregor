@@ -18,7 +18,8 @@ type connection struct {
 	c          net.Conn
 	xprt       rpc.Transporter
 	uid        gregor1.UID
-	tok        string
+	tok        gregor1.SessionToken
+	sid        gregor1.SessionID
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
@@ -39,26 +40,31 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) AuthenticateSessionToken(ctx context.Context, tok string) (gregor1.UID, error) {
+func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 	log.Printf("Authenticate: %+v", tok)
-	uid, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
+	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
-		c.uid = uid
 		c.tok = tok
+		c.uid = res.Uid
+		c.sid = res.Sid
 		c.lastAuthed = c.parent.clock.Now()
 	}
 	c.authCh <- err
-	return uid, err
+	return res, err
 }
 
-func (c *connection) RevokeSessionToken(ctx context.Context, tok string) error {
-	log.Printf("Revoke: %+v", tok)
-	if tok == c.tok {
-		c.uid = nil
-		c.tok = ""
-		c.lastAuthed = time.Time{}
+func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
+	for _, sid := range sessionIDs {
+		log.Printf("Revoke: %+v", sid)
+		if sid == c.sid {
+			c.tok = ""
+			c.uid = nil
+			c.sid = ""
+			c.lastAuthed = time.Time{}
+			break
+		}
 	}
-	return c.parent.auth.RevokeSessionToken(ctx, tok)
+	return c.parent.auth.RevokeSessionIDs(ctx, sessionIDs)
 }
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {

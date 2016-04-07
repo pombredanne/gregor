@@ -13,33 +13,49 @@ import (
 	"golang.org/x/net/context"
 )
 
-type mockAuth map[string]gregor1.UID
-
-func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok string) (gregor1.UID, error) {
-	if uid, ok := m[tok]; ok {
-		return uid, nil
-	}
-
-	return gregor1.UID{}, errors.New("invalid token")
+type mockAuth struct {
+	sessions   map[gregor1.SessionToken]gregor1.AuthResult
+	sessionIDs map[gregor1.SessionID]gregor1.SessionToken
 }
 
-func (m mockAuth) RevokeSessionToken(_ context.Context, tok string) error {
-	if _, ok := m[tok]; ok {
-		delete(m, tok)
-		return nil
+func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
+	if res, ok := m.sessions[tok]; ok {
+		return res, nil
 	}
+	return gregor1.AuthResult{}, errors.New("invalid token")
+}
 
-	return errors.New("invalid token")
+func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.SessionID) (err error) {
+	for _, sid := range sessionIDs {
+		if _, ok := m.sessions[m.sessionIDs[sid]]; !ok {
+			err = fmt.Errorf("invalid id: %s", sid)
+		}
+		delete(m.sessions, m.sessionIDs[sid])
+		delete(m.sessionIDs, sid)
+	}
+	return
 }
 
 const (
-	goodToken = "goodtoken"
-	badToken  = "badtoken"
+	goodToken = gregor1.SessionToken("goodtoken")
+	badToken  = gregor1.SessionToken("badtoken")
+	goodSID   = gregor1.SessionID("1")
+	badSID    = gregor1.SessionID("2")
 )
 
-var goodUID = gregor1.UID("gooduid")
+var (
+	goodUID    = gregor1.UID("gooduid")
+	goodResult = gregor1.AuthResult{Uid: goodUID, Sid: goodSID}
+)
 
-var mockAuthenticator gregor1.AuthInterface = mockAuth{goodToken: goodUID}
+var mockAuthenticator gregor1.AuthInterface = mockAuth{
+	sessions: map[gregor1.SessionToken]gregor1.AuthResult{
+		goodToken: goodResult,
+	},
+	sessionIDs: map[gregor1.SessionID]gregor1.SessionToken{
+		goodSID: goodToken,
+	},
+}
 
 type mockConsumer struct {
 	consumed []gregor.Message
