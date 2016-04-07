@@ -199,6 +199,11 @@ func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	}
 	// Nothing to do...
 	if srv == nil {
+		// even though nothing to do, create an event if
+		// an event handler in place:
+		if s.events != nil {
+			s.events.broadcastSent(m)
+		}
 		return nil
 	}
 	srv.sendBroadcastCh <- messageArgs{c, m, nil}
