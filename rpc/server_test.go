@@ -216,11 +216,14 @@ func TestCloseOne(t *testing.T) {
 	defer l.Close()
 	defer s.Shutdown()
 
+	fmt.Printf("X1\n")
 	c := newClient(l.Addr())
+	fmt.Printf("X2\n")
 
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
+	fmt.Printf("X3\n")
 
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -229,7 +232,9 @@ func TestCloseOne(t *testing.T) {
 		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
 
+	fmt.Printf("X4\n")
 	c.Shutdown()
+	fmt.Printf("X5\n")
 
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
@@ -238,14 +243,17 @@ func TestCloseOne(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	fmt.Printf("X6\n")
 	// make sure it didn't receive the broadcast
 	if len(c.broadcasts) != 0 {
 		t.Errorf("c broadcasts: %d, expected 0", len(c.broadcasts))
 	}
 
+	fmt.Printf("X7\n")
 	// and the user server should be deleted:
 	s.statsCh <- ch
 	stats = <-ch
+	fmt.Printf("X8\n")
 	if stats.UserServerCount != 0 {
 		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
 	}

@@ -3,8 +3,10 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
@@ -27,7 +29,6 @@ type messageArgs struct {
 type confirmUIDShutdownArgs struct {
 	uid        protocol.UID
 	lastConnID connectionID
-	ok         chan<- bool
 }
 
 // Stats contains information about the current state of the
@@ -70,7 +71,7 @@ func NewServer() *Server {
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
-		confirmCh:       make(chan confirmUIDShutdownArgs),
+		confirmCh:       make(chan confirmUIDShutdownArgs, 1),
 	}
 
 	return s
@@ -94,6 +95,9 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("A\n")
+	time.Sleep(100 * time.Millisecond)
+	fmt.Printf("B\n")
 	ret := s.users[k]
 	if ret != nil {
 		return ret, nil
@@ -137,27 +141,33 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 	k, err := s.uidKey(a.uid)
 	if err != nil {
 		log.Printf("confirmUIDShutdown, uidKey error: %s", err)
-		a.ok <- false
 		return
 	}
 	serverLast, ok := s.lastConns[k]
 	if !ok {
 		log.Printf("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
-		a.ok <- false
 		return
 	}
 
 	// it's ok to shutdown if the last connection that the server knows about
 	// matches the last connection in the perUIDServer
 	if serverLast == a.lastConnID {
+		su := s.users[k]
+
 		// remove the perUIDServer from users, lastConns
 		delete(s.users, k)
 		delete(s.lastConns, k)
-		a.ok <- true
+
+		// Non-blocking send that it should self-destruct
+		if su != nil {
+			select {
+			case su.shutdownCh <- struct{}{}:
+			default:
+			}
+		}
+
 		return
 	}
-
-	a.ok <- false
 }
 
 func (s *Server) reportStats(c chan *Stats) {
@@ -182,12 +192,18 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 		return ErrBadCast
 	}
 	retCh := make(chan error)
+	fmt.Printf("Y1\n")
 	s.broadcastCh <- messageArgs{c, tm, retCh}
-	return <-retCh
+	fmt.Printf("Y2\n")
+	ret := <-retCh
+	fmt.Printf("Y3\n")
+	return ret
 }
 
 func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
+	fmt.Printf("Q1\n")
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
+	fmt.Printf("Q2\n")
 	if err != nil {
 		return err
 	}
@@ -195,9 +211,14 @@ func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	if srv == nil {
 		return nil
 	}
+	fmt.Printf("Q3\n")
 	retCh := make(chan error)
+	fmt.Printf("Q4\n")
 	srv.sendBroadcastCh <- messageArgs{c, m, retCh}
-	return <-retCh
+	fmt.Printf("Q5\n")
+	ret := <-retCh
+	fmt.Printf("Q6\n")
+	return ret
 }
 
 func (s *Server) consume(c context.Context, m protocol.Message) error {
@@ -216,12 +237,19 @@ func (s *Server) serve() error {
 			err := s.nii.ConsumeMessage(a.c, a.m)
 			a.retCh <- err
 		case a := <-s.broadcastCh:
+			fmt.Printf("Z1\n")
 			err := s.sendBroadcast(a.c, a.m)
+			fmt.Printf("Z2\n")
 			a.retCh <- err
+			fmt.Printf("Z3\n")
 		case c := <-s.statsCh:
+			fmt.Printf("Z20.1\n")
 			s.reportStats(c)
+			fmt.Printf("Z20.2\n")
 		case a := <-s.confirmCh:
+			fmt.Printf("Z10\n")
 			s.confirmUIDShutdown(a)
+			fmt.Printf("Z10.1\n")
 		case <-s.closeCh:
 			return nil
 		}

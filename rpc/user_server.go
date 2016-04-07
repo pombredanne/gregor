@@ -54,23 +54,29 @@ func (s *perUIDServer) logError(prefix string, err error) {
 }
 
 func (s *perUIDServer) serve() {
+	fmt.Printf("serving it up!!!!\n")
 	for {
+		fmt.Printf("F1\n")
 		select {
 		case a := <-s.newConnectionCh:
+			fmt.Printf("F2\n")
 			s.logError("addConn", s.addConn(a))
 		case a := <-s.sendBroadcastCh:
+			fmt.Printf("J0\n")
 			s.broadcast(a)
 		case <-s.closeListenCh:
+			fmt.Printf("F3\n")
 			s.checkClosed()
-			if s.tryShutdown() {
-				return
-			}
+			s.tryShutdown()
+			fmt.Printf("F5\n")
 		case <-s.tryShutdownCh:
-			if s.tryShutdown() {
-				return
-			}
+			fmt.Printf("F6\n")
+			s.tryShutdown()
+			fmt.Printf("F7\n")
 		case <-s.shutdownCh:
+			fmt.Printf("F8\n")
 			s.removeAllConns()
+			fmt.Printf("F9\n")
 			return
 		}
 	}
@@ -85,7 +91,9 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 
 func (s *perUIDServer) broadcast(a messageArgs) {
 	var errMsgs []string
+	fmt.Printf("J1\n")
 	for id, conn := range s.conns {
+		fmt.Printf("J2\n")
 		log.Printf("uid %x broadcast to %d", s.uid, id)
 		oc := protocol.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
@@ -110,29 +118,21 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 
 // tryShutdown checks if it is ok to shutdown.  Returns true if it
 // is ok.
-func (s *perUIDServer) tryShutdown() bool {
+func (s *perUIDServer) tryShutdown() {
 	// make sure no connections have been added
 	if len(s.conns) != 0 {
 		log.Printf("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
-		return false
 	}
 
 	// confirm with the server that it is ok to shutdown
-	ok := make(chan bool)
 	args := confirmUIDShutdownArgs{
 		uid:        s.uid,
 		lastConnID: s.lastConnID,
-		ok:         ok,
 	}
+	fmt.Printf("T1\n")
 	s.parentConfirmCh <- args
-	confirmed := <-ok
-	if !confirmed {
-		log.Printf("tried shutdown, but parent server didn't allow it")
-		return false
-	}
-
-	log.Printf("shutting down perUIDServer for %x", s.uid)
-	return true
+	fmt.Printf("T2\n")
+	fmt.Printf("T3\n")
 }
 
 func (s *perUIDServer) checkClosed() {
