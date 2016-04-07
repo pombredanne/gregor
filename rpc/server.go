@@ -156,12 +156,10 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 		delete(s.users, k)
 		delete(s.lastConns, k)
 
-		// Non-blocking send that it should self-destruct
+		// close perUser's selfShutdown channel so it will
+		// self-destruct
 		if su != nil {
-			select {
-			case su.shutdownCh <- struct{}{}:
-			default:
-			}
+			close(su.selfShutdownCh)
 		}
 
 		return

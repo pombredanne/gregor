@@ -19,24 +19,26 @@ type perUIDServer struct {
 	conns      map[connectionID]*connection
 	lastConnID connectionID
 
-	parentConfirmCh chan confirmUIDShutdownArgs
-	newConnectionCh chan *connectionArgs
-	sendBroadcastCh chan messageArgs
-	tryShutdownCh   chan bool
-	closeListenCh   chan error
-	shutdownCh      chan struct{}
+	parentConfirmCh  chan confirmUIDShutdownArgs
+	newConnectionCh  chan *connectionArgs
+	sendBroadcastCh  chan messageArgs
+	tryShutdownCh    chan bool
+	closeListenCh    chan error
+	parentShutdownCh chan struct{}
+	selfShutdownCh   chan struct{}
 }
 
 func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}) *perUIDServer {
 	s := &perUIDServer{
-		uid:             uid,
-		conns:           make(map[connectionID]*connection),
-		newConnectionCh: make(chan *connectionArgs, 1),
-		sendBroadcastCh: make(chan messageArgs, 1),
-		tryShutdownCh:   make(chan bool, 1), // buffered so it can receive inside serve()
-		closeListenCh:   make(chan error),
-		parentConfirmCh: parentConfirmCh,
-		shutdownCh:      shutdownCh,
+		uid:              uid,
+		conns:            make(map[connectionID]*connection),
+		newConnectionCh:  make(chan *connectionArgs, 1),
+		sendBroadcastCh:  make(chan messageArgs, 1),
+		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error),
+		parentConfirmCh:  parentConfirmCh,
+		parentShutdownCh: shutdownCh,
+		selfShutdownCh:   make(chan struct{}),
 	}
 
 	go s.serve()
@@ -71,10 +73,15 @@ func (s *perUIDServer) serve() {
 			fmt.Printf("F6\n")
 			s.tryShutdown()
 			fmt.Printf("F7\n")
-		case <-s.shutdownCh:
+		case <-s.parentShutdownCh:
 			fmt.Printf("F8\n")
 			s.removeAllConns()
 			fmt.Printf("F9\n")
+			return
+		case <-s.selfShutdownCh:
+			fmt.Printf("FA\n")
+			s.removeAllConns()
+			fmt.Printf("FB\n")
 			return
 		}
 	}
