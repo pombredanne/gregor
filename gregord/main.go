@@ -21,10 +21,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	a := gregor1.AuthClient{
-		Cli: rpc.NewClient(rpc.NewTransport(conn, nil, nil), nil),
-	}
-	srv.SetAuthenticator(a)
+	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, nil), nil)
+	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}))
 
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }
