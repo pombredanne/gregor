@@ -364,6 +364,6 @@ func TestCloseConnect3(t *testing.T) {
 	s.statsCh <- ch
 	stats := <-ch
 	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
+		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
 }
