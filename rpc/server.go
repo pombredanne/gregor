@@ -24,12 +24,6 @@ type messageArgs struct {
 	retCh chan<- error
 }
 
-// broadcastsSent will contain each messages that is sent to a
-// perUIDServer.  If it is nil (default), it won't be used.  But
-// tests can create a channel to figure out when async broadcasts
-// are sent.
-var broadcastsSent chan protocol.Message
-
 type confirmUIDShutdownArgs struct {
 	uid        protocol.UID
 	lastConnID connectionID
@@ -61,6 +55,10 @@ type Server struct {
 	closeCh          chan struct{}
 	confirmCh        chan confirmUIDShutdownArgs
 	nextConnectionID connectionID
+
+	// events allows checking various server event occurrences
+	// (useful for testing, ok if left a default nil value)
+	events eventHandler
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
@@ -122,7 +120,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh)
+		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh, s.events)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}

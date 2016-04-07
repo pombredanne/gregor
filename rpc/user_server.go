@@ -25,9 +25,10 @@ type perUIDServer struct {
 	closeListenCh    chan error
 	parentShutdownCh chan struct{}
 	selfShutdownCh   chan struct{}
+	events           eventHandler
 }
 
-func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}) *perUIDServer {
+func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events eventHandler) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
@@ -38,9 +39,14 @@ func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownAr
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
 		selfShutdownCh:   make(chan struct{}),
+		events:           events,
 	}
 
 	go s.serve()
+
+	if s.events != nil {
+		s.events.uidServerCreated(s.uid)
+	}
 
 	return s
 }
@@ -53,6 +59,11 @@ func (s *perUIDServer) logError(prefix string, err error) {
 }
 
 func (s *perUIDServer) serve() {
+	defer func() {
+		if s.events != nil {
+			s.events.uidServerDestroyed(s.uid)
+		}
+	}()
 	for {
 		select {
 		case a := <-s.newConnectionCh:
@@ -78,6 +89,9 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 	a.c.xprt.AddCloseListener(s.closeListenCh)
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id
+	if s.events != nil {
+		s.events.connectionCreated(s.uid)
+	}
 	return nil
 }
 
@@ -94,14 +108,12 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		}
 	}
 
-	if len(s.conns) == 0 {
-		s.tryShutdownCh <- true
+	if s.events != nil {
+		s.events.broadcastSent(a.m)
 	}
 
-	// if the global broadcastsSent channel exists, put the message on it.
-	// (this is primarily for testing purposes)
-	if broadcastsSent != nil {
-		broadcastsSent <- a.m
+	if len(s.conns) == 0 {
+		s.tryShutdownCh <- true
 	}
 }
 
@@ -146,6 +158,9 @@ func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
 	log.Printf("uid server %x: removing connection %d", s.uid, id)
 	conn.close()
 	delete(s.conns, id)
+	if s.events != nil {
+		s.events.connectionDestroyed(s.uid)
+	}
 }
 
 func (s *perUIDServer) removeAllConns() {
