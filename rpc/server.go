@@ -3,7 +3,6 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 
@@ -100,8 +99,6 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("A\n")
-	fmt.Printf("B\n")
 	ret := s.users[k]
 	if ret != nil {
 		return ret, nil
@@ -198,9 +195,7 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 }
 
 func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
-	fmt.Printf("Q1\n")
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
-	fmt.Printf("Q2\n")
 	if err != nil {
 		return err
 	}
@@ -230,13 +225,9 @@ func (s *Server) serve() error {
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
-			fmt.Printf("Z20.1\n")
 			s.reportStats(c)
-			fmt.Printf("Z20.2\n")
 		case a := <-s.confirmCh:
-			fmt.Printf("Z10\n")
 			s.confirmUIDShutdown(a)
-			fmt.Printf("Z10.1\n")
 		case <-s.closeCh:
 			return nil
 		}

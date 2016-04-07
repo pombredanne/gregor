@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"fmt"
 	"io"
 	"log"
 
@@ -54,34 +53,22 @@ func (s *perUIDServer) logError(prefix string, err error) {
 }
 
 func (s *perUIDServer) serve() {
-	fmt.Printf("serving it up!!!!\n")
 	for {
-		fmt.Printf("F1\n")
 		select {
 		case a := <-s.newConnectionCh:
-			fmt.Printf("F2\n")
 			s.logError("addConn", s.addConn(a))
 		case a := <-s.sendBroadcastCh:
-			fmt.Printf("J0\n")
 			s.broadcast(a)
 		case <-s.closeListenCh:
-			fmt.Printf("F3\n")
 			s.checkClosed()
 			s.tryShutdown()
-			fmt.Printf("F5\n")
 		case <-s.tryShutdownCh:
-			fmt.Printf("F6\n")
 			s.tryShutdown()
-			fmt.Printf("F7\n")
 		case <-s.parentShutdownCh:
-			fmt.Printf("F8\n")
 			s.removeAllConns()
-			fmt.Printf("F9\n")
 			return
 		case <-s.selfShutdownCh:
-			fmt.Printf("FA\n")
 			s.removeAllConns()
-			fmt.Printf("FB\n")
 			return
 		}
 	}
@@ -95,15 +82,11 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 }
 
 func (s *perUIDServer) broadcast(a messageArgs) {
-	var errMsgs []string
-	fmt.Printf("J1\n")
 	for id, conn := range s.conns {
-		fmt.Printf("J2\n")
 		log.Printf("uid %x broadcast to %d", s.uid, id)
 		oc := protocol.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
-			// Just log error messages...
-			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
+			log.Printf("[connection %d]: %s", id, err)
 
 			if s.isConnDown(err) {
 				s.removeConnection(conn, id)
@@ -135,10 +118,7 @@ func (s *perUIDServer) tryShutdown() {
 		uid:        s.uid,
 		lastConnID: s.lastConnID,
 	}
-	fmt.Printf("T1\n")
 	s.parentConfirmCh <- args
-	fmt.Printf("T2\n")
-	fmt.Printf("T3\n")
 }
 
 func (s *perUIDServer) checkClosed() {
