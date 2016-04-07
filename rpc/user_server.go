@@ -1,11 +1,9 @@
 package rpc
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
-	"strings"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	protocol "github.com/keybase/gregor/protocol/go"
@@ -97,18 +95,13 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		log.Printf("uid %x broadcast to %d", s.uid, id)
 		oc := protocol.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
+			// Just log error messages...
 			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
 
 			if s.isConnDown(err) {
 				s.removeConnection(conn, id)
 			}
 		}
-	}
-
-	if len(errMsgs) == 0 {
-		a.retCh <- nil
-	} else {
-		a.retCh <- errors.New(strings.Join(errMsgs, ", "))
 	}
 
 	if len(s.conns) == 0 {

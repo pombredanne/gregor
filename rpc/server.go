@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"time"
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
@@ -71,7 +70,7 @@ func NewServer() *Server {
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
-		confirmCh:       make(chan confirmUIDShutdownArgs, 1),
+		confirmCh:       make(chan confirmUIDShutdownArgs),
 	}
 
 	return s
@@ -96,7 +95,6 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 		return nil, err
 	}
 	fmt.Printf("A\n")
-	time.Sleep(100 * time.Millisecond)
 	fmt.Printf("B\n")
 	ret := s.users[k]
 	if ret != nil {
@@ -191,13 +189,8 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
-	retCh := make(chan error)
-	fmt.Printf("Y1\n")
-	s.broadcastCh <- messageArgs{c, tm, retCh}
-	fmt.Printf("Y2\n")
-	ret := <-retCh
-	fmt.Printf("Y3\n")
-	return ret
+	s.broadcastCh <- messageArgs{c, tm, nil}
+	return nil
 }
 
 func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
@@ -211,14 +204,8 @@ func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	if srv == nil {
 		return nil
 	}
-	fmt.Printf("Q3\n")
-	retCh := make(chan error)
-	fmt.Printf("Q4\n")
-	srv.sendBroadcastCh <- messageArgs{c, m, retCh}
-	fmt.Printf("Q5\n")
-	ret := <-retCh
-	fmt.Printf("Q6\n")
-	return ret
+	srv.sendBroadcastCh <- messageArgs{c, m, nil}
+	return nil
 }
 
 func (s *Server) consume(c context.Context, m protocol.Message) error {
@@ -237,11 +224,7 @@ func (s *Server) serve() error {
 			err := s.nii.ConsumeMessage(a.c, a.m)
 			a.retCh <- err
 		case a := <-s.broadcastCh:
-			fmt.Printf("Z1\n")
-			err := s.sendBroadcast(a.c, a.m)
-			fmt.Printf("Z2\n")
-			a.retCh <- err
-			fmt.Printf("Z3\n")
+			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
 			fmt.Printf("Z20.1\n")
 			s.reportStats(c)
