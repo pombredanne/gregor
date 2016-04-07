@@ -18,6 +18,7 @@ type connection struct {
 	c          net.Conn
 	xprt       rpc.Transporter
 	uid        gregor1.UID
+	tok        string
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
@@ -38,15 +39,26 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) Authenticate(ctx context.Context, tok string) (gregor1.UID, error) {
+func (c *connection) AuthenticateSessionToken(ctx context.Context, tok string) (gregor1.UID, error) {
 	log.Printf("Authenticate: %+v", tok)
-	uid, err := c.parent.auth.Authenticate(ctx, tok)
+	uid, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
 		c.uid = uid
+		c.tok = tok
 		c.lastAuthed = c.parent.clock.Now()
 	}
 	c.authCh <- err
 	return uid, err
+}
+
+func (c *connection) RevokeSessionToken(ctx context.Context, tok string) error {
+	log.Printf("Revoke: %+v", tok)
+	if tok == c.tok {
+		c.uid = nil
+		c.tok = ""
+		c.lastAuthed = time.Time{}
+	}
+	return c.parent.auth.RevokeSessionToken(ctx, tok)
 }
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {

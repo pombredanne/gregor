@@ -5,7 +5,7 @@ import (
 	"os"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/protocol/keybase1"
+	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 )
 
@@ -21,7 +21,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	a := keybase1.SessionClient{
+	a := gregor1.AuthClient{
 		Cli: rpc.NewClient(rpc.NewTransport(conn, nil, nil), nil),
 	}
 	srv.SetAuthenticator(a)

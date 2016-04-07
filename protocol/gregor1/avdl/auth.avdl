@@ -1,5 +1,6 @@
 @namespace("gregor.1")
 
 protocol auth {
-	UID authenticate(string session);
+	UID authenticateSessionToken(string tok);
+	void revokeSessionToken(string tok);
 }

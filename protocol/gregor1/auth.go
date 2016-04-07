@@ -8,30 +8,51 @@ import (
 	context "golang.org/x/net/context"
 )
 
-type AuthenticateArg struct {
-	Session string `codec:"session" json:"session"`
+type AuthenticateSessionTokenArg struct {
+	Tok string `codec:"tok" json:"tok"`
+}
+
+type RevokeSessionTokenArg struct {
+	Tok string `codec:"tok" json:"tok"`
 }
 
 type AuthInterface interface {
-	Authenticate(context.Context, string) (UID, error)
+	AuthenticateSessionToken(context.Context, string) (UID, error)
+	RevokeSessionToken(context.Context, string) error
 }
 
 func AuthProtocol(i AuthInterface) rpc.Protocol {
 	return rpc.Protocol{
 		Name: "gregor.1.auth",
 		Methods: map[string]rpc.ServeHandlerDescription{
-			"authenticate": {
+			"authenticateSessionToken": {
 				MakeArg: func() interface{} {
-					ret := make([]AuthenticateArg, 1)
+					ret := make([]AuthenticateSessionTokenArg, 1)
 					return &ret
 				},
 				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
-					typedArgs, ok := args.(*[]AuthenticateArg)
+					typedArgs, ok := args.(*[]AuthenticateSessionTokenArg)
 					if !ok {
-						err = rpc.NewTypeError((*[]AuthenticateArg)(nil), args)
+						err = rpc.NewTypeError((*[]AuthenticateSessionTokenArg)(nil), args)
 						return
 					}
-					ret, err = i.Authenticate(ctx, (*typedArgs)[0].Session)
+					ret, err = i.AuthenticateSessionToken(ctx, (*typedArgs)[0].Tok)
+					return
+				},
+				MethodType: rpc.MethodCall,
+			},
+			"revokeSessionToken": {
+				MakeArg: func() interface{} {
+					ret := make([]RevokeSessionTokenArg, 1)
+					return &ret
+				},
+				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
+					typedArgs, ok := args.(*[]RevokeSessionTokenArg)
+					if !ok {
+						err = rpc.NewTypeError((*[]RevokeSessionTokenArg)(nil), args)
+						return
+					}
+					err = i.RevokeSessionToken(ctx, (*typedArgs)[0].Tok)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -44,8 +65,14 @@ type AuthClient struct {
 	Cli rpc.GenericClient
 }
 
-func (c AuthClient) Authenticate(ctx context.Context, session string) (res UID, err error) {
-	__arg := AuthenticateArg{Session: session}
-	err = c.Cli.Call(ctx, "gregor.1.auth.authenticate", []interface{}{__arg}, &res)
+func (c AuthClient) AuthenticateSessionToken(ctx context.Context, tok string) (res UID, err error) {
+	__arg := AuthenticateSessionTokenArg{Tok: tok}
+	err = c.Cli.Call(ctx, "gregor.1.auth.authenticateSessionToken", []interface{}{__arg}, &res)
+	return
+}
+
+func (c AuthClient) RevokeSessionToken(ctx context.Context, tok string) (err error) {
+	__arg := RevokeSessionTokenArg{Tok: tok}
+	err = c.Cli.Call(ctx, "gregor.1.auth.revokeSessionToken", []interface{}{__arg}, nil)
 	return
 }

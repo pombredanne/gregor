@@ -13,7 +13,24 @@ import (
 	"golang.org/x/net/context"
 )
 
-type mockAuth struct{}
+type mockAuth map[string]gregor1.UID
+
+func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok string) (gregor1.UID, error) {
+	if uid, ok := m[tok]; ok {
+		return uid, nil
+	}
+
+	return gregor1.UID{}, errors.New("invalid token")
+}
+
+func (m mockAuth) RevokeSessionToken(_ context.Context, tok string) error {
+	if _, ok := m[tok]; ok {
+		delete(m, tok)
+		return nil
+	}
+
+	return errors.New("invalid token")
+}
 
 const (
 	goodToken = "goodtoken"
@@ -22,13 +39,7 @@ const (
 
 var goodUID = gregor1.UID("gooduid")
 
-func (m mockAuth) Authenticate(_ context.Context, tok string) (gregor1.UID, error) {
-	if tok == goodToken {
-		return goodUID, nil
-	}
-
-	return gregor1.UID{}, errors.New("invalid token")
-}
+var mockAuthenticator gregor1.AuthInterface = mockAuth{goodToken: goodUID}
 
 type mockConsumer struct {
 	consumed []gregor.Message
@@ -42,9 +53,9 @@ func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) e
 func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *events) {
 	ev := newEvents()
 	s := NewServer()
-	s.auth = mockAuth{}
 	s.events = ev
 	s.useDeadlocker = true
+	s.SetAuthenticator(mockAuthenticator)
 	l := newLocalListener()
 	go s.Serve(x)
 	go s.ListenLoop(l)
@@ -120,11 +131,11 @@ func TestAuthentication(t *testing.T) {
 	c := newClient(l.Addr())
 	defer c.Shutdown()
 
-	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := c.AuthClient().Authenticate(context.TODO(), badToken); err == nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), badToken); err == nil {
 		t.Fatal("badtoken passed authentication")
 	}
 }
@@ -137,7 +148,7 @@ func TestCreatePerUIDServer(t *testing.T) {
 	c := newClient(l.Addr())
 	defer c.Shutdown()
 
-	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,7 +193,7 @@ func TestBroadcast(t *testing.T) {
 
 	c := newClient(l.Addr())
 	defer c.Shutdown()
-	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -209,7 +220,7 @@ func TestConsume(t *testing.T) {
 
 	c := newClient(l.Addr())
 	defer c.Shutdown()
-	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +240,7 @@ func TestCloseOne(t *testing.T) {
 
 	c := newClient(l.Addr())
 
-	if _, err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -273,7 +284,7 @@ func TestCloseConnect(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -281,7 +292,7 @@ func TestCloseConnect(t *testing.T) {
 	c1.Shutdown()
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -323,7 +334,7 @@ func TestCloseConnect2(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,7 +355,7 @@ func TestCloseConnect2(t *testing.T) {
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -375,7 +386,7 @@ func TestCloseConnect3(t *testing.T) {
 	defer s.Shutdown()
 
 	c1 := newClient(l.Addr())
-	if _, err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c1.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
@@ -384,7 +395,7 @@ func TestCloseConnect3(t *testing.T) {
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
-	if _, err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
+	if _, err := c2.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
