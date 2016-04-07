@@ -326,6 +326,9 @@ func TestCloseConnect2(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	<-ev.connCreated
+	<-ev.perUIDCreated
+
 	// close the first connection
 	c1.Shutdown()
 
@@ -336,14 +339,14 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	<-ev.perUIDDestroyed
+
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
 	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
 
-	// wait for two connection created events
-	<-ev.connCreated
 	<-ev.connCreated
 
 	// the user server should exist due to c2:
