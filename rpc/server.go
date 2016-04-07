@@ -25,6 +25,12 @@ type messageArgs struct {
 	retCh chan<- error
 }
 
+// broadcastsSent will contain each messages that is sent to a
+// perUIDServer.  If it is nil (default), it won't be used.  But
+// tests can create a channel to figure out when async broadcasts
+// are sent.
+var broadcastsSent chan protocol.Message
+
 type confirmUIDShutdownArgs struct {
 	uid        protocol.UID
 	lastConnID connectionID

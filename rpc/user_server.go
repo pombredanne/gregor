@@ -114,6 +114,12 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 	if len(s.conns) == 0 {
 		s.tryShutdownCh <- true
 	}
+
+	// if the global broadcastsSent channel exists, put the message on it.
+	// (this is primarily for testing purposes)
+	if broadcastsSent != nil {
+		broadcastsSent <- a.m
+	}
 }
 
 // tryShutdown checks if it is ok to shutdown.  Returns true if it

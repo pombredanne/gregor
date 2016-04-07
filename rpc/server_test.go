@@ -170,6 +170,13 @@ func newUpdateMessage(uid protocol.UID) protocol.Message {
 }
 
 func TestBroadcast(t *testing.T) {
+	// create this channel so we can figure out when the async
+	// broadcast is complete.  Destroy it when the test is finished.
+	broadcastsSent = make(chan protocol.Message, 100)
+	defer func() {
+		broadcastsSent = nil
+	}()
+
 	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
@@ -184,6 +191,9 @@ func TestBroadcast(t *testing.T) {
 	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
 		t.Fatal(err)
 	}
+
+	// wait for the broadcast to be sent
+	<-broadcastsSent
 
 	if len(c.broadcasts) != 1 {
 		t.Errorf("client broadcasts received: %d, expected 1", len(c.broadcasts))
@@ -212,6 +222,13 @@ func TestConsume(t *testing.T) {
 }
 
 func TestCloseOne(t *testing.T) {
+	// create this channel so we can figure out when the async
+	// broadcast is complete.  Destroy it when the test is finished.
+	broadcastsSent = make(chan protocol.Message, 100)
+	defer func() {
+		broadcastsSent = nil
+	}()
+
 	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
@@ -243,6 +260,9 @@ func TestCloseOne(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	// wait for the message to be broadcast
+	<-broadcastsSent
+
 	fmt.Printf("X6\n")
 	// make sure it didn't receive the broadcast
 	if len(c.broadcasts) != 0 {
@@ -260,6 +280,13 @@ func TestCloseOne(t *testing.T) {
 }
 
 func TestCloseConnect(t *testing.T) {
+	// create this channel so we can figure out when the async
+	// broadcast is complete.  Destroy it when the test is finished.
+	broadcastsSent = make(chan protocol.Message, 100)
+	defer func() {
+		broadcastsSent = nil
+	}()
+
 	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
@@ -284,6 +311,9 @@ func TestCloseConnect(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	// wait for the broadcast to be sent
+	<-broadcastsSent
+
 	// the user server should still exist due to c2:
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -304,6 +334,13 @@ func TestCloseConnect(t *testing.T) {
 }
 
 func TestCloseConnect2(t *testing.T) {
+	// create this channel so we can figure out when the async
+	// broadcast is complete.  Destroy it when the test is finished.
+	broadcastsSent = make(chan protocol.Message, 100)
+	defer func() {
+		broadcastsSent = nil
+	}()
+
 	s, l := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
@@ -322,6 +359,9 @@ func TestCloseConnect2(t *testing.T) {
 		// an error here is ok, as it could be about conn1 being closed:
 		t.Logf("broadcast error: %s", err)
 	}
+
+	// wait for the broadcast to be sent
+	<-broadcastsSent
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
