@@ -99,11 +99,9 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 	// because we started listening too late. So what we might do instead is
 	// check that we're connected, and if not, to send an artificial message
 	// on that channel.
-	/*
-		if !a.c.xprt.IsConnected() {
-			s.closeListenCh <- nil
-		}
-	*/
+	if !a.c.xprt.IsConnected() {
+		s.closeListenCh <- nil
+	}
 
 	return nil
 }
