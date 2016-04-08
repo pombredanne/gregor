@@ -39,13 +39,16 @@ func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) e
 	return nil
 }
 
-func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener) {
+func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *events) {
+	ev := newEvents()
 	s := NewServer()
 	s.auth = mockAuth{}
+	s.events = ev
+	s.useDeadlocker = true
 	l := newLocalListener()
 	go s.Serve(x)
 	go s.ListenLoop(l)
-	return s, l
+	return s, l, ev
 }
 
 func newLocalListener() net.Listener {
@@ -111,7 +114,7 @@ func (c *client) BroadcastMessage(ctx context.Context, m protocol.Message) error
 }
 
 func TestAuthentication(t *testing.T) {
-	_, l := startTestServer(nil)
+	_, l, _ := startTestServer(nil)
 	defer l.Close()
 
 	c := newClient(l.Addr())
@@ -127,7 +130,7 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestCreatePerUIDServer(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -137,6 +140,9 @@ func TestCreatePerUIDServer(t *testing.T) {
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
+
+	// wait for events from above before checking state
+	<-ev.connCreated
 
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -170,7 +176,7 @@ func newUpdateMessage(uid protocol.UID) protocol.Message {
 }
 
 func TestBroadcast(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -180,10 +186,15 @@ func TestBroadcast(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	<-ev.connCreated
+
 	m := newOOBMessage(goodUID, "sys", nil)
 	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
 		t.Fatal(err)
 	}
+
+	// wait for the broadcast to be sent
+	<-ev.bcastSent
 
 	if len(c.broadcasts) != 1 {
 		t.Errorf("client broadcasts received: %d, expected 1", len(c.broadcasts))
@@ -192,7 +203,7 @@ func TestBroadcast(t *testing.T) {
 
 func TestConsume(t *testing.T) {
 	mc := &mockConsumer{}
-	s, l := startTestServer(mc)
+	s, l, _ := startTestServer(mc)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -212,7 +223,7 @@ func TestConsume(t *testing.T) {
 }
 
 func TestCloseOne(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -221,6 +232,8 @@ func TestCloseOne(t *testing.T) {
 	if err := c.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
+
+	<-ev.perUIDCreated
 
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -243,6 +256,9 @@ func TestCloseOne(t *testing.T) {
 		t.Errorf("c broadcasts: %d, expected 0", len(c.broadcasts))
 	}
 
+	// wait for the perUID server to be shutdown
+	<-ev.perUIDDestroyed
+
 	// and the user server should be deleted:
 	s.statsCh <- ch
 	stats = <-ch
@@ -252,7 +268,7 @@ func TestCloseOne(t *testing.T) {
 }
 
 func TestCloseConnect(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -269,6 +285,10 @@ func TestCloseConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	<-ev.connCreated
+	<-ev.connDestroyed
+	<-ev.connCreated
+
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
 	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
@@ -276,12 +296,14 @@ func TestCloseConnect(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	<-ev.bcastSent
+
 	// the user server should still exist due to c2:
 	ch := make(chan *Stats)
 	s.statsCh <- ch
 	stats := <-ch
 	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
+		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
 	}
 
 	// c1 shouldn't have received the broadcast:
@@ -296,7 +318,7 @@ func TestCloseConnect(t *testing.T) {
 }
 
 func TestCloseConnect2(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -304,6 +326,9 @@ func TestCloseConnect2(t *testing.T) {
 	if err := c1.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
+
+	<-ev.connCreated
+	<-ev.perUIDCreated
 
 	// close the first connection
 	c1.Shutdown()
@@ -315,11 +340,15 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	<-ev.perUIDDestroyed
+
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
 	if err := c2.AuthClient().Authenticate(context.TODO(), goodToken); err != nil {
 		t.Fatal(err)
 	}
+
+	<-ev.connCreated
 
 	// the user server should exist due to c2:
 	ch := make(chan *Stats)
@@ -341,7 +370,7 @@ func TestCloseConnect2(t *testing.T) {
 }
 
 func TestCloseConnect3(t *testing.T) {
-	s, l := startTestServer(nil)
+	s, l, ev := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -359,11 +388,38 @@ func TestCloseConnect3(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// wait for two connection created events
+	<-ev.connCreated
+	<-ev.connCreated
+
+	// broadcast a message to goodUID
+	m := newOOBMessage(goodUID, "sys", nil)
+	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
+		// an error here is ok, as it could be about conn1 being closed:
+		t.Logf("broadcast error: %s", err)
+	}
+
+	// wait for the broadcast to be sent
+	<-ev.bcastSent
+
+	// wait for c1 connection destroyed
+	<-ev.connDestroyed
+
 	// the user server should exist due to c2:
 	ch := make(chan *Stats)
 	s.statsCh <- ch
 	stats := <-ch
 	if stats.UserServerCount != 1 {
 		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	}
+
+	// c1 shouldn't have received the broadcast:
+	if len(c1.broadcasts) != 0 {
+		t.Errorf("c1 broadcasts: %d, expected 0", len(c1.broadcasts))
+	}
+
+	// c2 should have received the broadcast:
+	if len(c2.broadcasts) != 1 {
+		t.Errorf("c2 broadcasts: %d, expected 1", len(c2.broadcasts))
 	}
 }

@@ -1,11 +1,8 @@
 package rpc
 
 import (
-	"errors"
-	"fmt"
 	"io"
 	"log"
-	"strings"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	protocol "github.com/keybase/gregor/protocol/go"
@@ -21,27 +18,35 @@ type perUIDServer struct {
 	conns      map[connectionID]*connection
 	lastConnID connectionID
 
-	parentConfirmCh chan confirmUIDShutdownArgs
-	newConnectionCh chan *connectionArgs
-	sendBroadcastCh chan messageArgs
-	tryShutdownCh   chan bool
-	closeListenCh   chan error
-	shutdownCh      chan struct{}
+	parentConfirmCh  chan confirmUIDShutdownArgs
+	newConnectionCh  chan *connectionArgs
+	sendBroadcastCh  chan messageArgs
+	tryShutdownCh    chan bool
+	closeListenCh    chan error
+	parentShutdownCh chan struct{}
+	selfShutdownCh   chan struct{}
+	events           eventHandler
 }
 
-func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}) *perUIDServer {
+func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events eventHandler) *perUIDServer {
 	s := &perUIDServer{
-		uid:             uid,
-		conns:           make(map[connectionID]*connection),
-		newConnectionCh: make(chan *connectionArgs, 1),
-		sendBroadcastCh: make(chan messageArgs, 1),
-		tryShutdownCh:   make(chan bool, 1), // buffered so it can receive inside serve()
-		closeListenCh:   make(chan error),
-		parentConfirmCh: parentConfirmCh,
-		shutdownCh:      shutdownCh,
+		uid:              uid,
+		conns:            make(map[connectionID]*connection),
+		newConnectionCh:  make(chan *connectionArgs, 1),
+		sendBroadcastCh:  make(chan messageArgs, 1),
+		tryShutdownCh:    make(chan bool, 1),    // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error, 100), // each connection uses the same closeListenCh, so buffer it more than 1
+		parentConfirmCh:  parentConfirmCh,
+		parentShutdownCh: shutdownCh,
+		selfShutdownCh:   make(chan struct{}),
+		events:           events,
 	}
 
 	go s.serve()
+
+	if s.events != nil {
+		s.events.uidServerCreated(s.uid)
+	}
 
 	return s
 }
@@ -54,6 +59,11 @@ func (s *perUIDServer) logError(prefix string, err error) {
 }
 
 func (s *perUIDServer) serve() {
+	defer func() {
+		if s.events != nil {
+			s.events.uidServerDestroyed(s.uid)
+		}
+	}()
 	for {
 		select {
 		case a := <-s.newConnectionCh:
@@ -62,14 +72,13 @@ func (s *perUIDServer) serve() {
 			s.broadcast(a)
 		case <-s.closeListenCh:
 			s.checkClosed()
-			if s.tryShutdown() {
-				return
-			}
+			s.tryShutdown()
 		case <-s.tryShutdownCh:
-			if s.tryShutdown() {
-				return
-			}
-		case <-s.shutdownCh:
+			s.tryShutdown()
+		case <-s.parentShutdownCh:
+			s.removeAllConns()
+			return
+		case <-s.selfShutdownCh:
 			s.removeAllConns()
 			return
 		}
@@ -77,19 +86,32 @@ func (s *perUIDServer) serve() {
 }
 
 func (s *perUIDServer) addConn(a *connectionArgs) error {
+
 	a.c.xprt.AddCloseListener(s.closeListenCh)
+
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id
+	if s.events != nil {
+		s.events.connectionCreated(s.uid)
+	}
+
+	// Well this is cute. We might have missed the s.closeListenCh above
+	// because we started listening too late. So what we might do instead is
+	// check that we're connected, and if not, to send an artificial message
+	// on that channel.
+	if !a.c.xprt.IsConnected() {
+		s.closeListenCh <- nil
+	}
+
 	return nil
 }
 
 func (s *perUIDServer) broadcast(a messageArgs) {
-	var errMsgs []string
 	for id, conn := range s.conns {
 		log.Printf("uid %x broadcast to %d", s.uid, id)
 		oc := protocol.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
-			errMsgs = append(errMsgs, fmt.Sprintf("[connection %d]: %s", id, err))
+			log.Printf("[connection %d]: %s", id, err)
 
 			if s.isConnDown(err) {
 				s.removeConnection(conn, id)
@@ -97,10 +119,8 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		}
 	}
 
-	if len(errMsgs) == 0 {
-		a.retCh <- nil
-	} else {
-		a.retCh <- errors.New(strings.Join(errMsgs, ", "))
+	if s.events != nil {
+		s.events.broadcastSent(a.m)
 	}
 
 	if len(s.conns) == 0 {
@@ -110,29 +130,18 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 
 // tryShutdown checks if it is ok to shutdown.  Returns true if it
 // is ok.
-func (s *perUIDServer) tryShutdown() bool {
+func (s *perUIDServer) tryShutdown() {
 	// make sure no connections have been added
 	if len(s.conns) != 0 {
 		log.Printf("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
-		return false
 	}
 
 	// confirm with the server that it is ok to shutdown
-	ok := make(chan bool)
 	args := confirmUIDShutdownArgs{
 		uid:        s.uid,
 		lastConnID: s.lastConnID,
-		ok:         ok,
 	}
 	s.parentConfirmCh <- args
-	confirmed := <-ok
-	if !confirmed {
-		log.Printf("tried shutdown, but parent server didn't allow it")
-		return false
-	}
-
-	log.Printf("shutting down perUIDServer for %x", s.uid)
-	return true
 }
 
 func (s *perUIDServer) checkClosed() {
@@ -160,6 +169,9 @@ func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
 	log.Printf("uid server %x: removing connection %d", s.uid, id)
 	conn.close()
 	delete(s.conns, id)
+	if s.events != nil {
+		s.events.connectionDestroyed(s.uid)
+	}
 }
 
 func (s *perUIDServer) removeAllConns() {

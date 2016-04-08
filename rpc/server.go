@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
@@ -18,6 +19,12 @@ var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
 
 type connectionID int
 
+func (s *Server) deadlocker() {
+	if s.useDeadlocker {
+		time.Sleep(3*time.Millisecond)
+	}
+}
+
 type messageArgs struct {
 	c     context.Context
 	m     protocol.Message
@@ -27,7 +34,6 @@ type messageArgs struct {
 type confirmUIDShutdownArgs struct {
 	uid        protocol.UID
 	lastConnID connectionID
-	ok         chan<- bool
 }
 
 // Stats contains information about the current state of the
@@ -56,6 +62,14 @@ type Server struct {
 	closeCh          chan struct{}
 	confirmCh        chan confirmUIDShutdownArgs
 	nextConnectionID connectionID
+
+	// events allows checking various server event occurrences
+	// (useful for testing, ok if left a default nil value)
+	events eventHandler
+
+	// Useful for testing. Insert arbitrary waits throughout the
+	// code and wait for something bad to happen.
+	useDeadlocker bool
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
@@ -90,6 +104,7 @@ func (s *Server) uidKey(u gregor.UID) (string, error) {
 }
 
 func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
+	s.deadlocker()
 	k, err := s.uidKey(u)
 	if err != nil {
 		return nil, err
@@ -102,6 +117,7 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 }
 
 func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
+	s.deadlocker()
 	k, err := s.uidKey(u)
 	if err != nil {
 		return err
@@ -117,7 +133,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh)
+		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh, s.events)
 		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
 			return err
 		}
@@ -128,36 +144,44 @@ func (s *Server) addUIDConnection(c *connection) error {
 		return err
 	}
 	s.lastConns[k] = s.nextConnectionID
+	s.deadlocker()
 	usrv.newConnectionCh <- &connectionArgs{c: c, id: s.nextConnectionID}
+	s.deadlocker()
 	s.nextConnectionID++
 	return nil
 }
 
 func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
+	s.deadlocker()
 	k, err := s.uidKey(a.uid)
 	if err != nil {
 		log.Printf("confirmUIDShutdown, uidKey error: %s", err)
-		a.ok <- false
 		return
 	}
 	serverLast, ok := s.lastConns[k]
 	if !ok {
 		log.Printf("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
-		a.ok <- false
 		return
 	}
 
 	// it's ok to shutdown if the last connection that the server knows about
 	// matches the last connection in the perUIDServer
 	if serverLast == a.lastConnID {
+		su := s.users[k]
+
 		// remove the perUIDServer from users, lastConns
 		delete(s.users, k)
 		delete(s.lastConns, k)
-		a.ok <- true
+
+		// close perUser's selfShutdown channel so it will
+		// self-destruct
+		if su != nil {
+			s.deadlocker()
+			close(su.selfShutdownCh)
+		}
+
 		return
 	}
-
-	a.ok <- false
 }
 
 func (s *Server) reportStats(c chan *Stats) {
@@ -181,9 +205,8 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
-	retCh := make(chan error)
-	s.broadcastCh <- messageArgs{c, tm, retCh}
-	return <-retCh
+	s.broadcastCh <- messageArgs{c, tm, nil}
+	return nil
 }
 
 func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
@@ -193,11 +216,15 @@ func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	}
 	// Nothing to do...
 	if srv == nil {
+		// even though nothing to do, create an event if
+		// an event handler in place:
+		if s.events != nil {
+			s.events.broadcastSent(m)
+		}
 		return nil
 	}
-	retCh := make(chan error)
-	srv.sendBroadcastCh <- messageArgs{c, m, retCh}
-	return <-retCh
+	srv.sendBroadcastCh <- messageArgs{c, m, nil}
+	return nil
 }
 
 func (s *Server) consume(c context.Context, m protocol.Message) error {
@@ -216,8 +243,7 @@ func (s *Server) serve() error {
 			err := s.nii.ConsumeMessage(a.c, a.m)
 			a.retCh <- err
 		case a := <-s.broadcastCh:
-			err := s.sendBroadcast(a.c, a.m)
-			a.retCh <- err
+			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
 			s.reportStats(c)
 		case a := <-s.confirmCh:
