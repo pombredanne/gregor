@@ -22,9 +22,10 @@ type connection struct {
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
+	errCh      <-chan error
 }
 
-func newConnection(c net.Conn, parent *Server) (*connection, error) {
+func newConnection(c net.Conn, parent *Server) *connection {
 	// TODO: logging and error wrapping mechanisms.
 	xprt := rpc.NewTransport(c, nil, nil)
 
@@ -34,12 +35,8 @@ func newConnection(c net.Conn, parent *Server) (*connection, error) {
 		parent: parent,
 		authCh: make(chan error, 100),
 	}
-
-	if err := conn.startRPCServer(); err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+	conn.errCh = conn.startRPCServer()
+	return conn
 }
 
 func (c *connection) Authenticate(ctx context.Context, tok protocol.AuthToken) error {
@@ -59,7 +56,7 @@ func (c *connection) ConsumeMessage(ctx context.Context, m protocol.Message) err
 	return c.parent.consume(ctx, m)
 }
 
-func (c *connection) startRPCServer() error {
+func (c *connection) startRPCServer() <-chan error {
 	// TODO: error wrapping mechanism
 	srv := rpc.NewServer(c.xprt, nil)
 
@@ -70,11 +67,13 @@ func (c *connection) startRPCServer() error {
 	for _, prot := range prots {
 		log.Printf("registering protocol %s", prot.Name)
 		if err := srv.Register(prot); err != nil {
-			return err
+			errCh := make(chan error, 1)
+			errCh <- err
+			return errCh
 		}
 	}
 
-	return srv.Run(true /* async */)
+	return srv.RunAsync()
 }
 
 func (c *connection) startAuthentication() error {

@@ -261,9 +261,11 @@ func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
 }
 
 func (s *Server) handleNewConnection(c net.Conn) error {
-	nc, err := newConnection(c, s)
-	if err != nil {
+	nc := newConnection(c, s)
+	select {
+	case err := <-nc.errCh:
 		return err
+	default:
 	}
 	if err := nc.startAuthentication(); err != nil {
 		nc.close()
