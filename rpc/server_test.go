@@ -286,8 +286,6 @@ func TestCloseConnect(t *testing.T) {
 	}
 
 	<-ev.connCreated
-	// taking this out gets rid of the deadlock:
-	// <-ev.connDestroyed
 	<-ev.connCreated
 
 	// broadcast a message to goodUID
@@ -297,6 +295,7 @@ func TestCloseConnect(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	<-ev.connDestroyed
 	<-ev.bcastSent
 
 	// the user server should still exist due to c2:
