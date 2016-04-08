@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -22,7 +23,7 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, nil), nil)
-	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}))
+	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, 10*time.Minute))
 
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }
