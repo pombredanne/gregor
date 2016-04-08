@@ -44,6 +44,7 @@ func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, 
 	s := NewServer()
 	s.auth = mockAuth{}
 	s.events = ev
+	s.useDeadlocker = true
 	l := newLocalListener()
 	go s.Serve(x)
 	go s.ListenLoop(l)

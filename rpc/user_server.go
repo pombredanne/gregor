@@ -34,8 +34,8 @@ func newPerUIDServer(uid protocol.UID, parentConfirmCh chan confirmUIDShutdownAr
 		conns:            make(map[connectionID]*connection),
 		newConnectionCh:  make(chan *connectionArgs, 1),
 		sendBroadcastCh:  make(chan messageArgs, 1),
-		tryShutdownCh:    make(chan bool, 1), // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error),
+		tryShutdownCh:    make(chan bool, 1),    // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error, 100), // each connection uses the same closeListenCh, so buffer it more than 1
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
 		selfShutdownCh:   make(chan struct{}),
@@ -86,12 +86,23 @@ func (s *perUIDServer) serve() {
 }
 
 func (s *perUIDServer) addConn(a *connectionArgs) error {
+
 	a.c.xprt.AddCloseListener(s.closeListenCh)
+
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id
 	if s.events != nil {
 		s.events.connectionCreated(s.uid)
 	}
+
+	// Well this is cute. We might have missed the s.closeListenCh above
+	// because we started listening too late. So what we might do instead is
+	// check that we're connected, and if not, to send an artificial message
+	// on that channel.
+	if !a.c.xprt.IsConnected() {
+		s.closeListenCh <- nil
+	}
+
 	return nil
 }
 
