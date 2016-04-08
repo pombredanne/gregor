@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
@@ -17,6 +18,12 @@ import (
 var ErrBadCast = errors.New("bad cast from gregor type to protocol type")
 
 type connectionID int
+
+func (s *Server) deadlocker() {
+	if s.useDeadlocker {
+		time.Sleep(3*time.Millisecond)
+	}
+}
 
 type messageArgs struct {
 	c     context.Context
@@ -59,6 +66,10 @@ type Server struct {
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
 	events eventHandler
+
+	// Useful for testing. Insert arbitrary waits throughout the
+	// code and wait for something bad to happen.
+	useDeadlocker bool
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
@@ -93,6 +104,7 @@ func (s *Server) uidKey(u gregor.UID) (string, error) {
 }
 
 func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
+	s.deadlocker()
 	k, err := s.uidKey(u)
 	if err != nil {
 		return nil, err
@@ -105,6 +117,7 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 }
 
 func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
+	s.deadlocker()
 	k, err := s.uidKey(u)
 	if err != nil {
 		return err
@@ -131,12 +144,15 @@ func (s *Server) addUIDConnection(c *connection) error {
 		return err
 	}
 	s.lastConns[k] = s.nextConnectionID
+	s.deadlocker()
 	usrv.newConnectionCh <- &connectionArgs{c: c, id: s.nextConnectionID}
+	s.deadlocker()
 	s.nextConnectionID++
 	return nil
 }
 
 func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
+	s.deadlocker()
 	k, err := s.uidKey(a.uid)
 	if err != nil {
 		log.Printf("confirmUIDShutdown, uidKey error: %s", err)
@@ -160,6 +176,7 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 		// close perUser's selfShutdown channel so it will
 		// self-destruct
 		if su != nil {
+			s.deadlocker()
 			close(su.selfShutdownCh)
 		}
 
