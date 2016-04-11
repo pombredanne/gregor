@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
@@ -32,7 +33,8 @@ func TestSessionCacher(t *testing.T) {
 	checkBad(t, a, badToken)
 	checkGood(t, a, goodToken, goodUID)
 	d := 100 * time.Millisecond
-	sc := NewSessionCacher(a, d)
+	fc := clockwork.NewFakeClock()
+	sc := NewSessionCacher(a, fc, d)
 	checkBad(t, sc, badToken)
 	checkGood(t, sc, goodToken, goodUID)
 
@@ -45,7 +47,7 @@ func TestSessionCacher(t *testing.T) {
 	checkBad(t, sc, badToken)
 	checkGood(t, sc, goodToken, goodUID)
 
-	// Sleep until timeout, cached results gone
-	time.Sleep(d)
+	// Advance past timeout, cached results gone
+	fc.Advance(d)
 	checkBad(t, sc, goodToken)
 }

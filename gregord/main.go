@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/keybase/client/go/libkb"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -24,7 +25,7 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, libkb.WrapError), libkb.ErrorUnwrapper{})
-	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, 10*time.Minute))
+	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute))
 
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }

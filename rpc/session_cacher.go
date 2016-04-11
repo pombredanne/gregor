@@ -3,6 +3,7 @@ package rpc
 import (
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
@@ -10,6 +11,7 @@ import (
 // sessionCacher implements gregor1.AuthInterface with a cache of authenticated sessions.
 type sessionCacher struct {
 	a          gregor1.AuthInterface
+	cl         clockwork.Clock
 	timeout    time.Duration
 	sessions   map[gregor1.SessionToken]gregor1.AuthResult
 	sessionIDs map[gregor1.SessionID]gregor1.SessionToken
@@ -17,9 +19,10 @@ type sessionCacher struct {
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
-func NewSessionCacher(a gregor1.AuthInterface, timeout time.Duration) gregor1.AuthInterface {
+func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.Duration) gregor1.AuthInterface {
 	sc := &sessionCacher{
 		a:          a,
+		cl:         cl,
 		timeout:    timeout,
 		sessions:   make(map[gregor1.SessionToken]gregor1.AuthResult),
 		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
@@ -85,7 +88,7 @@ func (sc *sessionCacher) requestHandler() {
 			sc.deleteSID(expiryQueue[0].sid)
 			expiryQueue = expiryQueue[1:]
 			if len(expiryQueue) > 0 {
-				expiryCh = time.After(expiryQueue[0].expiry.Sub(time.Now()))
+				expiryCh = sc.cl.After(expiryQueue[0].expiry.Sub(sc.cl.Now()))
 			}
 		case req := <-sc.reqCh:
 			switch req := req.(type) {
@@ -93,14 +96,13 @@ func (sc *sessionCacher) requestHandler() {
 				req.resp <- sc.readTok(req.tok)
 			case setResReq:
 				sc.setRes(req.tok, req.res)
-				e := expirySt{
-					sid:    req.res.Sid,
-					expiry: time.Now().Add(sc.timeout),
-				}
 				if len(expiryQueue) == 0 {
-					expiryCh = time.After(e.expiry.Sub(time.Now()))
+					expiryCh = sc.cl.After(sc.timeout)
 				}
-				expiryQueue = append(expiryQueue, e)
+				expiryQueue = append(expiryQueue, expirySt{
+					sid:    req.res.Sid,
+					expiry: sc.cl.Now().Add(sc.timeout),
+				})
 			case deleteSIDReq:
 				sc.deleteSID(req.sid)
 			}
