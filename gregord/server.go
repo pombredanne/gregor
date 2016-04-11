@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 )
 
 type mainServer struct {

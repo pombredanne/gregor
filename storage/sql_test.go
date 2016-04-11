@@ -8,7 +8,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jonboulle/clockwork"
-	protocol "github.com/keybase/gregor/protocol/go"
+	"github.com/keybase/gregor/protocol/gregor1"
 	test "github.com/keybase/gregor/test"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -44,7 +44,7 @@ func testEngine(t *testing.T, engine string, name string, w sqlTimeWriter) {
 		t.Fatal(err)
 	}
 	cl := clockwork.NewFakeClock()
-	var of protocol.ObjFactory
+	var of gregor1.ObjFactory
 	eng := NewSQLEngine(db, of, w, cl)
 	test.TestStateMachineAllDevices(t, eng)
 	test.TestStateMachinePerDevice(t, eng)

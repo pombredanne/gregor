@@ -1,14 +1,15 @@
 package rpc
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"net"
 	"time"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	protocol "github.com/keybase/gregor/protocol/go"
-	context "golang.org/x/net/context"
+	"github.com/keybase/gregor/protocol/gregor1"
+	"golang.org/x/net/context"
 )
 
 // ErrBadUID occurs when there is a bad UID on the auth channel.
@@ -17,8 +18,9 @@ var ErrBadUID = errors.New("bad UID on channel")
 type connection struct {
 	c          net.Conn
 	xprt       rpc.Transporter
-	uid        protocol.UID
-	session    protocol.SessionID
+	uid        gregor1.UID
+	tok        gregor1.SessionToken
+	sid        gregor1.SessionID
 	lastAuthed time.Time
 	parent     *Server
 	authCh     chan error
@@ -39,20 +41,57 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) Authenticate(ctx context.Context, tok protocol.AuthToken) error {
+func (c *connection) checkAuth(ctx context.Context, m gregor1.Message) error {
+	if _, err := c.AuthenticateSessionToken(ctx, c.tok); err != nil {
+		return err
+	}
+	if m.ToInBandMessage() != nil {
+		if !bytes.Equal(m.ToInBandMessage().Metadata().UID().Bytes(), c.uid) {
+			return errors.New("mismatched UIDs")
+		}
+	}
+	if m.ToOutOfBandMessage() != nil {
+		if !bytes.Equal(m.ToOutOfBandMessage().UID().Bytes(), c.uid) {
+			return errors.New("mismatched UIDs")
+		}
+	}
+	return nil
+}
+
+func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 	log.Printf("Authenticate: %+v", tok)
-	uid, sess, err := c.parent.auth.Authenticate(ctx, tok)
+	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
-		c.uid = uid
-		c.session = sess
+		c.tok = tok
+		c.uid = res.Uid
+		c.sid = res.Sid
 		c.lastAuthed = c.parent.clock.Now()
 	}
 	c.authCh <- err
-	return err
+	return res, err
 }
 
-func (c *connection) ConsumeMessage(ctx context.Context, m protocol.Message) error {
+func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
+	for _, sid := range sessionIDs {
+		log.Printf("Revoke: %+v", sid)
+		if sid == c.sid {
+			c.tok = ""
+			c.uid = nil
+			c.sid = ""
+			c.lastAuthed = time.Time{}
+			break
+		}
+	}
+	return c.parent.auth.RevokeSessionIDs(ctx, sessionIDs)
+}
+
+func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
+	if err := c.checkAuth(ctx, m); err != nil {
+		c.close()
+		return err
+	}
+
 	return c.parent.consume(ctx, m)
 }
 
@@ -61,8 +100,8 @@ func (c *connection) startRPCServer() <-chan error {
 	srv := rpc.NewServer(c.xprt, nil)
 
 	prots := []rpc.Protocol{
-		protocol.AuthProtocol(c),
-		protocol.IncomingProtocol(c),
+		gregor1.AuthProtocol(c),
+		gregor1.IncomingProtocol(c),
 	}
 	for _, prot := range prots {
 		log.Printf("registering protocol %s", prot.Name)
@@ -91,3 +130,5 @@ func (c *connection) close() {
 	close(c.authCh)
 	c.c.Close()
 }
+
+var _ gregor1.AuthInterface = (*connection)(nil)

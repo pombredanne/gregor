@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
-	protocol "github.com/keybase/gregor/protocol/go"
-	context "golang.org/x/net/context"
+	"github.com/keybase/gregor"
+	"github.com/keybase/gregor/protocol/gregor1"
+	"golang.org/x/net/context"
 )
 
 // ErrBadCast occurs when there is a problem casting a type from
@@ -27,12 +27,12 @@ func (s *Server) deadlocker() {
 
 type messageArgs struct {
 	c     context.Context
-	m     protocol.Message
+	m     gregor1.Message
 	retCh chan<- error
 }
 
 type confirmUIDShutdownArgs struct {
-	uid        protocol.UID
+	uid        gregor1.UID
 	lastConnID connectionID
 }
 
@@ -46,7 +46,7 @@ type Stats struct {
 // and gregor.NetworkInterface.
 type Server struct {
 	nii   gregor.NetworkInterfaceIncoming
-	auth  Authenticator
+	auth  gregor1.AuthInterface
 	clock clockwork.Clock
 
 	// key is the Hex-encoding of the binary UIDs
@@ -90,14 +90,14 @@ func NewServer() *Server {
 	return s
 }
 
-func (s *Server) SetAuthenticator(a Authenticator) {
+func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 	s.auth = a
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
-	tuid, ok := u.(protocol.UID)
+	tuid, ok := u.(gregor1.UID)
 	if !ok {
-		log.Printf("can't cast %v (%T) to protocol.UID", u, u)
+		log.Printf("can't cast %v (%T) to gregor1.UID", u, u)
 		return "", ErrBadCast
 	}
 	return hex.EncodeToString(tuid), nil
@@ -201,7 +201,7 @@ func (s *Server) logError(prefix string, err error) {
 
 // BroadcastMessage implements gregor.NetworkInterfaceOutgoing.
 func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
-	tm, ok := m.(protocol.Message)
+	tm, ok := m.(gregor1.Message)
 	if !ok {
 		return ErrBadCast
 	}
@@ -209,7 +209,7 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	return nil
 }
 
-func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
+func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
 	if err != nil {
 		return err
@@ -227,7 +227,7 @@ func (s *Server) sendBroadcast(c context.Context, m protocol.Message) error {
 	return nil
 }
 
-func (s *Server) consume(c context.Context, m protocol.Message) error {
+func (s *Server) consume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
 	args := messageArgs{c, m, retCh}
 	s.consumeCh <- args

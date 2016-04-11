@@ -1,0 +1,12 @@
+@namespace("gregor.1")
+
+protocol auth {
+	@typedef("string") record SessionID {}
+	@typedef("string") record SessionToken {}
+	record AuthResult {
+		UID uid;
+		SessionID sid;
+	}
+	AuthResult authenticateSessionToken(SessionToken tok);
+	void revokeSessionIDs(array<SessionID> sessionIDs);
+}

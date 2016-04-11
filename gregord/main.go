@@ -1,31 +1,31 @@
 package main
 
 import (
+	"log"
 	"os"
+	"time"
 
-	protocol "github.com/keybase/gregor/protocol/go"
-	"github.com/keybase/gregor/rpc"
-	"golang.org/x/net/context"
+	"github.com/jonboulle/clockwork"
+	"github.com/keybase/client/go/libkb"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor/protocol/gregor1"
+	grpc "github.com/keybase/gregor/rpc"
 )
-
-type dummyauth struct{}
-
-func (m dummyauth) Authenticate(_ context.Context, tok protocol.AuthToken) (protocol.UID, protocol.SessionID, error) {
-	return protocol.UID{}, protocol.SessionID(""), nil
-}
 
 func main() {
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
-		errorf("%s\n", err)
-		os.Exit(2)
+		log.Fatal(err)
 	}
-	srv := rpc.NewServer()
-	srv.SetAuthenticator(dummyauth{})
-	err = newMainServer(opts, srv).listenAndServe()
+
+	srv := grpc.NewServer()
+	conn, err := opts.SessionServer.Dial()
 	if err != nil {
-		errorf("%s\n", err)
-		os.Exit(2)
+		log.Fatal(err)
 	}
-	return
+
+	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, libkb.WrapError), libkb.ErrorUnwrapper{})
+	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute))
+
+	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }

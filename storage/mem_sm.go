@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 )
 
 // MemEngine is an implementation of a gregor StateMachine that just keeps

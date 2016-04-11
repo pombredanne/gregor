@@ -3,19 +3,16 @@ all: build
 
 AVDLC=node_modules/.bin/avdlc
 
-go-build-stamp: avdl/*.avdl $(AVDLC) | deps
-	@mkdir -p go/
-	$(AVDLC) -b -l go -o go/ avdl/*.avdl
-	(cd go && go fmt ./...)
-	date > $@
+build: $(AVDLC) gregor1/avdl/*.avdl
+	$(AVDLC) -b -l go -o gregor1/ gregor1/avdl/*.avdl
+	go fmt ./...
+	date > go-build-stamp
 
-clean:
-	rm -rf *build-stamp
-	$(AVDLC) -c -b -l go -o go avdl/*.avdl
-
-deps:
+$(AVDLC):
 	npm install
 
-build: go-build-stamp
+clean: $(AVDLC) gregor1/avdl/*.avdl
+	$(AVDLC) -c -b -l go -o gregor1 gregor1/avdl/*.avdl
+	$(RM) -r *build-stamp
 
-.PHONY: clean deps
+.PHONY: build clean

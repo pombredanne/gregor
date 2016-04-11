@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor"
 )
 
 func sqlWrapper(s string) string {
