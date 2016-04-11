@@ -102,6 +102,11 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 func (s *perUIDServer) broadcast(a messageArgs) {
 	for id, conn := range s.conns {
 		log.Printf("uid %x broadcast to %d", s.uid, id)
+		if err := conn.checkAuth(a.c); err != nil {
+			log.Printf("[connection %d]: %s", id, err)
+			s.removeConnection(conn, id)
+			continue
+		}
 		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
 			log.Printf("[connection %d]: %s", id, err)

@@ -40,6 +40,11 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
+func (c *connection) checkAuth(ctx context.Context) error {
+	_, err := c.AuthenticateSessionToken(ctx, c.tok)
+	return err
+}
+
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 	log.Printf("Authenticate: %+v", tok)
 	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
@@ -69,6 +74,10 @@ func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
+	if err := c.checkAuth(ctx); err != nil {
+		c.close()
+		return err
+	}
 	return c.parent.consume(ctx, m)
 }
 
