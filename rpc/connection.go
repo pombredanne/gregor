@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"net"
@@ -40,9 +41,21 @@ func newConnection(c net.Conn, parent *Server) *connection {
 	return conn
 }
 
-func (c *connection) checkAuth(ctx context.Context) error {
-	_, err := c.AuthenticateSessionToken(ctx, c.tok)
-	return err
+func (c *connection) checkAuth(ctx context.Context, m gregor1.Message) error {
+	if _, err := c.AuthenticateSessionToken(ctx, c.tok); err != nil {
+		return err
+	}
+	if m.ToInBandMessage() != nil {
+		if !bytes.Equal(m.ToInBandMessage().Metadata().UID().Bytes(), c.uid) {
+			return errors.New("mismatched UIDs")
+		}
+	}
+	if m.ToOutOfBandMessage() != nil {
+		if !bytes.Equal(m.ToOutOfBandMessage().UID().Bytes(), c.uid) {
+			return errors.New("mismatched UIDs")
+		}
+	}
+	return nil
 }
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
@@ -74,10 +87,11 @@ func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
-	if err := c.checkAuth(ctx); err != nil {
+	if err := c.checkAuth(ctx, m); err != nil {
 		c.close()
 		return err
 	}
+
 	return c.parent.consume(ctx, m)
 }
 
