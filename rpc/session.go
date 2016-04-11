@@ -74,23 +74,18 @@ type expirySt struct {
 	expiry time.Time
 }
 
-func expireAtTime(expiryCh chan gregor1.SessionID, e expirySt) {
-	time.Sleep(e.expiry.Sub(time.Now()))
-	expiryCh <- e.sid
-}
-
 // requestHandler runs in a single goroutine, handling all access requests and
 // periodic expiry of sessions.
 func (sc *sessionCacher) requestHandler() {
-	expiryCh := make(chan gregor1.SessionID)
+	var expiryCh <-chan time.Time
 	var expiryQueue []expirySt
 	for {
 		select {
-		case sid := <-expiryCh:
-			sc.deleteSID(sid)
+		case <-expiryCh:
+			sc.deleteSID(expiryQueue[0].sid)
 			expiryQueue = expiryQueue[1:]
 			if len(expiryQueue) > 0 {
-				go expireAtTime(expiryCh, expiryQueue[0])
+				expiryCh = time.After(expiryQueue[0].expiry.Sub(time.Now()))
 			}
 		case req := <-sc.reqCh:
 			switch req := req.(type) {
@@ -103,7 +98,7 @@ func (sc *sessionCacher) requestHandler() {
 					expiry: time.Now().Add(sc.timeout),
 				}
 				if len(expiryQueue) == 0 {
-					go expireAtTime(expiryCh, e)
+					expiryCh = time.After(e.expiry.Sub(time.Now()))
 				}
 				expiryQueue = append(expiryQueue, e)
 			case deleteSIDReq:
