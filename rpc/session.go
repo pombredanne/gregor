@@ -115,21 +115,41 @@ func (sc *sessionCacher) requestHandler() {
 
 func (sc *sessionCacher) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
 	respCh := make(chan authResp)
-	sc.reqCh <- readTokReq{tok, respCh}
-	if resp := <-respCh; resp.ok {
-		res = resp.res
+	select {
+	case sc.reqCh <- readTokReq{tok, respCh}:
+	case <-ctx.Done():
+		err = ctx.Err()
+		return
+	}
+
+	select {
+	case resp := <-respCh:
+		if resp.ok {
+			res = resp.res
+			return
+		}
+	case <-ctx.Done():
+		err = ctx.Err()
 		return
 	}
 
 	if res, err = sc.a.AuthenticateSessionToken(ctx, tok); err == nil {
-		sc.reqCh <- setResReq{tok, res}
+		select {
+		case sc.reqCh <- setResReq{tok, res}:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
 	}
 	return
 }
 
 func (sc *sessionCacher) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
 	for _, sid := range sessionIDs {
-		sc.reqCh <- deleteSIDReq{sid}
+		select {
+		case sc.reqCh <- deleteSIDReq{sid}:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	return sc.a.RevokeSessionIDs(ctx, sessionIDs)
 }
