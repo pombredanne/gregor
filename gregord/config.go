@@ -15,10 +15,11 @@ import (
 
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type Options struct {
-	SessionServer *fmpURI
+	SessionServer *rpc.FMPURI
 	BindAddress   string
 	MysqlDSN      *url.URL
 	Debug         bool
@@ -52,67 +53,6 @@ Environment Variables
     -aws-region or AWS_REGION
     -s3-config-bucket or S3_CONFIG_BUCKET
 `
-
-type fmpURIScheme string
-
-const (
-	fmpSchemeStandard fmpURIScheme = "fmprpc"
-	fmpSchemeTLS      fmpURIScheme = "fmprpc+tls"
-)
-
-type fmpURI struct {
-	Scheme   fmpURIScheme
-	HostPort string
-	Host     string
-}
-
-var errInvalidFMPScheme = errors.New("invalid framed msgpack rpc scheme")
-var errNoHost = errors.New("missing host in framed msgpack rpc URI")
-
-func parseFMPURI(s string) (*fmpURI, error) {
-	uri, err := url.Parse(s)
-	if err != nil {
-		return nil, err
-	}
-
-	f := &fmpURI{HostPort: uri.Host}
-
-	switch fmpURIScheme(uri.Scheme) {
-	case fmpSchemeStandard:
-		f.Scheme = fmpSchemeStandard
-	case fmpSchemeTLS:
-		f.Scheme = fmpSchemeTLS
-	default:
-		return nil, fmt.Errorf("invalid framed msgpack rpc scheme %s", uri.Scheme)
-	}
-
-	host, _, err := net.SplitHostPort(f.HostPort)
-	if err != nil {
-		return nil, err
-	}
-	if len(host) == 0 {
-		return nil, fmt.Errorf("missing host in address %s", f.HostPort)
-	}
-	f.Host = host
-
-	return f, nil
-}
-
-func (f *fmpURI) UseTLS() bool {
-	return f.Scheme == fmpSchemeTLS
-}
-
-func (f *fmpURI) String() string {
-	return fmt.Sprintf("%s://%s", f.Scheme, f.Host)
-}
-
-func (f *fmpURI) Dial() (net.Conn, error) {
-	network, addr := "tcp", f.HostPort
-	if f.UseTLS() {
-		return tls.Dial(network, addr, nil)
-	}
-	return net.Dial(network, addr)
-}
 
 type ErrBadUsage string
 type ErrBadConfig string
@@ -221,7 +161,7 @@ func (o *Options) Parse(raw *rawOpts) error {
 	}
 
 	var err error
-	if o.SessionServer, err = parseFMPURI(raw.sessionServerAddr); err != nil {
+	if o.SessionServer, err = rpc.ParseFMPURI(raw.sessionServerAddr); err != nil {
 		return badUsage("Error parsing session-server: %s", err)
 	}
 
