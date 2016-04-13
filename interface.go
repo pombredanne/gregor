@@ -103,6 +103,7 @@ type State interface {
 	Items() ([]Item, error)
 	ItemsInCategory(c Category) ([]Item, error)
 	Marshal() ([]byte, error)
+	Hash() ([]byte, error)
 }
 
 type Message interface {
