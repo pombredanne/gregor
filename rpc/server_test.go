@@ -38,23 +38,33 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 }
 
 const (
-	goodToken = gregor1.SessionToken("goodtoken")
-	badToken  = gregor1.SessionToken("badtoken")
-	goodSID   = gregor1.SessionID("1")
-	badSID    = gregor1.SessionID("2")
+	goodToken  = gregor1.SessionToken("goodtoken")
+	evilToken  = gregor1.SessionToken("eviltoken")
+	superToken = gregor1.SessionToken("supertoken")
+	badToken   = gregor1.SessionToken("badtoken")
+	goodSID    = gregor1.SessionID("1")
+	evilSID    = gregor1.SessionID("2")
+	superSID   = gregor1.SessionID("3")
 )
 
 var (
-	goodUID    = gregor1.UID("gooduid")
-	goodResult = gregor1.AuthResult{Uid: goodUID, Sid: goodSID}
+	goodUID     = gregor1.UID("gooduid")
+	evilUID     = gregor1.UID("eviluid")
+	goodResult  = gregor1.AuthResult{Uid: goodUID, Sid: goodSID}
+	evilResult  = gregor1.AuthResult{Uid: evilUID, Sid: evilSID}
+	superResult = gregor1.AuthResult{Uid: superUID, Sid: superSID}
 )
 
 var mockAuthenticator gregor1.AuthInterface = mockAuth{
 	sessions: map[gregor1.SessionToken]gregor1.AuthResult{
-		goodToken: goodResult,
+		goodToken:  goodResult,
+		evilToken:  evilResult,
+		superToken: superResult,
 	},
 	sessionIDs: map[gregor1.SessionID]gregor1.SessionToken{
-		goodSID: goodToken,
+		goodSID:  goodToken,
+		evilSID:  evilToken,
+		superSID: superToken,
 	},
 }
 
@@ -238,6 +248,48 @@ func TestConsume(t *testing.T) {
 	c := newClient(l.Addr())
 	defer c.Shutdown()
 	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(mc.consumed) != 1 {
+		t.Errorf("consumer messages received: %d, expected 1", len(mc.consumed))
+	}
+}
+
+func TestImpersonation(t *testing.T) {
+	mc := &mockConsumer{}
+	s, l, _ := startTestServer(mc)
+	defer l.Close()
+	defer s.Shutdown()
+
+	c := newClient(l.Addr())
+	defer c.Shutdown()
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), evilToken); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err == nil {
+		t.Fatal("no error when impersonating another user.")
+	}
+
+	if len(mc.consumed) != 0 {
+		t.Errorf("consumer messages received: %d, expected 0", len(mc.consumed))
+	}
+}
+
+func TestSuperUser(t *testing.T) {
+	mc := &mockConsumer{}
+	s, l, _ := startTestServer(mc)
+	defer l.Close()
+	defer s.Shutdown()
+
+	c := newClient(l.Addr())
+	defer c.Shutdown()
+	if _, err := c.AuthClient().AuthenticateSessionToken(context.TODO(), superToken); err != nil {
 		t.Fatal(err)
 	}
 
