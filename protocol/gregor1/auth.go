@@ -16,7 +16,7 @@ type AuthResult struct {
 }
 
 type AuthenticateSessionTokenArg struct {
-	Tok SessionToken `codec:"tok" json:"tok"`
+	Session SessionToken `codec:"session" json:"session"`
 }
 
 type RevokeSessionIDsArg struct {
@@ -43,7 +43,7 @@ func AuthProtocol(i AuthInterface) rpc.Protocol {
 						err = rpc.NewTypeError((*[]AuthenticateSessionTokenArg)(nil), args)
 						return
 					}
-					ret, err = i.AuthenticateSessionToken(ctx, (*typedArgs)[0].Tok)
+					ret, err = i.AuthenticateSessionToken(ctx, (*typedArgs)[0].Session)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -72,8 +72,8 @@ type AuthClient struct {
 	Cli rpc.GenericClient
 }
 
-func (c AuthClient) AuthenticateSessionToken(ctx context.Context, tok SessionToken) (res AuthResult, err error) {
-	__arg := AuthenticateSessionTokenArg{Tok: tok}
+func (c AuthClient) AuthenticateSessionToken(ctx context.Context, session SessionToken) (res AuthResult, err error) {
+	__arg := AuthenticateSessionTokenArg{Session: session}
 	err = c.Cli.Call(ctx, "gregor.1.auth.authenticateSessionToken", []interface{}{__arg}, &res)
 	return
 }

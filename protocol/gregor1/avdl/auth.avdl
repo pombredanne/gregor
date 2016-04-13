@@ -7,6 +7,6 @@ protocol auth {
 		UID uid;
 		SessionID sid;
 	}
-	AuthResult authenticateSessionToken(SessionToken tok);
+	AuthResult authenticateSessionToken(SessionToken session);
 	void revokeSessionIDs(array<SessionID> sessionIDs);
 }
