@@ -35,6 +35,8 @@ func TestSessionCacher(t *testing.T) {
 	d := 100 * time.Millisecond
 	fc := clockwork.NewFakeClock()
 	sc := NewSessionCacher(a, fc, d)
+	defer sc.Close()
+
 	checkBad(t, sc, badToken)
 	checkGood(t, sc, goodToken, goodUID)
 
