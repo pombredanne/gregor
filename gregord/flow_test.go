@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"testing"
-	"time"
 
 	"golang.org/x/net/context"
 
@@ -15,11 +14,41 @@ import (
 	grpc "github.com/keybase/gregor/rpc"
 )
 
-// Test with: MYSQL_DSN=gregor:@/gregor_test
-func startTestGregord(t *testing.T) (string, func()) {
-	name := os.Getenv("MYSQL_DSN")
+// Test with: TEST_MYSQL_DSN=gregor:@/gregor_test
+// (if you use MYSQL_DSN and test everything in this
+// package, you'll get an error because a flag test
+// will be incorrect due to the env var)
+func TestConsumeBroadcastFlow(t *testing.T) {
+	srvAddr, events, cleanup := startTestGregord(t)
+	defer cleanup()
+
+	clients := make([]*client, 5)
+	for i := 0; i < len(clients); i++ {
+		c, clean := startTestClient(t, srvAddr)
+		defer clean()
+		clients[i] = c
+	}
+
+	// send a message to the server from clients[0]
+	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(t, clients[0].uid)); err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for the broadcast
+	<-events.BcastSent
+
+	// check that all the clients received the message
+	for i := 0; i < len(clients); i++ {
+		if len(clients[i].broadcasts) != 1 {
+			t.Errorf("clients[%d] broadcasts: %d, expected 1", i, len(clients[i].broadcasts))
+		}
+	}
+}
+
+func startTestGregord(t *testing.T) (string, *grpc.Events, func()) {
+	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
-		t.Skip("MYSQL_DSN not set")
+		t.Skip("TEST_MYSQL_DSN not set")
 	}
 	u, err := url.Parse(name)
 	if err != nil {
@@ -35,24 +64,29 @@ func startTestGregord(t *testing.T) (string, func()) {
 
 	srv := grpc.NewServer()
 	setupMockAuth(srv)
+	e := grpc.NewEvents()
+	srv.SetEventHandler(e)
 
 	consumer, err := newConsumer(u)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	ms := newMainServer(&opts, srv)
+	ms.stopCh = make(chan struct{})
 	cleanup := func() {
 		consumer.shutdown()
+		close(ms.stopCh)
 	}
-	go srv.Serve(consumer)
 
-	ms := newMainServer(&opts, srv)
+	go srv.Serve(consumer)
 	go func() {
 		if err := ms.listenAndServe(); err != nil {
 			t.Fatal(err)
 		}
 	}()
-	return opts.BindAddress, cleanup
+
+	return opts.BindAddress, e, cleanup
 }
 
 type client struct {
@@ -107,36 +141,6 @@ func (c *client) AuthClient() gregor1.AuthClient {
 
 func (c *client) IncomingClient() gregor1.IncomingClient {
 	return gregor1.IncomingClient{Cli: c.cli}
-}
-
-func TestConsumeBroadcastFlow(t *testing.T) {
-	srvAddr, cleanup := startTestGregord(t)
-	defer cleanup()
-
-	c1, c1clean := startTestClient(t, srvAddr)
-	c2, c2clean := startTestClient(t, srvAddr)
-	c3, c3clean := startTestClient(t, srvAddr)
-	defer c1clean()
-	defer c2clean()
-	defer c3clean()
-
-	// send a message to the server from c1
-	if err := c1.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(t, c1.uid)); err != nil {
-		t.Fatal(err)
-	}
-
-	// need to refactor rpc/events to make it available to other packages
-	time.Sleep(100 * time.Millisecond)
-
-	if len(c1.broadcasts) != 1 {
-		t.Errorf("c1 broadcasts: %d, expected 1", len(c1.broadcasts))
-	}
-	if len(c2.broadcasts) != 1 {
-		t.Errorf("c2 broadcasts: %d, expected 1", len(c2.broadcasts))
-	}
-	if len(c3.broadcasts) != 1 {
-		t.Errorf("c3 broadcasts: %d, expected 1", len(c3.broadcasts))
-	}
 }
 
 func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {

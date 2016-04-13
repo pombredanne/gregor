@@ -65,7 +65,7 @@ type Server struct {
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
-	events eventHandler
+	events EventHandler
 
 	// Useful for testing. Insert arbitrary waits throughout the
 	// code and wait for something bad to happen.
@@ -92,6 +92,10 @@ func NewServer() *Server {
 
 func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 	s.auth = a
+}
+
+func (s *Server) SetEventHandler(e EventHandler) {
+	s.events = e
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
@@ -220,7 +224,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 		// even though nothing to do, create an event if
 		// an event handler in place:
 		if s.events != nil {
-			s.events.broadcastSent(m)
+			s.events.BroadcastSent(m)
 		}
 		return nil
 	}
