@@ -40,7 +40,7 @@ func main() {
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }
 
-func setupSessionAuth(opts *Options, srv *grpc.Server) string {
+func setupSessionAuth(opts *Options, srv *grpc.Server) *grpc.SessionCacher {
 	conn, err := opts.SessionServer.Dial()
 	if err != nil {
 		log.Fatal(err)
