@@ -13,14 +13,20 @@ type authResp struct {
 	expiry time.Time
 }
 
+type expirySt struct {
+	sid    gregor1.SessionID
+	expiry time.Time
+}
+
 // SessionCacher implements gregor1.AuthInterface with a cache of authenticated sessions.
 type SessionCacher struct {
-	parent     gregor1.AuthInterface
-	cl         clockwork.Clock
-	timeout    time.Duration
-	sessions   map[gregor1.SessionToken]authResp
-	sessionIDs map[gregor1.SessionID]gregor1.SessionToken
-	reqCh      chan request
+	parent      gregor1.AuthInterface
+	cl          clockwork.Clock
+	timeout     time.Duration
+	sessions    map[gregor1.SessionToken]*gregor1.AuthResult
+	sessionIDs  map[gregor1.SessionID]gregor1.SessionToken
+	reqCh       chan request
+	expiryQueue []expirySt
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
@@ -29,7 +35,7 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 		parent:     a,
 		cl:         cl,
 		timeout:    timeout,
-		sessions:   make(map[gregor1.SessionToken]authResp),
+		sessions:   make(map[gregor1.SessionToken]*gregor1.AuthResult),
 		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
 		reqCh:      make(chan request),
 	}
@@ -39,26 +45,13 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 
 type request interface{}
 
-type readTokReq struct {
-	tok  gregor1.SessionToken
-	resp chan *gregor1.AuthResult
-}
-
-func (sc *SessionCacher) readTok(tok gregor1.SessionToken) *gregor1.AuthResult {
-	resp, ok := sc.sessions[tok]
-	if ok && !resp.expiry.Before(sc.cl.Now()) {
-		return &resp.res
-	}
-	return nil
-}
-
 type setResReq struct {
 	tok gregor1.SessionToken
-	res gregor1.AuthResult
+	res *gregor1.AuthResult
 }
 
-func (sc *SessionCacher) setRes(tok gregor1.SessionToken, res gregor1.AuthResult, expiry time.Time) {
-	sc.sessions[tok] = authResp{res, expiry}
+func (sc *SessionCacher) setRes(tok gregor1.SessionToken, res *gregor1.AuthResult) {
+	sc.sessions[tok] = res
 	sc.sessionIDs[res.Sid] = tok
 }
 
@@ -75,50 +68,58 @@ func (sc *SessionCacher) deleteSID(sid gregor1.SessionID) {
 	}
 }
 
-type expirySt struct {
-	sid    gregor1.SessionID
-	expiry time.Time
+type readTokReq struct {
+	tok  gregor1.SessionToken
+	resp chan *gregor1.AuthResult
+}
+
+type sizeReq struct {
+	resp chan int
+}
+
+// clearExpiryQueue removes all currently expired sessions.
+func (sc *SessionCacher) clearExpiryQueue() {
+	now := sc.cl.Now()
+	for _, e := range sc.expiryQueue {
+		if now.Before(e.expiry) {
+			return
+		}
+
+		sc.deleteSID(sc.expiryQueue[0].sid)
+		sc.expiryQueue = sc.expiryQueue[1:]
+	}
 }
 
 // requestHandler runs in a single goroutine, handling all access requests and
 // periodic expiry of sessions.
 func (sc *SessionCacher) requestHandler() {
-	var expiryCh <-chan time.Time
-	var expiryQueue []expirySt
-	for {
-		select {
-		case <-expiryCh:
-			sc.deleteSID(expiryQueue[0].sid)
-			expiryQueue = expiryQueue[1:]
-			if len(expiryQueue) > 0 {
-				expiryCh = sc.cl.After(expiryQueue[0].expiry.Sub(sc.cl.Now()))
-			}
-		case req := <-sc.reqCh:
-			switch req := req.(type) {
-			case readTokReq:
-				req.resp <- sc.readTok(req.tok)
-			case setResReq:
-				if len(expiryQueue) == 0 {
-					expiryCh = sc.cl.After(sc.timeout)
-				}
-				e := expirySt{
-					sid:    req.res.Sid,
-					expiry: sc.cl.Now().Add(sc.timeout),
-				}
-				expiryQueue = append(expiryQueue, e)
-				sc.setRes(req.tok, req.res, e.expiry)
-			case deleteSIDReq:
-				sc.deleteSID(req.sid)
-			default:
-				// req = nil if sc.Close() has been called.
-				return
-			}
+	for req := range sc.reqCh {
+		sc.clearExpiryQueue()
+		switch req := req.(type) {
+		case readTokReq:
+			req.resp <- sc.sessions[req.tok]
+		case setResReq:
+			expiry := sc.cl.Now().Add(sc.timeout)
+			sc.expiryQueue = append(sc.expiryQueue, expirySt{req.res.Sid, expiry})
+			sc.setRes(req.tok, req.res)
+		case deleteSIDReq:
+			sc.deleteSID(req.sid)
+		case sizeReq:
+			req.resp <- len(sc.sessions)
 		}
 	}
 }
 
+// Close allows the SessionCacher to be garbage collected.
 func (sc *SessionCacher) Close() {
 	close(sc.reqCh)
+}
+
+// Size returns the number of sessions currently in the cache.
+func (sc *SessionCacher) Size() int {
+	respCh := make(chan int)
+	sc.reqCh <- sizeReq{respCh}
+	return <-respCh
 }
 
 // AuthenticateSessionToken authenticates a given session token, first against
@@ -145,7 +146,7 @@ func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 
 	if res, err = sc.parent.AuthenticateSessionToken(ctx, tok); err == nil {
 		select {
-		case sc.reqCh <- setResReq{tok, res}:
+		case sc.reqCh <- setResReq{tok, &res}:
 		case <-ctx.Done():
 			err = ctx.Err()
 		}

@@ -21,6 +21,10 @@ func checkGood(t *testing.T, a gregor1.AuthInterface, tok gregor1.SessionToken, 
 	require.Equal(t, res.Uid, uid, "UIDs equal")
 }
 
+func assertCacheSize(t *testing.T, sc *SessionCacher, expected int) {
+	require.Equal(t, expected, sc.Size())
+}
+
 func TestSessionCacher(t *testing.T) {
 	a := mockAuth{
 		sessions: map[gregor1.SessionToken]gregor1.AuthResult{
@@ -38,7 +42,9 @@ func TestSessionCacher(t *testing.T) {
 	defer sc.Close()
 
 	checkBad(t, sc, badToken)
+	assertCacheSize(t, sc, 0)
 	checkGood(t, sc, goodToken, goodUID)
+	assertCacheSize(t, sc, 1)
 
 	// Revoke goodToken
 	a.RevokeSessionIDs(context.TODO(), []gregor1.SessionID{goodSID})
@@ -48,8 +54,10 @@ func TestSessionCacher(t *testing.T) {
 	// cached results linger until timeout
 	checkBad(t, sc, badToken)
 	checkGood(t, sc, goodToken, goodUID)
+	assertCacheSize(t, sc, 1)
 
 	// Advance past timeout, cached results gone
 	fc.Advance(d)
+	assertCacheSize(t, sc, 0)
 	checkBad(t, sc, goodToken)
 }
