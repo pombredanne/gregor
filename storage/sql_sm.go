@@ -32,7 +32,7 @@ func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
 	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
 }
 
-func NewSqlLiteSQLEngin(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
+func NewSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
 	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewRealClock())
 }
 
