@@ -29,5 +29,13 @@ func main() {
 	defer sc.Close()
 	srv.SetAuthenticator(sc)
 
+	// create a message consumer state machine
+	consumer, err := newConsumer(opts.MysqlDSN)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer consumer.shutdown()
+	go srv.Serve(consumer)
+
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }

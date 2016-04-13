@@ -28,6 +28,14 @@ func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwo
 	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl}
 }
 
+func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
+	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
+}
+
+func NewSqlLiteSQLEngin(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
+	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewRealClock())
+}
+
 type builder interface {
 	Build(s string, args ...interface{})
 }

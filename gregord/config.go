@@ -171,6 +171,8 @@ func (o *Options) Parse(raw *rawOpts) error {
 		if o.MysqlDSN, err = url.Parse(raw.mysqlDSN); err != nil {
 			return badUsage("Error parsing mysql DSN: %s", err)
 		}
+	} else {
+		return badUsage("No mysql-dsn specified")
 	}
 
 	if o.TLSConfig, err = parseTLSConfig(raw); err != nil {
