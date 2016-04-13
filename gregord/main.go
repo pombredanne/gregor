@@ -25,7 +25,9 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
-	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute))
+	sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
+	defer sc.Close()
+	srv.SetAuthenticator(sc)
 
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }
