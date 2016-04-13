@@ -8,12 +8,17 @@ import (
 	"golang.org/x/net/context"
 )
 
+type authResp struct {
+	res    gregor1.AuthResult
+	expiry time.Time
+}
+
 // sessionCacher implements gregor1.AuthInterface with a cache of authenticated sessions.
 type sessionCacher struct {
 	a          gregor1.AuthInterface
 	cl         clockwork.Clock
 	timeout    time.Duration
-	sessions   map[gregor1.SessionToken]gregor1.AuthResult
+	sessions   map[gregor1.SessionToken]authResp
 	sessionIDs map[gregor1.SessionID]gregor1.SessionToken
 	reqCh      chan request
 }
@@ -24,7 +29,7 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 		a:          a,
 		cl:         cl,
 		timeout:    timeout,
-		sessions:   make(map[gregor1.SessionToken]gregor1.AuthResult),
+		sessions:   make(map[gregor1.SessionToken]authResp),
 		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
 		reqCh:      make(chan request),
 	}
@@ -34,19 +39,17 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 
 type request interface{}
 
-type authResp struct {
-	res gregor1.AuthResult
-	ok  bool
-}
-
 type readTokReq struct {
 	tok  gregor1.SessionToken
-	resp chan authResp
+	resp chan *gregor1.AuthResult
 }
 
-func (sc *sessionCacher) readTok(tok gregor1.SessionToken) (resp authResp) {
-	resp.res, resp.ok = sc.sessions[tok]
-	return
+func (sc *sessionCacher) readTok(tok gregor1.SessionToken) *gregor1.AuthResult {
+	resp, ok := sc.sessions[tok]
+	if ok && !resp.expiry.Before(sc.cl.Now()) {
+		return &resp.res
+	}
+	return nil
 }
 
 type setResReq struct {
@@ -54,8 +57,8 @@ type setResReq struct {
 	res gregor1.AuthResult
 }
 
-func (sc *sessionCacher) setRes(tok gregor1.SessionToken, res gregor1.AuthResult) {
-	sc.sessions[tok] = res
+func (sc *sessionCacher) setRes(tok gregor1.SessionToken, res gregor1.AuthResult, expiry time.Time) {
+	sc.sessions[tok] = authResp{res, expiry}
 	sc.sessionIDs[res.Sid] = tok
 }
 
@@ -95,14 +98,15 @@ func (sc *sessionCacher) requestHandler() {
 			case readTokReq:
 				req.resp <- sc.readTok(req.tok)
 			case setResReq:
-				sc.setRes(req.tok, req.res)
 				if len(expiryQueue) == 0 {
 					expiryCh = sc.cl.After(sc.timeout)
 				}
-				expiryQueue = append(expiryQueue, expirySt{
+				e := expirySt{
 					sid:    req.res.Sid,
 					expiry: sc.cl.Now().Add(sc.timeout),
-				})
+				}
+				expiryQueue = append(expiryQueue, e)
+				sc.setRes(req.tok, req.res, e.expiry)
 			case deleteSIDReq:
 				sc.deleteSID(req.sid)
 			}
@@ -111,7 +115,7 @@ func (sc *sessionCacher) requestHandler() {
 }
 
 func (sc *sessionCacher) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
-	respCh := make(chan authResp)
+	respCh := make(chan *gregor1.AuthResult)
 	select {
 	case sc.reqCh <- readTokReq{tok, respCh}:
 	case <-ctx.Done():
@@ -121,8 +125,8 @@ func (sc *sessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 
 	select {
 	case resp := <-respCh:
-		if resp.ok {
-			res = resp.res
+		if resp != nil {
+			res = *resp
 			return
 		}
 	case <-ctx.Done():
