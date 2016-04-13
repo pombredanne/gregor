@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 )
@@ -108,7 +109,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 			s.removeConnection(conn, id)
 			continue
 		}
-		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, nil)}
+		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, keybase1.ErrorUnwrapper{})}
 		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
 			log.Printf("[connection %d]: %s", id, err)
 

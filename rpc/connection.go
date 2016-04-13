@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
@@ -69,7 +70,7 @@ type connection struct {
 
 func newConnection(c net.Conn, parent *Server) (*connection, error) {
 	// TODO: logging and error wrapping mechanisms.
-	xprt := rpc.NewTransport(c, nil, nil)
+	xprt := rpc.NewTransport(c, nil, keybase1.WrapError)
 
 	conn := &connection{
 		c:      c,
@@ -141,7 +142,7 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 
 func (c *connection) startRPCServer() error {
 	// TODO: error wrapping mechanism
-	c.server = rpc.NewServer(c.xprt, nil)
+	c.server = rpc.NewServer(c.xprt, keybase1.WrapError)
 
 	prots := []rpc.Protocol{
 		gregor1.AuthProtocol(c),
