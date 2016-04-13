@@ -9,9 +9,8 @@ import (
 )
 
 type connectionArgs struct {
-	c     *connection
-	id    connectionID
-	errCh <-chan error
+	c  *connection
+	id connectionID
 }
 
 type perUIDServer struct {
@@ -87,8 +86,10 @@ func (s *perUIDServer) serve() {
 }
 
 func (s *perUIDServer) addConn(a *connectionArgs) error {
+	// Multiplex the connection close errors into closeListenCh.
 	go func() {
-		s.closeListenCh <- <-a.c.errCh
+		<-a.c.serverDoneChan()
+		s.closeListenCh <- a.c.serverDoneErr()
 	}()
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id

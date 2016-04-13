@@ -21,7 +21,7 @@ type connectionID int
 
 func (s *Server) deadlocker() {
 	if s.useDeadlocker {
-		time.Sleep(3*time.Millisecond)
+		time.Sleep(3 * time.Millisecond)
 	}
 }
 
@@ -127,19 +127,20 @@ func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
 }
 
 func (s *Server) addUIDConnection(c *connection) error {
-	usrv, err := s.getPerUIDServer(c.uid)
+	_, res, _ := c.authInfo.get()
+	usrv, err := s.getPerUIDServer(res.Uid)
 	if err != nil {
 		return err
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(c.uid, s.confirmCh, s.closeCh, s.events)
-		if err := s.setPerUIDServer(c.uid, usrv); err != nil {
+		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events)
+		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
 			return err
 		}
 	}
 
-	k, err := s.uidKey(c.uid)
+	k, err := s.uidKey(res.Uid)
 	if err != nil {
 		return err
 	}
@@ -261,11 +262,9 @@ func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
 }
 
 func (s *Server) handleNewConnection(c net.Conn) error {
-	nc := newConnection(c, s)
-	select {
-	case err := <-nc.errCh:
+	nc, err := newConnection(c, s)
+	if err != nil {
 		return err
-	default:
 	}
 	if err := nc.startAuthentication(); err != nil {
 		nc.close()
