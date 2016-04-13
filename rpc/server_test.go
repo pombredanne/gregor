@@ -7,6 +7,7 @@ import (
 	"net"
 	"testing"
 
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -101,15 +102,15 @@ func newClient(addr net.Addr) *client {
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test server: %s", err))
 	}
-	t := rpc.NewTransport(c, nil, nil)
+	t := rpc.NewTransport(c, nil, keybase1.WrapError)
 
 	x := &client{
 		conn: c,
 		tr:   t,
-		cli:  rpc.NewClient(t, nil),
+		cli:  rpc.NewClient(t, keybase1.ErrorUnwrapper{}),
 	}
 
-	srv := rpc.NewServer(t, nil)
+	srv := rpc.NewServer(t, keybase1.WrapError)
 	if err := srv.Register(gregor1.OutgoingProtocol(x)); err != nil {
 		panic(err.Error())
 	}
