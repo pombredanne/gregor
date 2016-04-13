@@ -70,8 +70,6 @@ func TestMySQLEngine(t *testing.T) {
 	if err != nil {
 		t.Fatalf("couldn't parse TEST_MYSQL_DSN: %v", err)
 	}
-	query := u.Query()
-	query.Set("parseTime", "true")
-	u.RawQuery = query.Encode()
+	u = ForceParseTime(u)
 	testEngine(t, "mysql", u.String(), mysqlTimeWriter{})
 }

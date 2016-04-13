@@ -47,7 +47,7 @@ func (c *consumer) shutdown() {
 }
 
 func (c *consumer) createDB(dsn *url.URL) error {
-	dsn = c.forceParseTime(dsn)
+	dsn = storage.ForceParseTime(dsn)
 	log.Printf("opening mysql connection to %s", dsn)
 	db, err := sql.Open("mysql", dsn.String())
 	if err != nil {
@@ -55,14 +55,6 @@ func (c *consumer) createDB(dsn *url.URL) error {
 	}
 	c.db = db
 	return nil
-}
-
-func (c *consumer) forceParseTime(dsn *url.URL) *url.URL {
-	// We need to have parseTime=true as one of our DSN paramenters
-	query := dsn.Query()
-	query.Set("parseTime", "true")
-	dsn.RawQuery = query.Encode()
-	return dsn
 }
 
 func (c *consumer) createStateMachine() error {
