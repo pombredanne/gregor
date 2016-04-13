@@ -47,7 +47,7 @@ func setupSessionAuth(opts *Options, srv *grpc.Server) *grpc.SessionCacher {
 	}
 	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
 	sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
-	srv.SetAuthenticator(grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute))
+	srv.SetAuthenticator(sc)
 	return sc
 }
 
