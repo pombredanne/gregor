@@ -3,6 +3,7 @@ package rpc
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -86,19 +87,25 @@ func newConnection(c net.Conn, parent *Server) (*connection, error) {
 	return conn, nil
 }
 
+var superUID = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}
+
+func matchUIDorSuperuser(uid, expected []byte) bool {
+	return bytes.Equal(uid, superUID) || bytes.Equal(uid, expected)
+}
+
 func (c *connection) checkAuth(ctx context.Context, m gregor1.Message) error {
 	tok, res, _ := c.authInfo.get()
 	if _, err := c.AuthenticateSessionToken(ctx, tok); err != nil {
 		return err
 	}
 	if m.ToInBandMessage() != nil {
-		if !bytes.Equal(m.ToInBandMessage().Metadata().UID().Bytes(), res.Uid) {
-			return errors.New("mismatched UIDs")
+		if !matchUIDorSuperuser(res.Uid, m.ToInBandMessage().Metadata().UID().Bytes()) {
+			return fmt.Errorf("mismatched UIDs: %v != %v", m.ToInBandMessage().Metadata().UID().Bytes(), res.Uid)
 		}
 	}
 	if m.ToOutOfBandMessage() != nil {
-		if !bytes.Equal(m.ToOutOfBandMessage().UID().Bytes(), res.Uid) {
-			return errors.New("mismatched UIDs")
+		if !matchUIDorSuperuser(res.Uid, m.ToOutOfBandMessage().UID().Bytes()) {
+			return fmt.Errorf("mismatched UIDs: %v != %v", m.ToOutOfBandMessage().UID().Bytes(), res.Uid)
 		}
 	}
 	return nil
