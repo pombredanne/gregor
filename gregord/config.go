@@ -24,6 +24,7 @@ type Options struct {
 	MysqlDSN      *url.URL
 	Debug         bool
 	TLSConfig     *tls.Config
+	MockAuth      bool
 }
 
 const usageStr = `Usage:
@@ -166,6 +167,7 @@ func (o *Options) Parse(raw *rawOpts) error {
 	}
 
 	o.Debug = raw.debug
+	o.MockAuth = raw.mockAuth
 
 	if raw.mysqlDSN != "" {
 		if o.MysqlDSN, err = url.Parse(raw.mysqlDSN); err != nil {
@@ -216,6 +218,7 @@ type rawOpts struct {
 	bindAddress       string
 	mysqlDSN          string
 	debug             bool
+	mockAuth          bool
 	tlsKey            string
 	tlsCert           string
 	awsRegion         string
@@ -243,6 +246,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.StringVar(&raw.bindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&raw.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "user:pw@host/dbname for MySQL")
 	fs.BoolVar(&raw.debug, "debug", false, "turn on debugging")
+	fs.BoolVar(&raw.mockAuth, "mock-auth", false, "turn on mock authentication")
 	fs.StringVar(&raw.tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")
 	fs.StringVar(&raw.tlsCert, "tls-cert", os.Getenv("TLS_CERT"), "file or S3 bucket or raw TLS Cert")
 	fs.StringVar(&raw.awsRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")

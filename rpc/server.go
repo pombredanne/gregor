@@ -232,7 +232,11 @@ func (s *Server) consume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
 	args := messageArgs{c, m, retCh}
 	s.consumeCh <- args
-	return <-retCh
+	if err := <-retCh; err != nil {
+		return err
+	}
+	s.broadcastCh <- args
+	return nil
 }
 
 func (s *Server) serve() error {

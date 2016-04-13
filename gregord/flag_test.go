@@ -30,19 +30,20 @@ func TestUsage(t *testing.T) {
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000"}, ebu, "No session-server URI specified")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "XXXXX://localhost:30000", "--tls-cert", "hi"},
 		ebu, "")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi"},
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi", "--mysql-dsn", "gregor:@/gregor_test"},
 		ebu, "you must provide a TLS Key and a TLS cert, or neither")
-	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-cert", "hi"},
+	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-cert", "hi", "--mysql-dsn", "gregor:@/gregor_test"},
 		ebu, "you must provide a TLS Key and a TLS cert, or neither")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
-		"--tls-cert", "bye", "--aws-region", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
+		"--tls-cert", "bye", "--aws-region", "foo", "--mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
-		"--tls-cert", "bye", "--s3-config-bucket", "foo"}, ebu, "you must provide an AWS Region and a Config bucket")
+		"--tls-cert", "bye", "--s3-config-bucket", "foo", "--mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
-		"--tls-cert", "file:///does/not/exist"}, ErrBadConfig(""), "no such file or directory")
+		"--tls-cert", "file:///does/not/exist", "--mysql-dsn", "gregor:@/gregor_test"}, ErrBadConfig(""), "no such file or directory")
+	testBadUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000"}, ebu, "No mysql-dsn specified")
 
-	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "127.0.0.1:4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "0.0.0.0:4000"})
-	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "localhost:4000"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000", "--mysql-dsn", "gregor:@/gregor_test"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "127.0.0.1:4000", "--mysql-dsn", "gregor:@/gregor_test"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "0.0.0.0:4000", "--mysql-dsn", "gregor:@/gregor_test"})
+	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", "localhost:4000", "--mysql-dsn", "gregor:@/gregor_test"})
 }
