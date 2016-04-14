@@ -3,4 +3,5 @@
 
 protocol incoming {
 	void consumeMessage(Message m);
+	string ping();
 }

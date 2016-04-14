@@ -147,6 +147,10 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 	return c.parent.consume(ctx, m)
 }
 
+func (c *connection) Ping(ctx context.Context) (string, error) {
+	return "pong", nil
+}
+
 func (c *connection) startRPCServer() error {
 	// TODO: error wrapping mechanism
 	c.server = rpc.NewServer(c.xprt, keybase1.WrapError)
