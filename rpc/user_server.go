@@ -26,10 +26,10 @@ type perUIDServer struct {
 	closeListenCh    chan error
 	parentShutdownCh chan struct{}
 	selfShutdownCh   chan struct{}
-	events           eventHandler
+	events           EventHandler
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events eventHandler) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
@@ -46,7 +46,7 @@ func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArg
 	go s.serve()
 
 	if s.events != nil {
-		s.events.uidServerCreated(s.uid)
+		s.events.UIDServerCreated(s.uid)
 	}
 
 	return s
@@ -62,7 +62,7 @@ func (s *perUIDServer) logError(prefix string, err error) {
 func (s *perUIDServer) serve() {
 	defer func() {
 		if s.events != nil {
-			s.events.uidServerDestroyed(s.uid)
+			s.events.UIDServerDestroyed(s.uid)
 		}
 	}()
 	for {
@@ -95,7 +95,7 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id
 	if s.events != nil {
-		s.events.connectionCreated(s.uid)
+		s.events.ConnectionCreated(s.uid)
 	}
 
 	return nil
@@ -120,7 +120,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 	}
 
 	if s.events != nil {
-		s.events.broadcastSent(a.m)
+		s.events.BroadcastSent(a.m)
 	}
 
 	if len(s.conns) == 0 {
@@ -170,7 +170,7 @@ func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
 	conn.close()
 	delete(s.conns, id)
 	if s.events != nil {
-		s.events.connectionDestroyed(s.uid)
+		s.events.ConnectionDestroyed(s.uid)
 	}
 }
 

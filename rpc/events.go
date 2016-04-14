@@ -4,10 +4,10 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 )
 
-type eventHandler interface {
-	connectionCreated(gregor1.UID)
-	connectionDestroyed(gregor1.UID)
-	uidServerCreated(gregor1.UID)
-	uidServerDestroyed(gregor1.UID)
-	broadcastSent(gregor1.Message)
+type EventHandler interface {
+	ConnectionCreated(gregor1.UID)
+	ConnectionDestroyed(gregor1.UID)
+	UIDServerCreated(gregor1.UID)
+	UIDServerDestroyed(gregor1.UID)
+	BroadcastSent(gregor1.Message)
 }

@@ -56,11 +56,11 @@ func TestSqliteEngine(t *testing.T) {
 	testEngine(t, "sqlite3", "./gregor.db", sqliteTimeWriter{})
 }
 
-// Test with: MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
+// Test with: TEST_MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
 func TestMySQLEngine(t *testing.T) {
-	name := os.Getenv("MYSQL_DSN")
+	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
-		t.Skip("MYSQL_DSN not set")
+		t.Skip("TEST_MYSQL_DSN not set")
 	}
 
 	// We need to have parseTime=true as one of our DSN paramenters,
@@ -68,10 +68,8 @@ func TestMySQLEngine(t *testing.T) {
 	// time.Time values back from MySQL.
 	u, err := url.Parse(name)
 	if err != nil {
-		t.Fatalf("couldn't parse MYSQL_DSN: %v", err)
+		t.Fatalf("couldn't parse TEST_MYSQL_DSN: %v", err)
 	}
-	query := u.Query()
-	query.Set("parseTime", "true")
-	u.RawQuery = query.Encode()
+	u = ForceParseTime(u)
 	testEngine(t, "mysql", u.String(), mysqlTimeWriter{})
 }

@@ -11,6 +11,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
 )
 
@@ -77,8 +78,8 @@ func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) e
 	return nil
 }
 
-func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *events) {
-	ev := newEvents()
+func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *test.Events) {
+	ev := test.NewEvents()
 	s := NewServer()
 	s.events = ev
 	s.useDeadlocker = true
@@ -180,7 +181,7 @@ func TestCreatePerUIDServer(t *testing.T) {
 	}
 
 	// wait for events from above before checking state
-	<-ev.connCreated
+	<-ev.ConnCreated
 
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -224,7 +225,7 @@ func TestBroadcast(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-ev.connCreated
+	<-ev.ConnCreated
 
 	m := newOOBMessage(goodUID, "sys", nil)
 	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
@@ -232,7 +233,7 @@ func TestBroadcast(t *testing.T) {
 	}
 
 	// wait for the broadcast to be sent
-	<-ev.bcastSent
+	<-ev.BcastSent
 
 	if len(c.broadcasts) != 1 {
 		t.Errorf("client broadcasts received: %d, expected 1", len(c.broadcasts))
@@ -313,7 +314,7 @@ func TestCloseOne(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-ev.perUIDCreated
+	<-ev.PerUIDCreated
 
 	ch := make(chan *Stats)
 	s.statsCh <- ch
@@ -337,7 +338,7 @@ func TestCloseOne(t *testing.T) {
 	}
 
 	// wait for the perUID server to be shutdown
-	<-ev.perUIDDestroyed
+	<-ev.PerUIDDestroyed
 
 	// and the user server should be deleted:
 	s.statsCh <- ch
@@ -365,9 +366,9 @@ func TestCloseConnect(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-ev.connCreated
-	<-ev.connDestroyed
-	<-ev.connCreated
+	<-ev.ConnCreated
+	<-ev.ConnDestroyed
+	<-ev.ConnCreated
 
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
@@ -376,7 +377,7 @@ func TestCloseConnect(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
-	<-ev.bcastSent
+	<-ev.BcastSent
 
 	// the user server should still exist due to c2:
 	ch := make(chan *Stats)
@@ -407,8 +408,8 @@ func TestCloseConnect2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-ev.connCreated
-	<-ev.perUIDCreated
+	<-ev.ConnCreated
+	<-ev.PerUIDCreated
 
 	// close the first connection
 	c1.Shutdown()
@@ -420,7 +421,7 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
-	<-ev.perUIDDestroyed
+	<-ev.PerUIDDestroyed
 
 	c2 := newClient(l.Addr())
 	defer c2.Shutdown()
@@ -428,7 +429,7 @@ func TestCloseConnect2(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	<-ev.connCreated
+	<-ev.ConnCreated
 
 	// the user server should exist due to c2:
 	ch := make(chan *Stats)
@@ -469,8 +470,8 @@ func TestCloseConnect3(t *testing.T) {
 	}
 
 	// wait for two connection created events
-	<-ev.connCreated
-	<-ev.connCreated
+	<-ev.ConnCreated
+	<-ev.ConnCreated
 
 	// broadcast a message to goodUID
 	m := newOOBMessage(goodUID, "sys", nil)
@@ -480,10 +481,10 @@ func TestCloseConnect3(t *testing.T) {
 	}
 
 	// wait for the broadcast to be sent
-	<-ev.bcastSent
+	<-ev.BcastSent
 
 	// wait for c1 connection destroyed
-	<-ev.connDestroyed
+	<-ev.ConnDestroyed
 
 	// the user server should exist due to c2:
 	ch := make(chan *Stats)
