@@ -59,7 +59,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 }
 
-func startTestGregord(t *testing.T) (string, *test.Events, func()) {
+func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
 		t.Skip("TEST_MYSQL_DSN not set")
@@ -72,7 +72,7 @@ func startTestGregord(t *testing.T) (string, *test.Events, func()) {
 	opts := Options{
 		MockAuth:    true,
 		MysqlDSN:    u,
-		BindAddress: "127.0.0.1:19911",
+		BindAddress: "127.0.0.1:0",
 		Debug:       true,
 	}
 
@@ -100,7 +100,7 @@ func startTestGregord(t *testing.T) (string, *test.Events, func()) {
 		}
 	}()
 
-	return opts.BindAddress, e, cleanup
+	return ms.addr, e, cleanup
 }
 
 type client struct {
@@ -112,8 +112,8 @@ type client struct {
 	sid        gregor1.SessionID
 }
 
-func startTestClient(t *testing.T, addr string) (*client, func()) {
-	c, err := net.Dial("tcp", addr)
+func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
+	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		t.Fatal(err)
 	}

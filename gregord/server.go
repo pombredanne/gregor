@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,6 +13,7 @@ type mainServer struct {
 	opts   *Options
 	mls    gregor.MainLoopServer
 	stopCh chan struct{}
+	addr   net.Addr
 }
 
 func newMainServer(o *Options, m gregor.MainLoopServer) *mainServer {
@@ -23,6 +25,7 @@ func (m *mainServer) listenAndServe() error {
 	if err != nil {
 		return err
 	}
+	m.addr = l.Addr()
 	signalCh := make(chan os.Signal, 1)
 	go signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, os.Kill)
 	go m.mls.ListenLoop(l)
