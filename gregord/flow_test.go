@@ -23,6 +23,8 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	srvAddr, events, cleanup := startTestGregord(t)
 	defer cleanup()
 
+	t.Logf("gregord server started on %v", srvAddr)
+
 	clients := make([]*client, 5)
 	for i := 0; i < len(clients); i++ {
 		c, clean := startTestClient(t, srvAddr)
@@ -113,6 +115,7 @@ type client struct {
 }
 
 func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
+	t.Logf("startTestClient dialing %v", addr)
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		t.Fatal(err)
