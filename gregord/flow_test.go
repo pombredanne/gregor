@@ -20,6 +20,16 @@ import (
 // package, you'll get an error because a flag test
 // will be incorrect due to the env var)
 func TestConsumeBroadcastFlow(t *testing.T) {
+	name := os.Getenv("TEST_MYSQL_DSN")
+	if name == "" {
+		t.Skip("TEST_MYSQL_DSN not set")
+	}
+	db, err := test.CreateDB("mysql", name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close() // gregord creates its own db connection
+
 	srvAddr, events, cleanup := startTestGregord(t)
 	defer cleanup()
 
