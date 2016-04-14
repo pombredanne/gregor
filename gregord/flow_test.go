@@ -12,6 +12,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+	"github.com/keybase/gregor/test"
 )
 
 // Test with: TEST_MYSQL_DSN=gregor:@/gregor_test
@@ -29,6 +30,10 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 		clients[i] = c
 	}
 
+	for i := 0; i < len(clients); i++ {
+		<-events.ConnCreated
+	}
+
 	// send a message to the server from clients[0]
 	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(t, clients[0].uid)); err != nil {
 		t.Fatal(err)
@@ -43,9 +48,18 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 			t.Errorf("clients[%d] broadcasts: %d, expected 1", i, len(clients[i].broadcasts))
 		}
 	}
+
+	post, clean := startTestClient(t, srvAddr)
+	defer clean()
+
+	<-events.ConnCreated
+
+	if len(post.broadcasts) != 0 {
+		t.Errorf("client connected after broadcast, has %d broadcasts, expected 0", len(post.broadcasts))
+	}
 }
 
-func startTestGregord(t *testing.T) (string, *grpc.Events, func()) {
+func startTestGregord(t *testing.T) (string, *test.Events, func()) {
 	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
 		t.Skip("TEST_MYSQL_DSN not set")
@@ -64,7 +78,7 @@ func startTestGregord(t *testing.T) (string, *grpc.Events, func()) {
 
 	srv := grpc.NewServer()
 	setupMockAuth(srv)
-	e := grpc.NewEvents()
+	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
 	consumer, err := newConsumer(u)
