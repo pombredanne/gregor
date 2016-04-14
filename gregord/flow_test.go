@@ -102,7 +102,7 @@ func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 		}
 	}()
 
-	return ms.addr, e, cleanup
+	return <-ms.addr, e, cleanup
 }
 
 type client struct {

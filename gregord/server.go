@@ -13,11 +13,11 @@ type mainServer struct {
 	opts   *Options
 	mls    gregor.MainLoopServer
 	stopCh chan struct{}
-	addr   net.Addr
+	addr   chan net.Addr
 }
 
 func newMainServer(o *Options, m gregor.MainLoopServer) *mainServer {
-	return &mainServer{opts: o, mls: m}
+	return &mainServer{opts: o, mls: m, addr: make(chan net.Addr, 1)}
 }
 
 func (m *mainServer) listenAndServe() error {
@@ -25,7 +25,7 @@ func (m *mainServer) listenAndServe() error {
 	if err != nil {
 		return err
 	}
-	m.addr = l.Addr()
+	m.addr <- l.Addr()
 	signalCh := make(chan os.Signal, 1)
 	go signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM, os.Kill)
 	go m.mls.ListenLoop(l)
