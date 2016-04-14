@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"net"
 	"net/url"
 	"os"
@@ -12,6 +13,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 )
 
@@ -24,11 +26,9 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	if name == "" {
 		t.Skip("TEST_MYSQL_DSN not set")
 	}
-	db, err := test.CreateDB("mysql", name)
-	if err != nil {
+	if err := createDBSchema(name); err != nil {
 		t.Fatal(err)
 	}
-	db.Close() // gregord creates its own db connection
 
 	srvAddr, events, cleanup := startTestGregord(t)
 	defer cleanup()
@@ -187,4 +187,24 @@ func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {
 		},
 	}
 
+}
+
+func createDBSchema(name string) error {
+	db, err := sql.Open("mysql", name)
+	if err != nil {
+		return err
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	schema := storage.Schema("mysql")
+	for _, stmt := range schema {
+		if _, err = tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
