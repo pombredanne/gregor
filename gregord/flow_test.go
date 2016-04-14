@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -22,6 +23,14 @@ import (
 // package, you'll get an error because a flag test
 // will be incorrect due to the env var)
 func TestConsumeBroadcastFlow(t *testing.T) {
+	if os.Getenv("TEST_WITH_SLEEP") != "" {
+		withSleep = 3 * time.Millisecond
+		t.Logf("using periodic artifical sleep of %s", withSleep)
+		defer func() {
+			withSleep = 0
+			t.Logf("cleared artifical sleep")
+		}()
+	}
 	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
 		t.Skip("TEST_MYSQL_DSN not set")
@@ -71,6 +80,14 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 }
 
+var withSleep time.Duration
+
+func maybeSleep() {
+	if withSleep > 0 {
+		time.Sleep(withSleep)
+	}
+}
+
 func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
@@ -107,6 +124,7 @@ func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 
 	go srv.Serve(consumer)
 	go func() {
+		maybeSleep()
 		if err := ms.listenAndServe(); err != nil {
 			t.Fatal(err)
 		}
@@ -126,10 +144,12 @@ type client struct {
 
 func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
 	t.Logf("startTestClient dialing %v", addr)
+	maybeSleep()
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		t.Fatal(err)
 	}
+	maybeSleep()
 	tr := rpc.NewTransport(c, nil, nil)
 
 	x := &client{
@@ -138,6 +158,7 @@ func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
 		cli:  rpc.NewClient(tr, nil),
 	}
 
+	maybeSleep()
 	srv := rpc.NewServer(tr, nil)
 	if err := srv.Register(gregor1.OutgoingProtocol(x)); err != nil {
 		t.Fatal(err)
