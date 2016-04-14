@@ -72,7 +72,7 @@ func startTestGregord(t *testing.T) (string, *test.Events, func()) {
 	opts := Options{
 		MockAuth:    true,
 		MysqlDSN:    u,
-		BindAddress: "localhost:19911",
+		BindAddress: "127.0.0.1:19911",
 		Debug:       true,
 	}
 
