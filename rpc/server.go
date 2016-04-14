@@ -224,6 +224,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 		// even though nothing to do, create an event if
 		// an event handler in place:
 		if s.events != nil {
+			log.Printf("sendBroadcast: no PerUIDServer for %s", gregor.UIDFromMessage(m))
 			s.events.BroadcastSent(m)
 		}
 		return nil

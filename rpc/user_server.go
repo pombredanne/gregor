@@ -128,12 +128,13 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 	}
 }
 
-// tryShutdown checks if it is ok to shutdown.  Returns true if it
-// is ok.
+// tryShutdown makes a request to the parent server for this
+// server to be terminated.
 func (s *perUIDServer) tryShutdown() {
 	// make sure no connections have been added
 	if len(s.conns) != 0 {
 		log.Printf("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
+		return
 	}
 
 	// confirm with the server that it is ok to shutdown

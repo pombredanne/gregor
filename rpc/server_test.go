@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"testing"
 
 	keybase1 "github.com/keybase/client/go/protocol"
@@ -106,6 +107,7 @@ type client struct {
 	cli        *rpc.Client
 	broadcasts []gregor1.Message
 	shutdown   bool
+	sync.Mutex
 }
 
 func newClient(addr net.Addr) *client {
@@ -133,6 +135,8 @@ func (c *client) Shutdown() {
 	c.conn.Close()
 	// this is required as closing the connection only closes one direction
 	// and there is a race in figuring out that the whole connection is closed.
+	c.Lock()
+	defer c.Unlock()
 	c.shutdown = true
 }
 
@@ -145,6 +149,8 @@ func (c *client) IncomingClient() gregor1.IncomingClient {
 }
 
 func (c *client) BroadcastMessage(ctx context.Context, m gregor1.Message) error {
+	c.Lock()
+	defer c.Unlock()
 	if c.shutdown {
 		return io.EOF
 	}
