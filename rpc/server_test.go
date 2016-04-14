@@ -11,6 +11,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
 )
 
@@ -67,8 +68,8 @@ func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) e
 	return nil
 }
 
-func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *Events) {
-	ev := NewEvents()
+func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *test.Events) {
+	ev := test.NewEvents()
 	s := NewServer()
 	s.events = ev
 	s.useDeadlocker = true
