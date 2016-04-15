@@ -11,18 +11,31 @@ addons:
     - mysql-server-5.6
     - mysql-client-core-5.6
     - mysql-client-5.6
-before_install:
-  - mysql -e "create database IF NOT EXISTS test;" -uroot
 env:
   - TEST_MYSQL_DSN=root:@/test 
 notifications:
   slack:
     rooms:
       secure: W5hUm0MPWJ3v2VGRAq9fxgroVvqFOkwnbrxllEX3Zadf3e909fwQzm7KEUvSEd9fhsKrdBxPrphCZd1UCq5cXjCkfokKFojnbgnYPKZYgL4M7GWqiURCfIUY7r0gQCDnFzIIANacIbhT8089IkQva8QWCdfX4zVycTKOvMC0msE=
-before_script:
-  - (cd protocol && npm i && git diff --quiet --exit-code)
 matrix:
   - os: osx
 branches:
   only:
     - master
+services:
+  - docker
+before_install:
+  - mysql -e "create database IF NOT EXISTS test;" -uroot
+before_script:
+  - (cd protocol && npm i && git diff --quiet --exit-code)
+script:
+  - go test -v ./...
+  - (cd gregord && go build)
+  - docker build -t kbgregor .
+after_success:
+  - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_BRANCH == 'master' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
+      docker tag kbgregor $CI_HOST/kbgregor;
+      docker push $CI_HOST/kbgregor;
+    else
+      echo "Not pushing to Docker, because this isn't a push to master.";
+    fi
