@@ -34,8 +34,12 @@ script:
   - docker build -t kbgregor .
 after_success:
   - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_BRANCH == 'master' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
-      docker tag kbgregor $CI_HOST/kbgregor;
-      docker push $CI_HOST/kbgregor;
+      echo "Logging into docker..." &&
+      docker login -e "$CI_EMAIL" -u "$CI_USER" -p "$CI_PASS" "$CI_HOST" &&
+      echo "Tagging kbgregor locally..." &&
+      docker tag kbgregor $CI_HOST/kbgregor &&
+      echo "Pushing kbgregor..." &&
+      docker push $CI_HOST/kbgregor
     else
       echo "Not pushing to Docker, because this isn't a push to master.";
     fi
