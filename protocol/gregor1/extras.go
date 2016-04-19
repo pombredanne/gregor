@@ -8,6 +8,7 @@ import (
 
 	"github.com/keybase/go-codec/codec"
 	"github.com/keybase/gregor"
+	"golang.org/x/net/context"
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
@@ -286,6 +287,43 @@ func (t Time) Before(t2 Time) bool { return t < t2 }
 func FormatTime(t Time) string {
 	layout := "2006-01-02 15:04:05 MST"
 	return FromTime(t).Format(layout)
+}
+
+type localIncoming struct {
+	sm gregor.StateMachine
+}
+
+func NewLocalIncoming(sm gregor.StateMachine) IncomingInterface {
+	return &localIncoming{sm}
+}
+
+func (i *localIncoming) ConsumeMessage(_ context.Context, msg Message) error {
+	return i.sm.ConsumeMessage(msg)
+}
+
+func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, err error) {
+	msgs, err := i.sm.InBandMessagesSince(arg.Uid, arg.Deviceid, FromTime(arg.Ctime))
+	if err != nil {
+		return
+	}
+
+	for _, msg := range msgs {
+		if msg := msg.(*InBandMessage); msg != nil {
+			res.Msgs = append(res.Msgs, *msg)
+		}
+	}
+
+	state, err := i.sm.State(arg.Uid, arg.Deviceid, nil)
+	if err != nil {
+		return
+	}
+
+	res.Hash, err = state.Hash()
+	return
+}
+
+func (i *localIncoming) Ping(_ context.Context) (string, error) {
+	return "pong", nil
 }
 
 var _ gregor.UID = UID{}

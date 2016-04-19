@@ -93,19 +93,26 @@ func matchUIDorSuperuser(uid, expected []byte) bool {
 	return bytes.Equal(uid, superUID) || bytes.Equal(uid, expected)
 }
 
-func (c *connection) checkAuth(ctx context.Context, m gregor1.Message) error {
+func (c *connection) checkUIDAuth(ctx context.Context, uid gregor1.UID) error {
 	tok, res, _ := c.authInfo.get()
 	if _, err := c.AuthenticateSessionToken(ctx, tok); err != nil {
 		return err
 	}
-	if m.ToInBandMessage() != nil {
-		if !matchUIDorSuperuser(res.Uid, m.ToInBandMessage().Metadata().UID().Bytes()) {
-			return fmt.Errorf("mismatched UIDs: %v != %v", m.ToInBandMessage().Metadata().UID().Bytes(), res.Uid)
-		}
+
+	if !matchUIDorSuperuser(res.Uid, uid.Bytes()) {
+		return fmt.Errorf("mismatched UIDs: %v != %v", uid, res.Uid)
 	}
-	if m.ToOutOfBandMessage() != nil {
-		if !matchUIDorSuperuser(res.Uid, m.ToOutOfBandMessage().UID().Bytes()) {
-			return fmt.Errorf("mismatched UIDs: %v != %v", m.ToOutOfBandMessage().UID().Bytes(), res.Uid)
+	return nil
+}
+
+func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) error {
+	if m.ToInBandMessage() != nil {
+		if err := c.checkUIDAuth(ctx, m.ToInBandMessage().Metadata().UID().Bytes()); err != nil {
+			return err
+		}
+	} else if m.ToOutOfBandMessage() != nil {
+		if err := c.checkUIDAuth(ctx, m.ToOutOfBandMessage().UID().Bytes()); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -137,9 +144,17 @@ func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.
 	return c.parent.auth.RevokeSessionIDs(ctx, sessionIDs)
 }
 
+func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	if err := c.checkUIDAuth(ctx, arg.Uid); err != nil {
+		return gregor1.SyncResult{}, err
+	}
+
+	return c.parent.sync(ctx, arg)
+}
+
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	log.Printf("ConsumeMessage: %+v", m)
-	if err := c.checkAuth(ctx, m); err != nil {
+	if err := c.checkMessageAuth(ctx, m); err != nil {
 		c.close()
 		return err
 	}
@@ -197,3 +212,5 @@ func (c *connection) close() {
 }
 
 var _ gregor1.AuthInterface = (*connection)(nil)
+
+// var _ gregor1.IncomingInterface = (*connection)(nil)

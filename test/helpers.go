@@ -247,7 +247,7 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID
 	// We make an optimization that we don't bother to return messages
 	// that have since expired or been dismissed. So we expect the
 	// two undismissed/unexpired messages above, and the two dismissals themselves.
-	msgs, err := sm.InBandMessagesSince(u1, nil, timeToTimeOrOffset(of, t0))
+	msgs, err := sm.InBandMessagesSince(u1, nil, t0)
 	require.Nil(t, err, "no error from InBandMessagesSince")
 	require.Equal(t, 4, len(msgs), "expected 4 messages")
 	msgIDsToDismiss := msgs[0].ToStateUpdateMessage().Dismissal().MsgIDsToDismiss()
@@ -319,4 +319,21 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID
 	assert5(nil)
 
 	return u1, d1
+}
+
+func AddStateMachinePerDevice(sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID) {
+	of := sm.ObjFactory()
+	cl := sm.Clock()
+	c1 := makeCategory(of, "bars")
+	sm.ConsumeMessage(
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b1", nil),
+	)
+	advanceClock(cl, time.Second)
+	sm.ConsumeMessage(
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b2", nil),
+	)
+	advanceClock(cl, time.Second)
+	sm.ConsumeMessage(
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b3", nil),
+	)
 }

@@ -87,6 +87,12 @@ func (i item) export(f gregor.ObjFactory) (gregor.Item, error) {
 
 // addItem adds an item for this user
 func (u *user) addItem(now time.Time, i gregor.Item) *item {
+	msgID := i.Metadata().MsgID().Bytes()
+	for _, it := range u.items {
+		if bytes.Equal(msgID, it.item.Metadata().MsgID().Bytes()) {
+			return it
+		}
+	}
 	newItem := &item{item: i, ctime: nowIfZero(now, i.Metadata().CTime())}
 	u.items = append(u.items, newItem)
 	return newItem
@@ -212,22 +218,23 @@ func isMessageForDevice(m gregor.InBandMessage, d gregor.DeviceID) bool {
 	return false
 }
 
-func (u *user) replayLog(now time.Time, d gregor.DeviceID, t gregor.TimeOrOffset) []gregor.InBandMessage {
-	var ret []gregor.InBandMessage
+func (u *user) replayLog(now time.Time, d gregor.DeviceID, t time.Time) (msgs []gregor.InBandMessage, latestCTime *time.Time) {
 	for _, msg := range u.log {
+		if latestCTime == nil || msg.ctime.After(*latestCTime) {
+			latestCTime = &msg.ctime
+		}
 		if !isMessageForDevice(msg.m, d) {
 			continue
 		}
-		if msg.ctime.Before(toTime(now, t)) {
+		if msg.ctime.Before(t) {
 			continue
 		}
 		if msg.isDismissedAt(now) {
 			continue
 		}
-
-		ret = append(ret, msg.m)
+		msgs = append(msgs, msg.m)
 	}
-	return ret
+	return
 }
 
 func (m *MemEngine) consumeInBandMessage(uid gregor.UID, msg gregor.InBandMessage) error {
@@ -311,12 +318,33 @@ func (m *MemEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	return user.state(m.clock.Now(), m.objFactory, d, t)
 }
 
-func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
+func (m *MemEngine) Clear() error {
+	m.users = make(map[string](*user))
+	return nil
+}
+
+func (m *MemEngine) LatestCTime(u gregor.UID, d gregor.DeviceID) *time.Time {
 	m.Lock()
 	defer m.Unlock()
-	user := m.getUser(u)
-	msg := user.replayLog(m.clock.Now(), d, t)
-	return msg, nil
+	log := m.getUser(u).log
+	for i := len(log) - 1; i >= 0; i-- {
+		if log[i].i != nil && log[i].i.item != nil &&
+			(d == nil || log[i].i.item.Metadata() != nil &&
+				(log[i].i.item.Metadata().DeviceID() == nil ||
+					bytes.Equal(d.Bytes(),
+						log[i].i.item.Metadata().DeviceID().Bytes()))) {
+			return &log[i].ctime
+		}
+	}
+	return nil
+}
+
+func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.Time) ([]gregor.InBandMessage, error) {
+	m.Lock()
+	defer m.Unlock()
+	msgs, _ := m.getUser(u).replayLog(m.clock.Now(), d, t)
+
+	return msgs, nil
 }
 
 func (m *MemEngine) IsEphemeral() bool {

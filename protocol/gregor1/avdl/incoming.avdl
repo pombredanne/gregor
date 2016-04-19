@@ -1,7 +1,11 @@
-
 @namespace("gregor.1")
 
 protocol incoming {
+	record SyncResult {
+		array<InBandMessage> msgs;
+		bytes hash;
+	}
+	SyncResult sync(UID uid, DeviceID deviceid, Time ctime);
 	void consumeMessage(Message m);
 	string ping();
 }

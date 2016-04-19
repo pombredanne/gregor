@@ -106,7 +106,7 @@ func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 	}
 
 	srv := grpc.NewServer()
-	setupMockAuth(srv)
+	srv.SetAuthenticator(mockAuth{})
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 

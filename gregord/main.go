@@ -23,9 +23,15 @@ func main() {
 	srv := grpc.NewServer()
 
 	if opts.MockAuth {
-		setupMockAuth(srv)
+		srv.SetAuthenticator(mockAuth{})
 	} else {
-		sc := setupSessionAuth(opts, srv)
+		conn, err := opts.SessionServer.Dial()
+		if err != nil {
+			log.Fatal(err)
+		}
+		Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
+		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
+		srv.SetAuthenticator(sc)
 		defer sc.Close()
 	}
 
@@ -40,23 +46,7 @@ func main() {
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
 }
 
-func setupSessionAuth(opts *Options, srv *grpc.Server) *grpc.SessionCacher {
-	conn, err := opts.SessionServer.Dial()
-	if err != nil {
-		log.Fatal(err)
-	}
-	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
-	sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
-	srv.SetAuthenticator(sc)
-	return sc
-}
-
-func setupMockAuth(srv *grpc.Server) {
-	var auth mockAuth
-	srv.SetAuthenticator(auth)
-}
-
-type mockAuth int
+type mockAuth struct{}
 
 func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 	return gregor1.AuthResult{Uid: gregor1.UID("gooduid"), Sid: gregor1.SessionID("1")}, nil
@@ -64,3 +54,5 @@ func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok gregor1.Sessio
 func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.SessionID) error {
 	return nil
 }
+
+var _ gregor1.AuthInterface = mockAuth{}

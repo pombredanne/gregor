@@ -7,8 +7,6 @@ import (
 	"net/url"
 
 	_ "github.com/go-sql-driver/mysql"
-	"golang.org/x/net/context"
-
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
@@ -17,6 +15,7 @@ import (
 type consumer struct {
 	db *sql.DB
 	sm gregor.StateMachine
+	gregor1.IncomingInterface
 }
 
 func newConsumer(dsn *url.URL) (*consumer, error) {
@@ -60,13 +59,6 @@ func (c *consumer) createDB(dsn *url.URL) error {
 func (c *consumer) createStateMachine() error {
 	var of gregor1.ObjFactory
 	c.sm = storage.NewMySQLEngine(c.db, of)
+	c.IncomingInterface = gregor1.NewLocalIncoming(c.sm)
 	return nil
-}
-
-func (c *consumer) ConsumeMessage(ctx context.Context, msg gregor.Message) error {
-	if c.sm == nil {
-		return errors.New("consumer has no gregor.StateMachine")
-	}
-
-	return c.sm.ConsumeMessage(msg)
 }

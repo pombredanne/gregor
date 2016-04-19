@@ -25,6 +25,17 @@ func (s *Server) deadlocker() {
 	}
 }
 
+type syncRet struct {
+	res gregor1.SyncResult
+	err error
+}
+
+type syncArgs struct {
+	c     context.Context
+	a     gregor1.SyncArg
+	retCh chan<- syncRet
+}
+
 type messageArgs struct {
 	c     context.Context
 	m     gregor1.Message
@@ -45,9 +56,9 @@ type Stats struct {
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
-	nii   gregor.NetworkInterfaceIncoming
-	auth  gregor1.AuthInterface
-	clock clockwork.Clock
+	incoming gregor1.IncomingInterface
+	auth     gregor1.AuthInterface
+	clock    clockwork.Clock
 
 	// key is the Hex-encoding of the binary UIDs
 	users map[string](*perUIDServer)
@@ -57,6 +68,7 @@ type Server struct {
 
 	newConnectionCh  chan *connection
 	statsCh          chan chan *Stats
+	syncCh           chan syncArgs
 	consumeCh        chan messageArgs
 	broadcastCh      chan messageArgs
 	closeCh          chan struct{}
@@ -233,6 +245,13 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	return nil
 }
 
+func (s *Server) sync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	retCh := make(chan syncRet)
+	s.syncCh <- syncArgs{c, arg, retCh}
+	ret := <-retCh
+	return ret.res, ret.err
+}
+
 func (s *Server) consume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
 	args := messageArgs{c, m, retCh}
@@ -250,8 +269,12 @@ func (s *Server) serve() error {
 		case c := <-s.newConnectionCh:
 			s.logError("addUIDConnection", s.addUIDConnection(c))
 		case a := <-s.consumeCh:
-			err := s.nii.ConsumeMessage(a.c, a.m)
+			err := s.incoming.ConsumeMessage(a.c, a.m)
 			a.retCh <- err
+		case a := <-s.syncCh:
+			var ret syncRet
+			ret.res, ret.err = s.incoming.Sync(a.c, a.a)
+			a.retCh <- ret
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
@@ -265,8 +288,8 @@ func (s *Server) serve() error {
 }
 
 // Serve starts the serve loop for Server.
-func (s *Server) Serve(i gregor.NetworkInterfaceIncoming) error {
-	s.nii = i
+func (s *Server) Serve(i gregor1.IncomingInterface) error {
+	s.incoming = i
 	return s.serve()
 }
 
@@ -302,6 +325,3 @@ func (s *Server) ListenLoop(l net.Listener) error {
 func (s *Server) Shutdown() {
 	close(s.closeCh)
 }
-
-var _ gregor.NetworkInterfaceOutgoing = (*Server)(nil)
-var _ gregor.NetworkInterface = (*Server)(nil)

@@ -8,10 +8,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
 )
@@ -37,6 +38,11 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 		delete(m.sessionIDs, sid)
 	}
 	return
+}
+
+func newMockIncomingInterface() gregor1.IncomingInterface {
+	var of gregor1.ObjFactory
+	return gregor1.NewLocalIncoming(storage.NewMemEngine(of, clockwork.NewRealClock()))
 }
 
 const (
@@ -70,23 +76,14 @@ var mockAuthenticator gregor1.AuthInterface = mockAuth{
 	},
 }
 
-type mockConsumer struct {
-	consumed []gregor.Message
-}
-
-func (m *mockConsumer) ConsumeMessage(ctx context.Context, msg gregor.Message) error {
-	m.consumed = append(m.consumed, msg)
-	return nil
-}
-
-func startTestServer(x gregor.NetworkInterfaceIncoming) (*Server, net.Listener, *test.Events) {
+func startTestServer(incoming gregor1.IncomingInterface) (*Server, net.Listener, *test.Events) {
 	ev := test.NewEvents()
 	s := NewServer()
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)
 	l := newLocalListener()
-	go s.Serve(x)
+	go s.Serve(incoming)
 	go s.ListenLoop(l)
 	return s, l, ev
 }
@@ -247,8 +244,8 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestConsume(t *testing.T) {
-	mc := &mockConsumer{}
-	s, l, _ := startTestServer(mc)
+	incoming := newMockIncomingInterface()
+	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -261,15 +258,11 @@ func TestConsume(t *testing.T) {
 	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err != nil {
 		t.Fatal(err)
 	}
-
-	if len(mc.consumed) != 1 {
-		t.Errorf("consumer messages received: %d, expected 1", len(mc.consumed))
-	}
 }
 
 func TestImpersonation(t *testing.T) {
-	mc := &mockConsumer{}
-	s, l, _ := startTestServer(mc)
+	incoming := newMockIncomingInterface()
+	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -282,15 +275,11 @@ func TestImpersonation(t *testing.T) {
 	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err == nil {
 		t.Fatal("no error when impersonating another user.")
 	}
-
-	if len(mc.consumed) != 0 {
-		t.Errorf("consumer messages received: %d, expected 0", len(mc.consumed))
-	}
 }
 
 func TestSuperUser(t *testing.T) {
-	mc := &mockConsumer{}
-	s, l, _ := startTestServer(mc)
+	incoming := newMockIncomingInterface()
+	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -302,10 +291,6 @@ func TestSuperUser(t *testing.T) {
 
 	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err != nil {
 		t.Fatal(err)
-	}
-
-	if len(mc.consumed) != 1 {
-		t.Errorf("consumer messages received: %d, expected 1", len(mc.consumed))
 	}
 }
 

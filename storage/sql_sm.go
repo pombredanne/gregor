@@ -435,7 +435,38 @@ func (s *SQLEngine) rowToInBandMessage(u gregor.UID, rows *sql.Rows) (gregor.InB
 	return nil, nil
 }
 
-func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) ([]gregor.InBandMessage, error) {
+func (s *SQLEngine) Clear() error {
+	tx, err := s.driver.Begin()
+	if err != nil {
+		return err
+	}
+
+	for _, stmt := range Schema("") {
+		if _, err = tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *SQLEngine) LatestCTime(u gregor.UID, d gregor.DeviceID) *time.Time {
+	qry := `SELECT MAX(ctime) 
+			FROM messages
+			WHERE uid = ? AND (devid = ? OR devid IS NULL)`
+	var ctime timeScanner
+	err := s.driver.QueryRow(qry, hexEnc(u), hexEnc(d)).Scan(&ctime)
+	if err != nil {
+		return nil
+	}
+	return ctime.TimeOrNil()
+}
+
+func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.Time) ([]gregor.InBandMessage, error) {
 	qry := `SELECT m.msgid, m.devid, m.ctime, m.mtype,
                i.category, i.body,
                dt.category, dt.dtime,
@@ -454,7 +485,7 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t grego
 	}
 
 	qb.Build("AND m.ctime >= ")
-	qb.TimeOrOffset(t)
+	qb.AddTime(t)
 
 	qb.Build("ORDER BY m.ctime ASC")
 	stmt, err := s.driver.Prepare(qb.Query())
