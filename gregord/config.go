@@ -118,9 +118,6 @@ func parseTLSConfig(raw *rawOpts) (*tls.Config, error) {
 	if raw.tlsCert == "" || raw.tlsKey == "" {
 		return nil, nil
 	}
-	if (raw.awsRegion == "") != (raw.configBucket == "") {
-		return nil, badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
-	}
 	if raw.awsRegion != "" {
 		buckets, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.tlsCert, raw.tlsKey)
 		if err != nil {
@@ -137,6 +134,23 @@ func parseTLSConfig(raw *rawOpts) (*tls.Config, error) {
 		return nil, err
 	}
 	return makeTLSConfig(cert, key)
+}
+
+func parseMysqlDSN(raw *rawOpts) (*url.URL, error) {
+	var dsn string
+	if len(raw.awsRegion) == 0 {
+		dsn = raw.mysqlDSN
+	} else {
+		results, err := readFromS3Config(raw.awsRegion, raw.configBucket, raw.mysqlDSN)
+		if err != nil {
+			return nil, err
+		}
+		dsn = strings.TrimSpace(results[0])
+		if len(dsn) == 0 {
+			return nil, fmt.Errorf("empty dsn")
+		}
+	}
+	return url.Parse(dsn)
 }
 
 func (o *Options) Parse(raw *rawOpts) error {
@@ -169,8 +183,12 @@ func (o *Options) Parse(raw *rawOpts) error {
 	o.Debug = raw.debug
 	o.MockAuth = raw.mockAuth
 
+	if (raw.awsRegion == "") != (raw.configBucket == "") {
+		return badUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
+	}
+
 	if raw.mysqlDSN != "" {
-		if o.MysqlDSN, err = url.Parse(raw.mysqlDSN); err != nil {
+		if o.MysqlDSN, err = parseMysqlDSN(raw); err != nil {
 			return badUsage("Error parsing mysql DSN: %s", err)
 		}
 	} else {
@@ -235,7 +253,6 @@ func ParseOptionsQuiet(argv []string) (*Options, error) {
 }
 
 func parseOptions(argv []string, quiet bool) (*Options, error) {
-
 	fs := flag.NewFlagSet(argv[0], flag.ContinueOnError)
 	if quiet {
 		fs.Usage = func() {}
