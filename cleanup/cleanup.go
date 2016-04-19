@@ -91,6 +91,13 @@ func cleanup(db *sql.DB) {
 	}
 }
 
+// Note that this query relies on the following foreign key reference
+// FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE
+// on child tables of messages.
+const deleteQuery = `DELETE FROM messages USING 
+	messages LEFT JOIN items ON (messages.uid=items.uid AND messages.msgid=items.msgid) 
+	WHERE items.uid LIKE ? AND items.dtime < DATE_SUB(NOW(), INTERVAL ? DAY)`
+
 func partition(db *sql.DB, prefix string) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -98,10 +105,7 @@ func partition(db *sql.DB, prefix string) {
 	}
 	defer tx.Commit()
 
-	// Note that this query relies on the following foreign key reference
-	// FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE
-	// on child tables of messages.
-	res, err := tx.Exec("DELETE FROM messages USING messages LEFT JOIN items ON (messages.uid=items.uid AND messages.msgid=items.msgid) WHERE items.uid LIKE ? AND items.dtime < DATE_SUB(NOW(), INTERVAL ? DAY)", prefix+"%", interval)
+	res, err := tx.Exec(deleteQuery, prefix+"%", interval)
 	if err != nil {
 		tx.Rollback()
 		log.Fatalf("[%s] tx exec error: %s", prefix, err)
@@ -125,12 +129,24 @@ func signals() {
 	}
 }
 
+// partitionFormat generates a fmt format string to transform an
+// int into a uid partition prefix.  The number of partitions must
+// be a power of 16 so that the entire uid space is partitioned.
+// e.g., '0%' => 'f%', '00%' => 'ff%', '000%' => 'fff%'.
 func partitionFormat() {
+	// convert partitions to hex and make sure it is a power of 16.
 	maxHex := fmt.Sprintf("%x", partitions-1)
 	for _, x := range maxHex {
 		if x != 'f' {
 			log.Fatalf("number of partitions: %d, must be a power of 16", partitions)
 		}
 	}
+
+	// The uid partition format should be of the form "%02x" where 16 ^ 2 == partitions.
+	// The individual parts of the format below that generates this are:
+	// %% => single percent sign
+	// 0  => zero pad
+	// %d => Use the length of maxHex to specify the length of the string.
+	// x  => format as hex
 	format = fmt.Sprintf("%%0%dx", len(maxHex))
 }
