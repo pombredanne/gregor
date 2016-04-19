@@ -23,7 +23,7 @@ var schema = []string{
 		category VARCHAR(128) NOT NULL,
 		dtime DATETIME(6),
 		body BLOB,
-		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid),
+		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
 		PRIMARY KEY(uid, msgid)
 	)`,
 
@@ -35,6 +35,7 @@ var schema = []string{
 		uid   CHAR(32) NOT NULL,
 		msgid CHAR(32) NOT NULL,
 		ntime DATETIME(6) NOT NULL,
+		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
 		PRIMARY KEY(uid, msgid, ntime)
 	)`,
 
@@ -42,7 +43,8 @@ var schema = []string{
 		uid   CHAR(32) NOT NULL,
 		msgid CHAR(32) NOT NULL,
 		dmsgid CHAR(32) NOT NULL, -- "the message IDs to dismiss",
-		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid),
+		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
+		FOREIGN KEY(uid, dmsgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
 		PRIMARY KEY(uid, msgid, dmsgid)
 	)`,
 
@@ -51,7 +53,7 @@ var schema = []string{
 		msgid CHAR(32) NOT NULL,
 		category VARCHAR(128) NOT NULL,
 		dtime DATETIME(6) NOT NULL, -- "throw out matching events before dtime",
-		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid),
+		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
 		PRIMARY KEY(uid, msgid, category, dtime)
 	)`,
 }
