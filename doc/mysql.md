@@ -15,3 +15,6 @@ space, or if table data file grows without bounds.
 Conclusion: while the InnoDB file size doesn't shrink
 after deleting rows, the space that was used by deleted 
 rows is reused for new rows.
+
+Tested on 5.7.10 on OS X and 5.6.28 on linux, same
+results.
