@@ -6,34 +6,53 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func main() {
-	var interval int
-	var help bool
-	var dsn string
+var dsn string
+var help bool
+var interval int
+var partitions int
+var sleepBetweenPartitions time.Duration
+var runOnce bool
+var sleepBetweenRuns time.Duration
+var done chan struct{}
+var format string
 
-	flag.IntVar(&interval, "interval", 30, "clean messages older than interval `days`")
+func init() {
+	flag.StringVar(&dsn, "dsn", "gregor:@/gregor_test", "mysql dsn for gregor database")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&help, "help", false, "show help")
-	flag.StringVar(&dsn, "dsn", "gregor:@/gregor_test", "mysql dsn for gregor database")
+	flag.IntVar(&interval, "interval", 30, "clean messages older than interval `days`")
+	flag.IntVar(&partitions, "partitions", 256, "number of uid partitions for the database")
+	flag.DurationVar(&sleepBetweenPartitions, "sleep", 100*time.Millisecond, "sleep duration between uid partition cleans")
+	flag.BoolVar(&runOnce, "once", true, "run one time, then exit")
+	flag.DurationVar(&sleepBetweenRuns, "runsleep", 1*time.Minute, "sleep duration between full runs (when -once is false)")
+}
 
+func main() {
 	flag.Parse()
 	if help {
 		flag.Usage()
 		os.Exit(0)
 	}
 
+	partitionFormat()
+
 	log.Printf("cleaning up dismissed messages older than %d days", interval)
-	db := database(dsn)
+	done = make(chan struct{})
+	go signals()
+	db := database()
 	defer db.Close()
-	cleanup(db, interval)
+	run(db)
 	log.Printf("done")
 }
 
-func database(dsn string) *sql.DB {
+func database() *sql.DB {
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatalf("error opening database connection to %s: %s", dsn, err)
@@ -41,13 +60,38 @@ func database(dsn string) *sql.DB {
 	return db
 }
 
-func cleanup(db *sql.DB, interval int) {
-	for i := 0x00; i <= 0xff; i++ {
-		partition(db, fmt.Sprintf("%02x", i), interval)
+func run(db *sql.DB) {
+	if runOnce {
+		cleanup(db)
+		return
+	}
+
+	for {
+		cleanup(db)
+		select {
+		case <-done:
+			log.Printf("aborting run loop")
+			return
+		case <-time.After(sleepBetweenRuns):
+		}
 	}
 }
 
-func partition(db *sql.DB, prefix string, interval int) {
+func cleanup(db *sql.DB) {
+	for i := 0; i < partitions; i++ {
+		if i > 0 {
+			select {
+			case <-done:
+				log.Printf("aborting cleanup loop")
+				return
+			case <-time.After(sleepBetweenPartitions):
+			}
+		}
+		partition(db, fmt.Sprintf(format, i))
+	}
+}
+
+func partition(db *sql.DB, prefix string) {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatalf("error starting transaction: %s", err)
@@ -69,4 +113,24 @@ func partition(db *sql.DB, prefix string, interval int) {
 	}
 
 	log.Printf("uid prefix %s, messages deleted: %d", prefix, affected)
+}
+
+func signals() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill, syscall.SIGTERM)
+	select {
+	case x := <-c:
+		log.Printf("caught signal %v", x)
+		close(done)
+	}
+}
+
+func partitionFormat() {
+	maxHex := fmt.Sprintf("%x", partitions-1)
+	for _, x := range maxHex {
+		if x != 'f' {
+			log.Fatalf("number of partitions: %d, must be a power of 16", partitions)
+		}
+	}
+	format = fmt.Sprintf("%%0%dx", len(maxHex))
 }
