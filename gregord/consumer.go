@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"net/url"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -46,8 +45,9 @@ func (c *consumer) shutdown() {
 }
 
 func (c *consumer) createDB(dsn *url.URL) error {
+	logger.Debug("consumer: creating DB")
 	dsn = storage.ForceParseTime(dsn)
-	log.Printf("opening mysql connection to %s", dsn)
+	logger.Debugf("opening mysql connection to %s", dsn)
 	db, err := sql.Open("mysql", dsn.String())
 	if err != nil {
 		return err
@@ -57,6 +57,7 @@ func (c *consumer) createDB(dsn *url.URL) error {
 }
 
 func (c *consumer) createStateMachine() error {
+	logger.Debug("consumer: creating StateMachine")
 	var of gregor1.ObjFactory
 	c.sm = storage.NewMySQLEngine(c.db, of)
 	c.IncomingInterface = gregor1.NewLocalIncoming(c.sm)

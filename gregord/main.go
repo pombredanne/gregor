@@ -1,23 +1,41 @@
 package main
 
 import (
-	"log"
+	"log/syslog"
+	"net"
 	"os"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
-	"golang.org/x/net/context"
-
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/go-logging"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+	"golang.org/x/net/context"
 )
+
+var logger *logging.Logger
+
+func init() {
+	logger = logging.MustGetLogger("gregord")
+	syslogIP, syslogPort := os.Getenv("LOGGLY_PORT_514_UDP_ADDR"), os.Getenv("LOGGLY_PORT_514_UDP_PORT")
+	if syslogIP != "" && syslogPort != "" {
+		w, err := syslog.Dial("udp", net.JoinHostPort(syslogIP, syslogPort), syslog.LOG_DEBUG, "[gregord] ")
+		if err != nil {
+			logger.Errorf("unable to dial sysloger: %v", err)
+		}
+
+		logger.SetBackend(logging.AddModuleLevel(&logging.SyslogBackend{w}))
+		logger.Debug("syslog logging enabled")
+	}
+
+}
 
 func main() {
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 
 	srv := grpc.NewServer()
@@ -25,9 +43,10 @@ func main() {
 	if opts.MockAuth {
 		srv.SetAuthenticator(mockAuth{})
 	} else {
+		logger.Debugf("dialing authd at %s", opts.SessionServer.String())
 		conn, err := opts.SessionServer.Dial()
 		if err != nil {
-			log.Fatal(err)
+			logger.Fatal(err)
 		}
 		Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
 		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
@@ -38,12 +57,13 @@ func main() {
 	// create a message consumer state machine
 	consumer, err := newConsumer(opts.MysqlDSN)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err)
 	}
 	defer consumer.shutdown()
+	logger.Debug("serving consumer")
 	go srv.Serve(consumer)
 
-	log.Fatal(newMainServer(opts, srv).listenAndServe())
+	logger.Fatal(newMainServer(opts, srv).listenAndServe())
 }
 
 type mockAuth struct{}

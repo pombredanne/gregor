@@ -21,6 +21,7 @@ func newMainServer(o *Options, m gregor.MainLoopServer) *mainServer {
 }
 
 func (m *mainServer) listenAndServe() error {
+	logger.Debug("listening at", m.opts.BindAddress)
 	l, err := m.listen()
 	if err != nil {
 		return err
