@@ -308,8 +308,8 @@ func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, er
 	}
 
 	for _, msg := range msgs {
-		if msg := msg.(*InBandMessage); msg != nil {
-			res.Msgs = append(res.Msgs, *msg)
+		if msg, ok := msg.(InBandMessage); ok {
+			res.Msgs = append(res.Msgs, msg)
 		}
 	}
 
