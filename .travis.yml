@@ -30,7 +30,7 @@ before_script:
   - (cd protocol && npm i && git diff --quiet --exit-code)
 script:
   - go test -v ./...
-  - (cd gregord && go build)
+  - (cd gregord && CGO_ENABLED=0 go build)
   - docker build -t kbgregor .
 after_success:
   - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_BRANCH == 'master' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
