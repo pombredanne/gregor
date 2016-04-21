@@ -1,7 +1,7 @@
-FROM ubuntu:14.04
+FROM alpine:3.3
 MAINTAINER Keybase <admin@keybase.io>
 
-RUN useradd -m keybase
+RUN adduser -D keybase
 USER keybase
 ENV PATH=/home/keybase:$PATH
 WORKDIR /home/keybase
