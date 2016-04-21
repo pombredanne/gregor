@@ -93,6 +93,7 @@ func NewServer() *Server {
 		lastConns:       make(map[string]connectionID),
 		newConnectionCh: make(chan *connection),
 		statsCh:         make(chan chan *Stats, 1),
+		syncCh:          make(chan syncArgs),
 		consumeCh:       make(chan messageArgs),
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
