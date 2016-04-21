@@ -2,7 +2,7 @@ package rpc
 
 import (
 	"io"
-	"log"
+	log "github.com/Sirupsen/logrus"
 
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"

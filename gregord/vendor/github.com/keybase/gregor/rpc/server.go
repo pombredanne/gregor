@@ -3,7 +3,7 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"time"
 

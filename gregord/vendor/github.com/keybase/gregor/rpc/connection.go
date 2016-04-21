@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"sync"
 	"time"
@@ -70,8 +70,8 @@ type connection struct {
 }
 
 func newConnection(c net.Conn, parent *Server) (*connection, error) {
-	// TODO: logging and error wrapping mechanisms.
-	xprt := rpc.NewTransport(c, nil, keybase1.WrapError)
+	// TODO: error wrapping mechanisms.
+	xprt := rpc.NewTransport(c, NewLogrusRPCLogFactory(), keybase1.WrapError)
 
 	conn := &connection{
 		c:      c,
@@ -214,3 +214,29 @@ func (c *connection) close() {
 var _ gregor1.AuthInterface = (*connection)(nil)
 
 // var _ gregor1.IncomingInterface = (*connection)(nil)
+
+func NewLogrusRPCLogFactory() rpc.LogFactory {
+	return rpc.NewSimpleLogFactory(&LogrusWrapper{}, nil)
+}
+
+type LogrusWrapper struct{}
+
+func (w *LogrusWrapper) Error(s string, args ...interface{}) {
+	log.Errorf(s, args...)
+}
+
+func (w *LogrusWrapper) Warning(s string, args ...interface{}) {
+	log.Warningf(s, args...)
+}
+
+func (w *LogrusWrapper) Info(s string, args ...interface{}) {
+	log.Infof(s, args...)
+}
+
+func (w *LogrusWrapper) Debug(s string, args ...interface{}) {
+	log.Debugf(s, args...)
+}
+
+func (w *LogrusWrapper) Profile(s string, args ...interface{}) {
+	log.Debugf(s, args...)
+}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 	"time"
 
@@ -12,9 +11,15 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+
+	log "github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	syslog "log/syslog"
 )
 
 func main() {
+	initLogging()
+
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
 		log.Fatal(err)
@@ -29,7 +34,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
+		Cli := rpc.NewClient(rpc.NewTransport(conn, grpc.NewLogrusRPCLogFactory(), keybase1.WrapError), keybase1.ErrorUnwrapper{})
 		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
 		defer sc.Close()
@@ -44,6 +49,23 @@ func main() {
 	go srv.Serve(consumer)
 
 	log.Fatal(newMainServer(opts, srv).listenAndServe())
+}
+
+func initLogging() {
+	log.SetLevel(log.DebugLevel)
+	// Add a syslog hook if the right env vars are set.
+	syslogIP := os.Getenv("LOGGLY_PORT_514_UDP_ADDR")
+	syslogPort := os.Getenv("LOGGLY_PORT_514_UDP_PORT")
+	if syslogIP != "" && syslogPort != "" {
+		syslogURL := syslogIP + ":" + syslogPort
+		hook, err := logrus_syslog.NewSyslogHook("udp", syslogURL, syslog.LOG_DEBUG, "")
+		if err != nil {
+			log.Error("Unable to connect to local syslog daemon at %s", syslogURL)
+		} else {
+			log.Info("Connected to syslog at %s", syslogURL)
+			log.AddHook(hook)
+		}
+	}
 }
 
 type mockAuth struct{}

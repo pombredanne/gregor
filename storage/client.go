@@ -3,7 +3,7 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"log"
+	log "github.com/Sirupsen/logrus"
 	"time"
 
 	"github.com/keybase/gregor"

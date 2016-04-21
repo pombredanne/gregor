@@ -66,8 +66,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/rpc",
-			"revision": "981e40adf9373075abd789255a21b2e56ec57ffb",
-			"revisionTime": "2016-04-21T10:43:38-07:00"
+			"revision": "030769e7b0d669525d277a3b4e9c3a327fa84721",
+			"revisionTime": "2016-04-21T16:38:47-04:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",

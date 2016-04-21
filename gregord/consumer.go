@@ -3,13 +3,14 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"net/url"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 type consumer struct {
