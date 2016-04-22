@@ -211,7 +211,7 @@ func (c *connection) close() {
 
 var _ gregor1.AuthInterface = (*connection)(nil)
 
-// var _ gregor1.IncomingInterface = (*connection)(nil)
+var _ gregor1.IncomingInterface = (*connection)(nil)
 
 func NewLogrusRPCLogFactory() rpc.LogFactory {
 	return rpc.NewSimpleLogFactory(&LogrusWrapper{}, nil)
