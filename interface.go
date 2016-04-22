@@ -88,6 +88,11 @@ type Item interface {
 	Category() Category
 }
 
+type Notification interface {
+	Item
+	NotifyTime() time.Time
+}
+
 type MsgRange interface {
 	EndTime() TimeOrOffset
 	Category() Category
@@ -153,6 +158,9 @@ type StateMachine interface {
 	// return global messages and per-device messages for that device.
 	InBandMessagesSince(u UID, d DeviceID, t time.Time) ([]InBandMessage, error)
 
+	// Notifications returns a a chan of non-dismissed items past their NotifyTimes.
+	Notifications() <-chan Item
+
 	// ObjFactory returns the ObjFactory used by this StateMachine.
 	ObjFactory() ObjFactory
 
@@ -167,6 +175,7 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
+	MakeNotification(i Item, t time.Time) (Notification, error)
 	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error)
 	MakeDismissalByIDs(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d []MsgID) (InBandMessage, error)
 	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error)
