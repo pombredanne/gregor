@@ -70,7 +70,6 @@ type connection struct {
 }
 
 func newConnection(c net.Conn, parent *Server) (*connection, error) {
-	// TODO: error wrapping mechanisms.
 	xprt := rpc.NewTransport(c, NewLogrusRPCLogFactory(), keybase1.WrapError)
 
 	conn := &connection{
@@ -167,7 +166,6 @@ func (c *connection) Ping(ctx context.Context) (string, error) {
 }
 
 func (c *connection) startRPCServer() error {
-	// TODO: error wrapping mechanism
 	c.server = rpc.NewServer(c.xprt, keybase1.WrapError)
 
 	prots := []rpc.Protocol{
