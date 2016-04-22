@@ -3,6 +3,16 @@
 	"ignore": "test",
 	"package": [
 		{
+			"path": "github.com/Sirupsen/logrus",
+			"revision": "cdaedc68f2894175ac2b3221869685602c759e71",
+			"revisionTime": "2015-11-23T03:15:15-05:00"
+		},
+		{
+			"path": "github.com/Sirupsen/logrus/hooks/syslog",
+			"revision": "cdaedc68f2894175ac2b3221869685602c759e71",
+			"revisionTime": "2015-11-23T03:15:15-05:00"
+		},
+		{
 			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1",
@@ -170,6 +180,11 @@
 			"path": "golang.org/x/net/context",
 			"revision": "815d315ead425c4365077d904a2331ee9e179820",
 			"revisionTime": "2016-04-20T16:37:57+10:00"
+		},
+		{
+			"path": "golang.org/x/sys/unix",
+			"revision": "2bacc619e34d59719d9ed86f0e04e8261aed3409",
+			"revisionTime": "2015-11-24T09:07:05+02:00"
 		}
 	]
 }
