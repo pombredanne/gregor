@@ -3,7 +3,6 @@ package rpc
 import (
 	"encoding/hex"
 	"errors"
-	"log"
 	"net"
 	"time"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
+
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 // ErrBadCast occurs when there is a problem casting a type from
@@ -82,11 +83,13 @@ type Server struct {
 	// Useful for testing. Insert arbitrary waits throughout the
 	// code and wait for something bad to happen.
 	useDeadlocker bool
+
+	log rpc.LogOutput
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer() *Server {
+func NewServer(log rpc.LogOutput) *Server {
 	s := &Server{
 		clock:           clockwork.NewRealClock(),
 		users:           make(map[string]*perUIDServer),
@@ -98,6 +101,7 @@ func NewServer() *Server {
 		broadcastCh:     make(chan messageArgs),
 		closeCh:         make(chan struct{}),
 		confirmCh:       make(chan confirmUIDShutdownArgs),
+		log:             log,
 	}
 
 	return s
@@ -114,7 +118,7 @@ func (s *Server) SetEventHandler(e EventHandler) {
 func (s *Server) uidKey(u gregor.UID) (string, error) {
 	tuid, ok := u.(gregor1.UID)
 	if !ok {
-		log.Printf("can't cast %v (%T) to gregor1.UID", u, u)
+		s.log.Info("can't cast %v (%T) to gregor1.UID", u, u)
 		return "", ErrBadCast
 	}
 	return hex.EncodeToString(tuid), nil
@@ -151,7 +155,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events)
+		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log)
 		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
 			return err
 		}
@@ -173,12 +177,12 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 	s.deadlocker()
 	k, err := s.uidKey(a.uid)
 	if err != nil {
-		log.Printf("confirmUIDShutdown, uidKey error: %s", err)
+		s.log.Info("confirmUIDShutdown, uidKey error: %s", err)
 		return
 	}
 	serverLast, ok := s.lastConns[k]
 	if !ok {
-		log.Printf("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
+		s.log.Info("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
 		return
 	}
 
@@ -203,7 +207,7 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 }
 
 func (s *Server) reportStats(c chan *Stats) {
-	log.Printf("reportStats")
+	s.log.Info("reportStats")
 	stats := &Stats{
 		UserServerCount: len(s.users),
 	}
@@ -214,7 +218,7 @@ func (s *Server) logError(prefix string, err error) {
 	if err == nil {
 		return
 	}
-	log.Printf("%s error: %s", prefix, err)
+	s.log.Info("%s error: %s", prefix, err)
 }
 
 // BroadcastMessage implements gregor.NetworkInterfaceOutgoing.
@@ -237,7 +241,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 		// even though nothing to do, create an event if
 		// an event handler in place:
 		if s.events != nil {
-			log.Printf("sendBroadcast: no PerUIDServer for %s", gregor.UIDFromMessage(m))
+			s.log.Info("sendBroadcast: no PerUIDServer for %s", gregor.UIDFromMessage(m))
 			s.events.BroadcastSent(m)
 		}
 		return nil

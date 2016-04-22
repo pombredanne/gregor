@@ -3,26 +3,28 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"net/url"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
+
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type consumer struct {
 	db *sql.DB
 	sm gregor.StateMachine
 	gregor1.IncomingInterface
+	log rpc.LogOutput
 }
 
-func newConsumer(dsn *url.URL) (*consumer, error) {
+func newConsumer(dsn *url.URL, log rpc.LogOutput) (*consumer, error) {
 	if dsn == nil {
 		return nil, errors.New("nil mysql dsn provided to newConsumer")
 	}
-	c := &consumer{}
+	c := &consumer{log: log}
 	if err := c.setup(dsn); err != nil {
 		return nil, err
 	}
@@ -47,7 +49,7 @@ func (c *consumer) shutdown() {
 
 func (c *consumer) createDB(dsn *url.URL) error {
 	dsn = storage.ForceParseTime(dsn)
-	log.Printf("opening mysql connection to %s", dsn)
+	c.log.Info("opening mysql connection to %s", dsn)
 	db, err := sql.Open("mysql", dsn.String())
 	if err != nil {
 		return err

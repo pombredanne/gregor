@@ -11,6 +11,8 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/test"
 	"github.com/syndtr/goleveldb/leveldb"
+
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type clientServerSM struct {
@@ -90,7 +92,7 @@ func TestLevelDBClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, gregor1.NewLocalIncoming(sm.server))
+	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, gregor1.NewLocalIncoming(sm.server), rpc.SimpleLogOutput{})
 
 	if err := c.Save(); err != nil {
 		t.Fatal(err)

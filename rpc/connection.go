@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -67,17 +66,20 @@ type connection struct {
 	// Suitable for receiving externally after
 	// startAuthentication() finishes successfully.
 	serverDoneCh <-chan struct{}
+
+	log rpc.LogOutput
 }
 
 func newConnection(c net.Conn, parent *Server) (*connection, error) {
 	// TODO: logging and error wrapping mechanisms.
-	xprt := rpc.NewTransport(c, nil, keybase1.WrapError)
+	xprt := rpc.NewTransport(c, rpc.NewSimpleLogFactory(parent.log, nil), keybase1.WrapError)
 
 	conn := &connection{
 		c:      c,
 		xprt:   xprt,
 		parent: parent,
 		authCh: make(chan error, 1),
+		log:    parent.log,
 	}
 
 	if err := conn.startRPCServer(); err != nil {
@@ -119,7 +121,7 @@ func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) er
 }
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
-	log.Printf("Authenticate: %+v", tok)
+	c.log.Info("Authenticate: %+v", tok)
 	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
 		c.authInfo.set(tok, res, c.parent.clock.Now())
@@ -136,7 +138,7 @@ func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.S
 
 func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
 	for _, sid := range sessionIDs {
-		log.Printf("Revoke: %+v", sid)
+		c.log.Info("Revoke: %+v", sid)
 		if c.authInfo.clear(sid) {
 			break
 		}
@@ -153,7 +155,7 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 }
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
-	log.Printf("ConsumeMessage: %+v", m)
+	c.log.Info("ConsumeMessage: %+v", m)
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		c.close()
 		return err
@@ -175,7 +177,7 @@ func (c *connection) startRPCServer() error {
 		gregor1.IncomingProtocol(c),
 	}
 	for _, prot := range prots {
-		log.Printf("registering protocol %s", prot.Name)
+		c.log.Info("registering protocol %s", prot.Name)
 		if err := c.server.Register(prot); err != nil {
 			return err
 		}

@@ -105,12 +105,12 @@ func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
 		Debug:       true,
 	}
 
-	srv := grpc.NewServer()
+	srv := grpc.NewServer(rpc.SimpleLogOutput{})
 	srv.SetAuthenticator(mockAuth{})
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
-	consumer, err := newConsumer(u)
+	consumer, err := newConsumer(u, rpc.SimpleLogOutput{})
 	if err != nil {
 		t.Fatal(err)
 	}
