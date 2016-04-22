@@ -2,7 +2,9 @@ package storage
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/hex"
+	"log"
 	"sync"
 	"time"
 
@@ -17,9 +19,10 @@ import (
 // when SQLite isn't available.
 type MemEngine struct {
 	sync.Mutex
-	objFactory gregor.ObjFactory
-	clock      clockwork.Clock
-	users      map[string](*user)
+	objFactory        gregor.ObjFactory
+	clock             clockwork.Clock
+	users             map[string](*user)
+	addNotificationCh chan gregor.Notification
 }
 
 // NewMemEngine makes a new MemEngine with the given object factory and the
@@ -245,6 +248,13 @@ func (m *MemEngine) consumeInBandMessage(uid gregor.UID, msg gregor.InBandMessag
 	switch {
 	case msg.ToStateUpdateMessage() != nil:
 		i, err = m.consumeStateUpdateMessage(user, now, msg.ToStateUpdateMessage())
+		if m.addNotificationCh != nil {
+			for _, too := range i.item.NotifyTimes() {
+				if t := too.Time(); t != nil {
+					m.objFactory.MakeNotification(i.item, *t)
+				}
+			}
+		}
 	default:
 	}
 	user.logMessage(now, msg, i)
@@ -345,6 +355,70 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	msgs, _ := m.getUser(u).replayLog(m.clock.Now(), d, t)
 
 	return msgs, nil
+}
+
+func (m *MemEngine) prepopulateNotifications() (notificationQueue, error) {
+	m.Lock()
+	defer m.Lock()
+	var nq notificationQueue
+	for _, u := range m.users {
+		for _, it := range u.items {
+			for _, too := range it.item.NotifyTimes() {
+				if t := too.Time(); t != nil && !it.isDismissedAt(*t) {
+					not, err := m.objFactory.MakeNotification(it.item, *t)
+					if err != nil {
+						return nil, err
+					}
+					heap.Push(&nq, not)
+				}
+			}
+		}
+	}
+
+	return nq, nil
+}
+
+func (m *MemEngine) sendNotifications(notificationCh chan gregor.Notification) {
+	nq, err := m.prepopulateNotifications()
+	if err != nil {
+		log.Println(err)
+		close(notificationCh)
+		return
+	}
+
+	// Create global channel for inserting new notifications. Capacity or 100 to
+	// prevent blocking.
+	m.addNotificationCh = make(chan gregor.Notification, 100)
+
+	var notifyCh <-chan time.Time
+	if len(nq) != 0 {
+		notifyCh = m.clock.After(nq[0].NotifyTime().Sub(m.clock.Now()))
+	}
+	for {
+		select {
+		case <-notifyCh:
+			if not := heap.Pop(&nq).(gregor.Notification); not.DTime() == nil {
+				notificationCh <- not
+			}
+		case not := <-m.addNotificationCh:
+			if len(nq) == 0 {
+				notifyCh = m.clock.After(not.NotifyTime().Sub(m.clock.Now()))
+			}
+			heap.Push(&nq, not)
+		default:
+			close(notificationCh)
+			m.Lock()
+			m.addNotificationCh = nil
+			m.Unlock()
+			return
+		}
+	}
+}
+
+func (m *MemEngine) Notifications() <-chan gregor.Notification {
+	notificationCh := make(chan gregor.Notification)
+	go m.sendNotifications(notificationCh)
+	return notificationCh
 }
 
 func (m *MemEngine) IsEphemeral() bool {

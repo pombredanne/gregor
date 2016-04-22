@@ -1,10 +1,12 @@
 package storage
 
 import (
+	"container/heap"
 	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -18,10 +20,11 @@ func sqlWrapper(s string) string {
 }
 
 type SQLEngine struct {
-	driver     *sql.DB
-	objFactory gregor.ObjFactory
-	clock      clockwork.Clock
-	stw        sqlTimeWriter
+	driver            *sql.DB
+	objFactory        gregor.ObjFactory
+	clock             clockwork.Clock
+	stw               sqlTimeWriter
+	addNotificationCh chan gregor.Notification
 }
 
 func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock) *SQLEngine {
@@ -126,7 +129,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("INSERT INTO items(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
+		nqb.Build("INSERT INTO reminders(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -305,6 +308,25 @@ func (s *SQLEngine) rowToItem(u gregor.UID, rows *sql.Rows) (gregor.Item, error)
 		return nil, err
 	}
 	return s.objFactory.MakeItem(u, msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
+}
+
+func (s *SQLEngine) rowToNotification(rows *sql.Rows) (gregor.Notification, error) {
+	uid := uidScanner{o: s.objFactory}
+	deviceID := deviceIDScanner{o: s.objFactory}
+	msgID := msgIDScanner{o: s.objFactory}
+	category := categoryScanner{o: s.objFactory}
+	body := bodyScanner{o: s.objFactory}
+	var dtime timeScanner
+	var ctime timeScanner
+	var ntime timeScanner
+	if err := rows.Scan(&msgID, &deviceID, &category, &dtime, &body, &ctime, &ntime); err != nil {
+		return nil, err
+	}
+	it, err := s.objFactory.MakeItem(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
+	if err != nil {
+		return nil, err
+	}
+	return s.objFactory.MakeNotification(it, ntime.Time())
 }
 
 func (s *SQLEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {
@@ -515,6 +537,68 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 		}
 	}
 	return ret, nil
+}
+
+func (s *SQLEngine) prepopulateNotifications() (notificationQueue, error) {
+	var nq notificationQueue
+	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
+	        FROM items AS i
+	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
+	        INNER JOIN reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
+	        AND i.dtime IS NULL`
+
+	rows, err := s.driver.Query(qry)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		not, err := s.rowToNotification(rows)
+		if err != nil {
+			return nil, err
+		}
+		heap.Push(&nq, not)
+	}
+	return nq, nil
+}
+
+func (s *SQLEngine) sendNotifications(notificationCh chan gregor.Notification) {
+	nq, err := s.prepopulateNotifications()
+	if err != nil {
+		log.Println(err)
+		close(notificationCh)
+		return
+	}
+
+	// Create global channel for inserting new notifications. Capacity or 100 to
+	// prevent blocking.
+	s.addNotificationCh = make(chan gregor.Notification, 100)
+
+	var notifyCh <-chan time.Time
+	if len(nq) != 0 {
+		notifyCh = s.clock.After(nq[0].NotifyTime().Sub(s.clock.Now()))
+	}
+	for {
+		select {
+		case <-notifyCh:
+			// TODO: check that Item hasn't been dismissed
+			notificationCh <- heap.Pop(&nq).(gregor.Notification)
+		case not := <-s.addNotificationCh:
+			if len(nq) == 0 {
+				notifyCh = s.clock.After(not.NotifyTime().Sub(s.clock.Now()))
+			}
+			heap.Push(&nq, not)
+		default:
+			close(notificationCh)
+			s.addNotificationCh = nil
+		}
+	}
+}
+
+func (s *SQLEngine) Notifications() <-chan gregor.Notification {
+	notificationCh := make(chan gregor.Notification)
+	go s.sendNotifications(notificationCh)
+	return notificationCh
 }
 
 func (s *SQLEngine) IsEphemeral() bool {

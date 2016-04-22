@@ -159,7 +159,7 @@ type StateMachine interface {
 	InBandMessagesSince(u UID, d DeviceID, t time.Time) ([]InBandMessage, error)
 
 	// Notifications returns a a chan of non-dismissed items past their NotifyTimes.
-	Notifications() <-chan Item
+	Notifications() <-chan Notification
 
 	// ObjFactory returns the ObjFactory used by this StateMachine.
 	ObjFactory() ObjFactory
