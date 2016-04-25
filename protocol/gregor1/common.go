@@ -57,6 +57,11 @@ type ItemAndMetadata struct {
 	Item_ *Item     `codec:"item,omitempty" json:"item,omitempty"`
 }
 
+type Reminder struct {
+	Item_  ItemAndMetadata `codec:"item" json:"item"`
+	Ntime_ Time            `codec:"ntime" json:"ntime"`
+}
+
 type OutOfBandMessage struct {
 	Uid_    UID    `codec:"uid" json:"uid"`
 	System_ System `codec:"system" json:"system"`

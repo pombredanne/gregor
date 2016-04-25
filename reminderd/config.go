@@ -1,9 +1,25 @@
 package main
 
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/goamz/goamz/aws"
+	"github.com/goamz/goamz/s3"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
+)
+
 type Options struct {
-	NotifyServer *rpc.FMPURI
-	MysqlDSN     *url.URL
-	Debug        bool
+	RemindServer   *rpc.FMPURI
+	RemindDuration time.Duration
+	MysqlDSN       *url.URL
+	Debug          bool
 }
 
 const usageStr = `Usage:
@@ -69,14 +85,15 @@ func (o *Options) Parse(raw *rawOpts) error {
 		return ErrExitOnHelp
 	}
 
-	if raw.notifyServerAddr == "" {
+	if raw.remindServerAddr == "" {
 		return badUsage("No session-server URI specified")
 	}
 
 	var err error
-	if o.SessionServer, err = rpc.ParseFMPURI(raw.notifyServerAddr); err != nil {
+	if o.RemindServer, err = rpc.ParseFMPURI(raw.remindServerAddr); err != nil {
 		return badUsage("Error parsing session-server: %s", err)
 	}
+	o.RemindDuration = raw.remindDuration
 
 	o.Debug = raw.debug
 
@@ -91,10 +108,42 @@ func (o *Options) Parse(raw *rawOpts) error {
 	return nil
 }
 
+// readFromS3Config reads the content of the files denoted by fileNames
+// from S3 configuration bucket
+func readFromS3Config(region string, bucket string, fileNames ...string) ([]string, error) {
+	if _, ok := aws.Regions[region]; !ok {
+		return nil, badConfig("unknown region: %s", region)
+	}
+	// this will attempt to populate an Auth object by getting
+	// credentials from (in order):
+	//
+	//   (1) credentials file
+	//   (2) environment variables
+	//   (3) instance role (this will be the case for production)
+	//
+	auth, err := aws.GetAuth("", "", "", time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	client := s3.New(auth, aws.Regions[region]).Bucket(bucket)
+	results := make([]string, len(fileNames))
+	for i, name := range fileNames {
+		buf, err := client.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = string(buf)
+	}
+	return results, nil
+}
+
 type rawOpts struct {
-	notifyServerAddr string
+	remindServerAddr string
+	remindDuration   time.Duration
 	mysqlDSN         string
 	debug            bool
+	awsRegion        string
+	configBucket     string
 	helpExtended     bool
 }
 
@@ -113,7 +162,8 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		fs.SetOutput(ioutil.Discard)
 	}
 	var raw rawOpts
-	fs.StringVar(&raw.notifyServerAddr, "notify-server", os.Getenv("NOTIFY_SERVER"), "host:port of the session server")
+	fs.StringVar(&raw.remindServerAddr, "remind-server", os.Getenv("REMIND_SERVER"), "FMPURI of the remind server")
+	fs.DurationVar(&raw.remindDuration, "remind-duration", time.Minute, "Duration between remind calls")
 	fs.StringVar(&raw.mysqlDSN, "mysql-dsn", os.Getenv("MYSQL_DSN"), "user:pw@host/dbname for MySQL")
 	fs.BoolVar(&raw.debug, "debug", false, "turn on debugging")
 	fs.BoolVar(&raw.helpExtended, "help-extended", false, "get more help")

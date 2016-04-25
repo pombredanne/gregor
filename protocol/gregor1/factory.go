@@ -101,14 +101,14 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 	}, nil
 }
 
-func (o ObjFactory) MakeNotification(i gregor.Item, t time.Time) (gregor.Notification, error) {
+func (o ObjFactory) MakeReminder(i gregor.Item, t time.Time) (gregor.Reminder, error) {
 	it, ok := i.(ItemAndMetadata)
 	if !ok {
 		return nil, errors.New("item is not gregor1.ItemAndMetadata")
 	}
-	return Notification{
-		ItemAndMetadata: it,
-		ntime:           t,
+	return Reminder{
+		Item_:  it,
+		Ntime_: ToTime(t),
 	}, nil
 }
 

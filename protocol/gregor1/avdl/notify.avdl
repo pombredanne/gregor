@@ -1,4 +1,0 @@
-@namespace("gregor.1")
-protocol notify {
-   void notify(ItemAndMetadata md);
-}

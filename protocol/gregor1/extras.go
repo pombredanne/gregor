@@ -214,12 +214,8 @@ func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 	return m.Oobm_
 }
 
-type Notification struct {
-	ItemAndMetadata
-	ntime time.Time
-}
-
-func (n Notification) NotifyTime() time.Time { return n.ntime }
+func (r Reminder) Item() gregor.Item     { return r.Item_ }
+func (r Reminder) NotifyTime() time.Time { return FromTime(r.Ntime_) }
 
 type State struct {
 	items []ItemAndMetadata
@@ -345,7 +341,7 @@ var _ gregor.StateSyncMessage = StateSyncMessage{}
 var _ gregor.MsgRange = MsgRange{}
 var _ gregor.Dismissal = Dismissal{}
 var _ gregor.Item = ItemAndMetadata{}
-var _ gregor.Notification = Notification{}
+var _ gregor.Reminder = Reminder{}
 var _ gregor.StateUpdateMessage = StateUpdateMessage{}
 var _ gregor.InBandMessage = InBandMessage{}
 var _ gregor.OutOfBandMessage = OutOfBandMessage{}

@@ -52,6 +52,11 @@ protocol common {
 		union { null, Item } item;
 	}
 
+	record Reminder {
+		ItemAndMetadata item;
+		Time ntime;
+	}
+
 	record OutOfBandMessage {
 		UID uid;
 		System system;
