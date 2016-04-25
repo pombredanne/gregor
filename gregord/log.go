@@ -43,7 +43,7 @@ var noColorFormat = `%{level:.4s} %{time:15:04:05.000} %{shortfile} %{message}`
 
 var colorFormat = "%{color}" + noColorFormat + "%{color:reset}"
 
-func newLogger() *logging.Logger {
+func newLogger() rpc.LogOutput {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
 	var format string
 	if terminal.IsTerminal(int(os.Stdout.Fd())) {
@@ -74,5 +74,5 @@ func newLogger() *logging.Logger {
 
 	logger := logging.MustGetLogger("gregord")
 	logger.SetBackend(logging.MultiLogger(backends...))
-	return logger
+	return &GoLoggingWrapperForRPC{logger}
 }

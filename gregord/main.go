@@ -13,38 +13,41 @@ import (
 )
 
 func main() {
-	logger := newLogger()
-	rpcLogger := &GoLoggingWrapperForRPC{logger}
+	log := newLogger()
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
-		logger.Fatal(err)
+		log.Error("%#v", err)
+		os.Exit(1)
 	}
 
-	srv := grpc.NewServer(rpcLogger)
+	srv := grpc.NewServer(log)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(mockAuth{})
 	} else {
 		conn, err := opts.SessionServer.Dial()
 		if err != nil {
-			logger.Fatal(err)
+			log.Error("%#v", err)
+			os.Exit(2)
 		}
-		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(rpcLogger, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
+		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
 		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
 		defer sc.Close()
 	}
 
 	// create a message consumer state machine
-	consumer, err := newConsumer(opts.MysqlDSN, rpcLogger)
+	consumer, err := newConsumer(opts.MysqlDSN, log)
 	if err != nil {
-		logger.Fatal(err)
+		log.Error("%#v", err)
+		os.Exit(3)
 	}
 	defer consumer.shutdown()
 	go srv.Serve(consumer)
 
-	logger.Fatal(newMainServer(opts, srv).listenAndServe())
+	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
+	os.Exit(4)
 }
 
 type mockAuth struct{}
