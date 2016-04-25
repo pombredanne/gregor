@@ -121,7 +121,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 		return err
 	}
 
-	for _, t := range i.NotifyTimes() {
+	for _, t := range i.RemindTimes() {
 		if t == nil {
 			continue
 		}

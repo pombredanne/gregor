@@ -48,7 +48,7 @@ type Dismissal struct {
 type Item struct {
 	Category_    Category       `codec:"category" json:"category"`
 	Dtime_       TimeOrOffset   `codec:"dtime" json:"dtime"`
-	NotifyTimes_ []TimeOrOffset `codec:"notifyTimes" json:"notifyTimes"`
+	RemindTimes_ []TimeOrOffset `codec:"remindTimes" json:"remindTimes"`
 	Body_        Body           `codec:"body" json:"body"`
 }
 

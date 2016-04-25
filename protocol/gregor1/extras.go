@@ -108,9 +108,9 @@ func (i ItemAndMetadata) DTime() gregor.TimeOrOffset {
 	}
 	return i.Item_.Dtime_
 }
-func (i ItemAndMetadata) NotifyTimes() []gregor.TimeOrOffset {
+func (i ItemAndMetadata) RemindTimes() []gregor.TimeOrOffset {
 	var ret []gregor.TimeOrOffset
-	for _, t := range i.Item_.NotifyTimes_ {
+	for _, t := range i.Item_.RemindTimes_ {
 		ret = append(ret, t)
 	}
 	return ret
@@ -215,7 +215,7 @@ func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 }
 
 func (r Reminder) Item() gregor.Item     { return r.Item_ }
-func (r Reminder) NotifyTime() time.Time { return FromTime(r.Ntime_) }
+func (r Reminder) RemindTime() time.Time { return FromTime(r.Ntime_) }
 
 type State struct {
 	items []ItemAndMetadata

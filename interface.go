@@ -83,14 +83,14 @@ type TimeOrOffset interface {
 type Item interface {
 	MessageWithMetadata
 	DTime() TimeOrOffset
-	NotifyTimes() []TimeOrOffset
+	RemindTimes() []TimeOrOffset
 	Body() Body
 	Category() Category
 }
 
 type Reminder interface {
 	Item() Item
-	NotifyTime() time.Time
+	RemindTime() time.Time
 }
 
 type MsgRange interface {
@@ -158,7 +158,7 @@ type StateMachine interface {
 	// return global messages and per-device messages for that device.
 	InBandMessagesSince(u UID, d DeviceID, t time.Time) ([]InBandMessage, error)
 
-	// Reminders returns a slice of non-dismissed items past their NotifyTimes.
+	// Reminders returns a slice of non-dismissed items past their RemindTimes.
 	Reminders() ([]Reminder, error)
 
 	// ObjFactory returns the ObjFactory used by this StateMachine.

@@ -43,7 +43,7 @@ protocol common {
 	record Item {
 		Category category;
 		TimeOrOffset dtime;
-		array<TimeOrOffset> notifyTimes;
+		array<TimeOrOffset> remindTimes;
 		Body body;
 	}
 

@@ -83,7 +83,7 @@ type TimeOrOffset interface {
 type Item interface {
 	MessageWithMetadata
 	DTime() TimeOrOffset
-	NotifyTimes() []TimeOrOffset
+	RemindTimes() []TimeOrOffset
 	Body() Body
 	Category() Category
 }
