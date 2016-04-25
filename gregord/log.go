@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	logging "github.com/keybase/go-logging"
-	"golang.org/x/crypto/ssh/terminal"
 	"log/syslog"
 	"os"
+
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	logging "github.com/keybase/go-logging"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // The gregor libraries don't depend on any particular logging implementation.
@@ -18,6 +20,8 @@ import (
 type GoLoggingWrapperForRPC struct {
 	inner *logging.Logger
 }
+
+var _ rpc.LogOutput = (*GoLoggingWrapperForRPC)(nil)
 
 func (g *GoLoggingWrapperForRPC) Error(s string, args ...interface{}) {
 	g.inner.Errorf(s, args...)
