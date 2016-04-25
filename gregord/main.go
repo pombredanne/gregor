@@ -6,11 +6,10 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
-	"golang.org/x/net/context"
-
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+	"golang.org/x/net/context"
 )
 
 func main() {

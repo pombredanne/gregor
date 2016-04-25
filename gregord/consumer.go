@@ -6,11 +6,10 @@ import (
 	"net/url"
 
 	_ "github.com/go-sql-driver/mysql"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
-
-	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type consumer struct {
