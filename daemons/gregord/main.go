@@ -7,13 +7,14 @@ import (
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor/daemons"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 	"golang.org/x/net/context"
 )
 
 func main() {
-	log := newLogger()
+	log := daemons.NewLogger()
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {

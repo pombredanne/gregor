@@ -1,4 +1,4 @@
-package main
+package daemons
 
 import (
 	"fmt"
@@ -43,7 +43,7 @@ var noColorFormat = `%{level:.4s} %{time:15:04:05.000} %{shortfile} %{message}`
 
 var colorFormat = "%{color}" + noColorFormat + "%{color:reset}"
 
-func newLogger() rpc.LogOutput {
+func NewLogger() rpc.LogOutput {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
 	var format string
 	if terminal.IsTerminal(int(os.Stdout.Fd())) {

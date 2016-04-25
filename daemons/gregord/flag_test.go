@@ -3,6 +3,7 @@ package main
 import (
 	"testing"
 
+	"github.com/keybase/gregor/daemons"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,9 +22,9 @@ func testGoodUsage(t *testing.T, args []string) {
 }
 
 func TestUsage(t *testing.T) {
-	ebu := ErrBadUsage("")
+	ebu := daemons.ErrBadUsage("")
 	testBadUsage(t, []string{"gregor"}, ebu, "No valid bind-address specified")
-	testBadUsage(t, []string{"gregor", "--bind-address", "aabb"}, ebu, "bad bind-address")
+	testBadUsage(t, []string{"gregor", "--bind-address", "aabb"}, ebu, "bad bind-address: missing port in address aabb")
 	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:aabb", "--session-server", "localhost"}, ebu, "bad port (\"aabb\") in bind-address")
 	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:65537", "--session-server", "localhost"}, ebu, "bad port (\"65537\") in bind-address")
 	testBadUsage(t, []string{"gregor", "--bind-address", "localhost:-20", "--session-server", "localhost"}, ebu, "bad port (\"-20\") in bind-address")
@@ -39,7 +40,7 @@ func TestUsage(t *testing.T) {
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
 		"--tls-cert", "bye", "--s3-config-bucket", "foo", "--mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "--bind-address", ":4000", "--session-server", "fmprpc://localhost:30000", "--tls-key", "hi",
-		"--tls-cert", "file:///does/not/exist", "--mysql-dsn", "gregor:@/gregor_test"}, ErrBadConfig(""), "no such file or directory")
+		"--tls-cert", "file:///does/not/exist", "--mysql-dsn", "gregor:@/gregor_test"}, daemons.ErrBadConfig(""), "no such file or directory")
 	testBadUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000"}, ebu, "No mysql-dsn specified")
 
 	testGoodUsage(t, []string{"gregor", "--session-server", "fmprpc://localhost:30000", "--bind-address", ":4000", "--mysql-dsn", "gregor:@/gregor_test"})
