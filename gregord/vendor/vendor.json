@@ -55,6 +55,11 @@
 			"revisionTime": "2016-04-21T10:04:43-07:00"
 		},
 		{
+			"path": "github.com/keybase/go-logging",
+			"revision": "f3c7c3c1605e29ebcce430bb1e0d048faf4081ce",
+			"revisionTime": "2016-03-23T15:35:38-07:00"
+		},
+		{
 			"path": "github.com/keybase/gregor",
 			"revision": "981e40adf9373075abd789255a21b2e56ec57ffb",
 			"revisionTime": "2016-04-21T10:43:38-07:00"
@@ -159,6 +164,11 @@
 			"path": "github.com/vaughan0/go-ini",
 			"revision": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1",
 			"revisionTime": "2013-09-23T16:52:12+02:00"
+		},
+		{
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "7b85b097bf7527677d54d3220065e966a0e3b613",
+			"revisionTime": "2015-11-30T17:07:01-05:00"
 		},
 		{
 			"checksumSHA1": "pancewZW3HwGvpDwfH5Imrbadc4=",
