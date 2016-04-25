@@ -71,6 +71,10 @@ func (sm *clientServerSM) Reminders() ([]gregor.Reminder, error) {
 	return sm.server.Reminders()
 }
 
+func (sm *clientServerSM) DeleteReminder(r gregor.Reminder) error {
+	return sm.server.DeleteReminder(r)
+}
+
 func (sm *clientServerSM) ObjFactory() gregor.ObjFactory {
 	return sm.clientOF
 }

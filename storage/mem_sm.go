@@ -352,6 +352,11 @@ func (m *MemEngine) Reminders() ([]gregor.Reminder, error) {
 	return nil, nil
 }
 
+func (m *MemEngine) DeleteReminder(r gregor.Reminder) error {
+	// Unimplemented for MemEngine
+	return nil
+}
+
 func (m *MemEngine) IsEphemeral() bool {
 	return true
 }

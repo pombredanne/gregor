@@ -161,6 +161,9 @@ type StateMachine interface {
 	// Reminders returns a slice of non-dismissed items past their RemindTimes.
 	Reminders() ([]Reminder, error)
 
+	// DeleteReminder deletes a reminder.
+	DeleteReminder(r Reminder) error
+
 	// ObjFactory returns the ObjFactory used by this StateMachine.
 	ObjFactory() ObjFactory
 

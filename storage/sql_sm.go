@@ -541,18 +541,8 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
 	        INNER JOIN reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
-	        WHERE i.dtime IS NULL AND r.ntime <=`
-	qb := s.newQueryBuilder()
-	qb.Build(qry)
-	now := s.clock.Now()
-	qb.Build("?", now)
-
-	tx, err := s.driver.Begin()
-	if err != nil {
-		return nil, err
-	}
-
-	rows, err := tx.Query(qb.Query())
+	        WHERE i.dtime IS NULL AND r.ntime <= ?`
+	rows, err := s.driver.Query(qry, s.clock.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -565,19 +555,14 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 		}
 		reminders = append(reminders, not)
 	}
-
-	del := `DELETE FROM reminders WHERE ntime <=`
-	qb2 := s.newQueryBuilder()
-	qb2.Build(qb2)
-	qb2.Build("?", now)
-
-	if err := qb.Exec(tx); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	return reminders, nil
+}
+
+func (s *SQLEngine) DeleteReminder(r gregor.Reminder) error {
+	qry := `DELETE FROM reminders WHERE 
+			uid = ? AND msgid = ? ntime = ?`
+	_, err := s.driver.Exec(qry, r.Item().Metadata().UID(), r.Item().Metadata().MsgID(), r.RemindTime())
+	return err
 }
 
 func (s *SQLEngine) IsEphemeral() bool {

@@ -22,14 +22,14 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, nil, keybase1.WrapError), keybase1.ErrorUnwrapper{})
-	r, err := newReminder(opts.MysqlDSN, gregor1.RemindClient{Cli})
+	n, err := newNagger(opts.MysqlDSN, gregor1.RemindClient{Cli})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer r.shutdown()
+	defer n.shutdown()
 
 	for _ = range time.Tick(opts.RemindDuration) {
-		if err := r.sendReminders(); err != nil {
+		if err := n.sendReminders(); err != nil {
 			log.Fatal(err)
 		}
 	}
