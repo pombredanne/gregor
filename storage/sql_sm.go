@@ -544,9 +544,15 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 	        WHERE i.dtime IS NULL AND r.ntime <=`
 	qb := s.newQueryBuilder()
 	qb.Build(qry)
-	qb.Now()
+	now := s.clock.Now()
+	qb.Build("?", now)
 
-	rows, err := s.driver.Query(qb.Query())
+	tx, err := s.driver.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(qb.Query())
 	if err != nil {
 		return nil, err
 	}
@@ -558,6 +564,18 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 			return nil, err
 		}
 		reminders = append(reminders, not)
+	}
+
+	del := `DELETE FROM reminders WHERE ntime <=`
+	qb2 := s.newQueryBuilder()
+	qb2.Build(qb2)
+	qb2.Build("?", now)
+
+	if err := qb.Exec(tx); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return reminders, nil
 }
