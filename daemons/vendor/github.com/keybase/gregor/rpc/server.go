@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
-
-	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 // ErrBadCast occurs when there is a problem casting a type from

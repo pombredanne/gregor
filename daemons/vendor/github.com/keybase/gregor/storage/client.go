@@ -3,12 +3,13 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"log"
 	"time"
 
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
+
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 type LocalStorageEngine interface {
@@ -22,15 +23,17 @@ type Client struct {
 	sm       gregor.StateMachine
 	storage  LocalStorageEngine
 	incoming gregor1.IncomingInterface
+	log      rpc.LogOutput
 }
 
-func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine, storage LocalStorageEngine, incoming gregor1.IncomingInterface) *Client {
+func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine, storage LocalStorageEngine, incoming gregor1.IncomingInterface, log rpc.LogOutput) *Client {
 	return &Client{
 		user:     user,
 		device:   device,
 		sm:       sm,
 		storage:  storage,
 		incoming: incoming,
+		log:      log,
 	}
 }
 
@@ -113,7 +116,7 @@ func (c *Client) syncFromTime(t *time.Time) error {
 func (c *Client) Sync() error {
 	if err := c.syncFromTime(c.sm.LatestCTime(c.user, c.device)); err != nil {
 		if _, ok := err.(errHashMismatch); ok {
-			log.Printf("Sync failure: %v\nReseting StateMachine and retrying")
+			c.log.Info("Sync failure: %v\nReseting StateMachine and retrying", err)
 			c.sm.Clear()
 			err = c.syncFromTime(nil)
 		}

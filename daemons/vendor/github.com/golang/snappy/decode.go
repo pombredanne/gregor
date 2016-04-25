@@ -108,9 +108,9 @@ func (r *Reader) Reset(reader io.Reader) {
 	r.readHeader = false
 }
 
-func (r *Reader) readFull(p []byte, allowEOF bool) (ok bool) {
+func (r *Reader) readFull(p []byte) (ok bool) {
 	if _, r.err = io.ReadFull(r.r, p); r.err != nil {
-		if r.err == io.ErrUnexpectedEOF || (r.err == io.EOF && !allowEOF) {
+		if r.err == io.ErrUnexpectedEOF {
 			r.err = ErrCorrupt
 		}
 		return false
@@ -129,7 +129,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 			r.i += n
 			return n, nil
 		}
-		if !r.readFull(r.buf[:4], true) {
+		if !r.readFull(r.buf[:4]) {
 			return 0, r.err
 		}
 		chunkType := r.buf[0]
@@ -156,7 +156,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 				return 0, r.err
 			}
 			buf := r.buf[:chunkLen]
-			if !r.readFull(buf, false) {
+			if !r.readFull(buf) {
 				return 0, r.err
 			}
 			checksum := uint32(buf[0]) | uint32(buf[1])<<8 | uint32(buf[2])<<16 | uint32(buf[3])<<24
@@ -189,17 +189,13 @@ func (r *Reader) Read(p []byte) (int, error) {
 				return 0, r.err
 			}
 			buf := r.buf[:checksumSize]
-			if !r.readFull(buf, false) {
+			if !r.readFull(buf) {
 				return 0, r.err
 			}
 			checksum := uint32(buf[0]) | uint32(buf[1])<<8 | uint32(buf[2])<<16 | uint32(buf[3])<<24
 			// Read directly into r.decoded instead of via r.buf.
 			n := chunkLen - checksumSize
-			if n > len(r.decoded) {
-				r.err = ErrCorrupt
-				return 0, r.err
-			}
-			if !r.readFull(r.decoded[:n], false) {
+			if !r.readFull(r.decoded[:n]) {
 				return 0, r.err
 			}
 			if crc(r.decoded[:n]) != checksum {
@@ -215,7 +211,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 				r.err = ErrCorrupt
 				return 0, r.err
 			}
-			if !r.readFull(r.buf[:len(magicBody)], false) {
+			if !r.readFull(r.buf[:len(magicBody)]) {
 				return 0, r.err
 			}
 			for i := 0; i < len(magicBody); i++ {
@@ -234,7 +230,7 @@ func (r *Reader) Read(p []byte) (int, error) {
 		}
 		// Section 4.4 Padding (chunk type 0xfe).
 		// Section 4.6. Reserved skippable chunks (chunk types 0x80-0xfd).
-		if !r.readFull(r.buf[:chunkLen], false) {
+		if !r.readFull(r.buf[:chunkLen]) {
 			return 0, r.err
 		}
 	}

@@ -347,6 +347,16 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	return msgs, nil
 }
 
+func (m *MemEngine) Reminders() ([]gregor.Reminder, error) {
+	// Unimplemented for MemEngine
+	return nil, nil
+}
+
+func (m *MemEngine) DeleteReminder(r gregor.Reminder) error {
+	// Unimplemented for MemEngine
+	return nil
+}
+
 func (m *MemEngine) IsEphemeral() bool {
 	return true
 }

@@ -214,6 +214,9 @@ func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 	return m.Oobm_
 }
 
+func (r Reminder) Item() gregor.Item     { return r.Item_ }
+func (r Reminder) RemindTime() time.Time { return FromTime(r.Ntime_) }
+
 type State struct {
 	items []ItemAndMetadata
 }
@@ -308,8 +311,8 @@ func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, er
 	}
 
 	for _, msg := range msgs {
-		if msg, ok := msg.(InBandMessage); ok {
-			res.Msgs = append(res.Msgs, msg)
+		if msg, ok := msg.(*InBandMessage); ok {
+			res.Msgs = append(res.Msgs, *msg)
 		}
 	}
 
@@ -338,6 +341,7 @@ var _ gregor.StateSyncMessage = StateSyncMessage{}
 var _ gregor.MsgRange = MsgRange{}
 var _ gregor.Dismissal = Dismissal{}
 var _ gregor.Item = ItemAndMetadata{}
+var _ gregor.Reminder = Reminder{}
 var _ gregor.StateUpdateMessage = StateUpdateMessage{}
 var _ gregor.InBandMessage = InBandMessage{}
 var _ gregor.OutOfBandMessage = OutOfBandMessage{}
