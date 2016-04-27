@@ -60,7 +60,7 @@ func ParseOptionsQuiet(argv []string) (*Options, error) {
 }
 
 func parseOptions(argv []string, quiet bool) (*Options, error) {
-	fs := flag.NewFlagSet(argv[0], flag.ExitOnError)
+	fs := flag.NewFlagSet(argv[0], flag.ContinueOnError)
 	if quiet {
 		fs.Usage = func() {}
 		fs.SetOutput(ioutil.Discard)
@@ -85,15 +85,15 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 
 	if err := fs.Parse(argv[1:]); err != nil {
-		return nil, err
+		return nil, daemons.BadUsage(err.Error())
 	}
 
 	if len(fs.Args()) != 0 {
 		return nil, daemons.BadUsage("no non-flag arguments expected")
 	}
 
-	if (s3conf.AWSRegion == "") != (s3conf.ConfigBucket == "") {
-		return nil, daemons.BadUsage("you must provide an AWS Region and a Config bucket; can't specify one or the other")
+	if err := s3conf.Validate(); err != nil {
+		return nil, err
 	}
 
 	if options.BindAddress == "" {
@@ -102,21 +102,21 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	if _, port, err := net.SplitHostPort(options.BindAddress); err != nil {
 		return nil, daemons.BadUsage("bad bind-address: %s", err)
-	} else if _, err = strconv.ParseUint(port, 10, 16); err != nil {
+	} else if _, err := strconv.ParseUint(port, 10, 16); err != nil {
 		return nil, daemons.BadUsage("bad port (%q) in bind-address: %s", port, err)
 	}
 
 	var err error
 	if options.TLSConfig, err = daemons.ParseTLSConfig(&s3conf, tlsCert, tlsKey); err != nil {
-		return nil, daemons.BadUsage("Error parsing TLS Config: %v", err)
+		return nil, err
 	}
 
 	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok {
+	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok || options.MysqlDSN == nil {
 		return nil, daemons.BadUsage("Error parsing mysql DSN")
 	}
 
-	if options.SessionServer, ok = sessionServer.Get().(*rpc.FMPURI); !ok {
+	if options.SessionServer, ok = sessionServer.Get().(*rpc.FMPURI); !ok || options.SessionServer == nil {
 		return nil, daemons.BadUsage("Error parsing session server URI")
 	}
 
