@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
+	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -81,7 +82,7 @@ func timeToTimeOrOffset(of gregor.ObjFactory, t time.Time) gregor.TimeOrOffset {
 	return ret
 }
 
-func newCreation(of gregor.ObjFactory, u gregor.UID, m gregor.MsgID, d gregor.DeviceID, ctime time.Time, c gregor.Category, data string, dtime *time.Time) gregor.Message {
+func newCreation(of gregor.ObjFactory, u gregor.UID, m gregor.MsgID, d gregor.DeviceID, ctime time.Time, c gregor.Category, data string, dtime *time.Time, ntimes []time.Time) gregor.Message {
 	b, err := of.MakeBody([]byte(data))
 	if err != nil {
 		panic(err)
@@ -89,6 +90,12 @@ func newCreation(of gregor.ObjFactory, u gregor.UID, m gregor.MsgID, d gregor.De
 	i, err := of.MakeItem(u, m, d, ctime, c, dtime, b)
 	if err != nil {
 		panic(err)
+	}
+	if i, ok := i.(gregor1.ItemAndMetadata); ok {
+		for _, ntime := range ntimes {
+			too := gregor1.TimeOrOffset{Time_: gregor1.ToTime(ntime)}
+			i.Item_.RemindTimes_ = append(i.Item_.RemindTimes_, too)
+		}
 	}
 	ibmsg, err := of.MakeInBandMessageFromItem(i)
 	if err != nil {
@@ -160,7 +167,7 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID
 	// Produce a new mesasge, with payload "f1"
 	m1 := makeMsgID(of)
 	consumeMessage(t, "m1", sm,
-		newCreation(of, u1, m1, nil, cl.Now(), c1, "f1", nil),
+		newCreation(of, u1, m1, nil, cl.Now(), c1, "f1", nil, nil),
 	)
 	advanceClock(cl, time.Second)
 	// Make an assertion: that there is 1 item in the StateMachine,
@@ -190,14 +197,14 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID
 
 	// Make and consume 3 new messages.
 	consumeMessage(t, "m2", sm,
-		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f2", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f2", nil, nil),
 	)
 	dt4 := cl.Now().Add(3 * time.Second)
 	consumeMessage(t, "m3", sm,
-		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f3", &dt4),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c1, "f3", &dt4, nil),
 	)
 	consumeMessage(t, "m4", sm,
-		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b1", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b1", nil, nil),
 	)
 
 	// Make an assertion: that the items wound up and in the right
@@ -226,11 +233,11 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID
 	assert4(timeToTimeOrOffset(of, tm4))
 
 	consumeMessage(t, "m5", sm,
-		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b3", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b3", nil, nil),
 	)
 	advanceClock(cl, 4*time.Second)
 	consumeMessage(t, "m6", sm,
-		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b4", nil),
+		newCreation(of, u1, makeMsgID(of), nil, cl.Now(), c2, "b4", nil, nil),
 	)
 	advanceClock(cl, time.Second)
 	consumeMessage(t, "d2", sm,
@@ -276,7 +283,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID
 	assert1(nil)
 	m1 := makeMsgID(of)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m1, d1, cl.Now(), c1, "f1", nil),
+		newCreation(of, u1, m1, d1, cl.Now(), c1, "f1", nil, nil),
 	)
 	assert2 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, d1, too, 1)
@@ -286,7 +293,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID
 	m2 := makeMsgID(of)
 	d2 := makeDeviceID(of)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m2, d2, cl.Now(), c1, "f2", nil),
+		newCreation(of, u1, m2, d2, cl.Now(), c1, "f2", nil, nil),
 	)
 	assert3 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
@@ -309,7 +316,7 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID
 	m3 := makeMsgID(of)
 	advanceClock(cl, time.Second)
 	sm.ConsumeMessage(
-		newCreation(of, u1, m3, nil, cl.Now(), c1, "f3", nil),
+		newCreation(of, u1, m3, nil, cl.Now(), c1, "f3", nil, nil),
 	)
 	assert5 := func(too gregor.TimeOrOffset) {
 		assertNItems(t, sm, u1, nil, too, 2)
@@ -326,14 +333,25 @@ func AddStateMachinePerDevice(sm gregor.StateMachine, u gregor.UID, d gregor.Dev
 	cl := sm.Clock()
 	c1 := makeCategory(of, "bars")
 	sm.ConsumeMessage(
-		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b1", nil),
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b1", nil, nil),
 	)
 	advanceClock(cl, time.Second)
 	sm.ConsumeMessage(
-		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b2", nil),
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b2", nil, nil),
 	)
 	advanceClock(cl, time.Second)
 	sm.ConsumeMessage(
-		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b3", nil),
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b3", nil, nil),
+	)
+}
+
+func AddReminder(sm gregor.StateMachine, dur time.Duration) {
+	of := sm.ObjFactory()
+	cl := sm.Clock()
+	u := makeUID(of)
+	d := makeDeviceID(of)
+	c1 := makeCategory(of, "bars")
+	sm.ConsumeMessage(
+		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b1", nil, []time.Time{cl.Now().Add(dur)}),
 	)
 }

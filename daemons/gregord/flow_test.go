@@ -9,13 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/context"
-
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
+	"golang.org/x/net/context"
 )
 
 // Test with: TEST_MYSQL_DSN=gregor:@/gregor_test

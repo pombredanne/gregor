@@ -97,13 +97,13 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
+			"revision": "944ef4cace64754525f96470cd135c95a08f264d",
+			"revisionTime": "2016-04-27T11:24:46-07:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/test",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
+			"revision": "7f5cb2f8aba405190a2db5620f3c8cb525631725",
+			"revisionTime": "2016-04-27T11:24:46-07:00"
 		},
 		{
 			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",

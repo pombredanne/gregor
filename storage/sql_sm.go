@@ -32,8 +32,12 @@ func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
 	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
 }
 
-func NewSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewRealClock())
+func NewTestMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
+	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewFakeClock())
+}
+
+func NewTestSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
+	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewFakeClock())
 }
 
 type builder interface {
