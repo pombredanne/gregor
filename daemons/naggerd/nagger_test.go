@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"github.com/keybase/gregor/daemons"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
@@ -16,7 +17,7 @@ import (
 )
 
 func TestNagger(t *testing.T) {
-	var remind mockRemind
+	remind := new(mockRemind)
 	n := newMockNagger(t, remind)
 	fc, ok := n.sm.Clock().(clockwork.FakeClock)
 	if !ok {
@@ -24,31 +25,42 @@ func TestNagger(t *testing.T) {
 	}
 	doneCh := make(chan bool)
 	go sendReminders(t, n, fc, doneCh)
+	defer close(doneCh)
 
-	test.AddReminder(n.sm, time.Millisecond)
-	test.AddReminder(n.sm, 2*time.Second+time.Millisecond)
-	assert.Equal(t, 0, len(remind.rms), "no reminders should be sent yet")
+	rm1 := test.AddReminder(n.sm, time.Millisecond)
+	rm2 := test.AddReminder(n.sm, 2*time.Second+time.Millisecond)
+
+	fc.BlockUntil(1)
+	assert.Equal(t, 0, len(remind.rms), "no reminders should be received yet")
 
 	fc.Advance(time.Second)
-	assert.Equal(t, 1, len(remind.rms), "1 reminders should have been sent")
-	fc.Advance(time.Second)
-	assert.Equal(t, 1, len(remind.rms), "1 reminders should have been sent")
-	fc.Advance(time.Second)
-	assert.Equal(t, 2, len(remind.rms), "2 reminders should have been sent")
+	fc.BlockUntil(1)
+	assert.Equal(t, 1, len(remind.rms), "1 reminder should be received")
+	assert.Equal(t, rm1.Item().Metadata().UID(), remind.rms[0].Item().Metadata().UID(), "first reminder sent should be first received")
+	assert.Equal(t, rm1.Item().Metadata().MsgID(), remind.rms[0].Item().Metadata().MsgID(), "first reminder sent should be first received")
+	assert.Equal(t, rm1.RemindTime(), remind.rms[0].RemindTime(), "first reminder sent should be first received")
 
-	close(doneCh)
+	fc.Advance(time.Second)
+	fc.BlockUntil(1)
+	assert.Equal(t, 1, len(remind.rms), "1 reminder should be received")
+	fc.Advance(time.Second)
+	fc.BlockUntil(1)
+	assert.Equal(t, 2, len(remind.rms), "2 reminders should be received")
+	assert.Equal(t, rm2.Item().Metadata().UID(), remind.rms[1].Item().Metadata().UID(), "second reminder sent should be second received")
+	assert.Equal(t, rm2.Item().Metadata().MsgID(), remind.rms[1].Item().Metadata().MsgID(), "second reminder sent should be second received")
+	assert.Equal(t, rm2.RemindTime(), remind.rms[1].RemindTime(), "second reminder sent should be second received")
+
 }
 
 func sendReminders(t *testing.T, n *nagger, cl clockwork.Clock, doneCh chan bool) {
 	for {
 		select {
-		case <-doneCh:
-			return
-		default:
-			cl.Sleep(time.Second)
+		case <-cl.After(time.Second):
 			if err := n.sendReminders(); err != nil {
 				t.Fatal(err)
 			}
+		case <-doneCh:
+			return
 		}
 	}
 }
@@ -70,16 +82,16 @@ func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
 	}
 
 	var of gregor1.ObjFactory
-	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind}
+	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, daemons.NewLogger()}
 }
 
 type mockRemind struct {
 	rms []gregor1.Reminder
 }
 
-func (m mockRemind) Remind(_ context.Context, rms []gregor1.Reminder) error {
+func (m *mockRemind) Remind(_ context.Context, rms []gregor1.Reminder) error {
 	m.rms = append(m.rms, rms...)
 	return nil
 }
 
-var _ gregor1.RemindInterface = mockRemind{}
+var _ gregor1.RemindInterface = (*mockRemind)(nil)

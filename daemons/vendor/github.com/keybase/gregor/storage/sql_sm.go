@@ -109,11 +109,11 @@ func (s *SQLEngine) newQueryBuilder() *queryBuilder {
 	return &queryBuilder{clock: s.clock, stw: s.stw}
 }
 
-func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) error {
+func (s *SQLEngine) consumeCreation(tx *sql.Tx, i gregor.Item) error {
 	md := i.Metadata()
 	qb := s.newQueryBuilder()
 	qb.Build("INSERT INTO items(uid, msgid, category, body, dtime) VALUES(?,?,?,?,",
-		hexEnc(u),
+		hexEnc(md.UID()),
 		hexEnc(md.MsgID()),
 		i.Category().String(),
 		i.Body().Bytes(),
@@ -130,7 +130,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, u gregor.UID, i gregor.Item) err
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("INSERT INTO reminders(uid, msgid, ntime) VALUES(?,?,", hexEnc(u), hexEnc(md.MsgID()))
+		nqb.Build("INSERT INTO reminders(uid, msgid, ntime) VALUES(?,?,", hexEnc(md.UID()), hexEnc(md.MsgID()))
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -282,7 +282,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err 
 		return err
 	}
 	if m.Creation() != nil {
-		if err = s.consumeCreation(tx, md.UID(), m.Creation()); err != nil {
+		if err = s.consumeCreation(tx, m.Creation()); err != nil {
 			return err
 		}
 	}
@@ -320,7 +320,7 @@ func (s *SQLEngine) rowToReminder(rows *sql.Rows) (gregor.Reminder, error) {
 	var dtime timeScanner
 	var ctime timeScanner
 	var ntime timeScanner
-	if err := rows.Scan(&msgID, &deviceID, &category, &dtime, &body, &ctime, &ntime); err != nil {
+	if err := rows.Scan(&uid, &msgID, &deviceID, &category, &dtime, &body, &ctime, &ntime); err != nil {
 		return nil, err
 	}
 	it, err := s.objFactory.MakeItem(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
@@ -541,7 +541,7 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 }
 
 func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
-	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.ntime
+	qry := `SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.ntime
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
 	        INNER JOIN reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
@@ -564,8 +564,8 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 
 func (s *SQLEngine) DeleteReminder(r gregor.Reminder) error {
 	qry := `DELETE FROM reminders WHERE 
-			uid = ? AND msgid = ? ntime = ?`
-	_, err := s.driver.Exec(qry, r.Item().Metadata().UID(), r.Item().Metadata().MsgID(), r.RemindTime())
+			uid = ? AND msgid = ? AND ntime = ?`
+	_, err := s.driver.Exec(qry, hexEnc(r.Item().Metadata().UID()), hexEnc(r.Item().Metadata().MsgID()), r.RemindTime())
 	return err
 }
 

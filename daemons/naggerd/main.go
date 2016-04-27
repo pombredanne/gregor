@@ -26,7 +26,7 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
-	n, err := newNagger(opts.MysqlDSN, gregor1.RemindClient{Cli})
+	n, err := newNagger(opts.MysqlDSN, gregor1.RemindClient{Cli}, log)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)

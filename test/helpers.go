@@ -97,6 +97,7 @@ func newCreation(of gregor.ObjFactory, u gregor.UID, m gregor.MsgID, d gregor.De
 			i.Item_.RemindTimes_ = append(i.Item_.RemindTimes_, too)
 		}
 	}
+
 	ibmsg, err := of.MakeInBandMessageFromItem(i)
 	if err != nil {
 		panic(err)
@@ -345,13 +346,17 @@ func AddStateMachinePerDevice(sm gregor.StateMachine, u gregor.UID, d gregor.Dev
 	)
 }
 
-func AddReminder(sm gregor.StateMachine, dur time.Duration) {
+func AddReminder(sm gregor.StateMachine, d time.Duration) gregor.Reminder {
 	of := sm.ObjFactory()
 	cl := sm.Clock()
-	u := makeUID(of)
-	d := makeDeviceID(of)
 	c1 := makeCategory(of, "bars")
-	sm.ConsumeMessage(
-		newCreation(of, u, makeMsgID(of), d, cl.Now(), c1, "b1", nil, []time.Time{cl.Now().Add(dur)}),
-	)
+	ntime := cl.Now().Add(d)
+	msg := newCreation(of, makeUID(of), makeMsgID(of), makeDeviceID(of), cl.Now(), c1, "b1", nil, []time.Time{ntime})
+	sm.ConsumeMessage(msg)
+
+	rm, err := of.MakeReminder(msg.ToInBandMessage().ToStateUpdateMessage().Creation(), ntime)
+	if err != nil {
+		panic(err)
+	}
+	return rm
 }
