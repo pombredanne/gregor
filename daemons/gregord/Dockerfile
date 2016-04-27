@@ -15,4 +15,4 @@ USER keybase
 ENV PATH=/home/keybase:$PATH
 WORKDIR /home/keybase
 
-COPY ./gregord/gregord /home/keybase/gregord
+COPY gregord /home/keybase/gregord
