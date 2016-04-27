@@ -97,8 +97,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "1164f0382c33b78d64160d53fa0a85f9ec481f4c",
-			"revisionTime": "2016-04-27T13:04:34-07:00"
+			"revision": "16599b357ed89429a2bacb703b0637413b91efda",
+			"revisionTime": "2016-04-27T14:45:08-07:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/test",

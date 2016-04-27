@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"database/sql"
 	"net"
 	"net/url"
 	"os"
@@ -30,13 +29,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 			t.Logf("cleared artifical sleep")
 		}()
 	}
-	name := os.Getenv("TEST_MYSQL_DSN")
-	if name == "" {
-		t.Skip("TEST_MYSQL_DSN not set")
-	}
-	if err := createDBSchema(name); err != nil {
-		t.Fatal(err)
-	}
+	storage.InitMySQLEngine(t)
 
 	srvAddr, events, cleanup := startTestGregord(t)
 	defer cleanup()
@@ -207,24 +200,4 @@ func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {
 		},
 	}
 
-}
-
-func createDBSchema(name string) error {
-	db, err := sql.Open("mysql", name)
-	if err != nil {
-		return err
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	schema := storage.Schema("mysql")
-	for _, stmt := range schema {
-		if _, err = tx.Exec(stmt); err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
 }

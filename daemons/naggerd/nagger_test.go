@@ -1,9 +1,6 @@
 package main
 
 import (
-	"database/sql"
-	"net/url"
-	"os"
 	"testing"
 	"time"
 
@@ -60,22 +57,8 @@ func TestNagger(t *testing.T) {
 }
 
 func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
-	name := os.Getenv("TEST_MYSQL_DSN")
-	if name == "" {
-		t.Skip("TEST_MYSQL_DSN not set")
-	}
-
-	dsn, err := url.Parse(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dsn = storage.ForceParseTime(dsn)
-	db, err := sql.Open("mysql", dsn.String())
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	var of gregor1.ObjFactory
+	db := storage.InitMySQLEngine(t)
 	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, daemons.NewLogger()}
 }
 
