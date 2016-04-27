@@ -24,45 +24,39 @@ func TestNagger(t *testing.T) {
 		t.Fatal("state machine doesn't have a FakeClock")
 	}
 	doneCh := make(chan bool)
-	go sendReminders(t, n, fc, doneCh)
 	defer close(doneCh)
 
 	rm1 := test.AddReminder(n.sm, time.Millisecond)
 	rm2 := test.AddReminder(n.sm, 2*time.Second+time.Millisecond)
 
-	fc.BlockUntil(1)
+	if err := n.sendReminders(); err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, 0, len(remind.rms), "no reminders should be received yet")
 
 	fc.Advance(time.Second)
-	fc.BlockUntil(1)
+	if err := n.sendReminders(); err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, 1, len(remind.rms), "1 reminder should be received")
 	assert.Equal(t, rm1.Item().Metadata().UID(), remind.rms[0].Item().Metadata().UID(), "first reminder sent should be first received")
 	assert.Equal(t, rm1.Item().Metadata().MsgID(), remind.rms[0].Item().Metadata().MsgID(), "first reminder sent should be first received")
 	assert.Equal(t, rm1.RemindTime(), remind.rms[0].RemindTime(), "first reminder sent should be first received")
 
 	fc.Advance(time.Second)
-	fc.BlockUntil(1)
+	if err := n.sendReminders(); err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, 1, len(remind.rms), "1 reminder should be received")
+
 	fc.Advance(time.Second)
-	fc.BlockUntil(1)
+	if err := n.sendReminders(); err != nil {
+		t.Fatal(err)
+	}
 	assert.Equal(t, 2, len(remind.rms), "2 reminders should be received")
 	assert.Equal(t, rm2.Item().Metadata().UID(), remind.rms[1].Item().Metadata().UID(), "second reminder sent should be second received")
 	assert.Equal(t, rm2.Item().Metadata().MsgID(), remind.rms[1].Item().Metadata().MsgID(), "second reminder sent should be second received")
 	assert.Equal(t, rm2.RemindTime(), remind.rms[1].RemindTime(), "second reminder sent should be second received")
-
-}
-
-func sendReminders(t *testing.T, n *nagger, cl clockwork.Clock, doneCh chan bool) {
-	for {
-		select {
-		case <-cl.After(time.Second):
-			if err := n.sendReminders(); err != nil {
-				t.Fatal(err)
-			}
-		case <-doneCh:
-			return
-		}
-	}
 }
 
 func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
