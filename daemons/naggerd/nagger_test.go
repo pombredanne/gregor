@@ -66,8 +66,8 @@ type mockRemind struct {
 	rms []gregor1.Reminder
 }
 
-func (m *mockRemind) Remind(_ context.Context, rms []gregor1.Reminder) error {
-	m.rms = append(m.rms, rms...)
+func (m *mockRemind) Remind(_ context.Context, r gregor1.Reminder) error {
+	m.rms = append(m.rms, r)
 	return nil
 }
 

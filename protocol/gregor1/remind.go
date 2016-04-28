@@ -9,11 +9,11 @@ import (
 )
 
 type RemindArg struct {
-	Rs []Reminder `codec:"rs" json:"rs"`
+	R Reminder `codec:"r" json:"r"`
 }
 
 type RemindInterface interface {
-	Remind(context.Context, []Reminder) error
+	Remind(context.Context, Reminder) error
 }
 
 func RemindProtocol(i RemindInterface) rpc.Protocol {
@@ -31,7 +31,7 @@ func RemindProtocol(i RemindInterface) rpc.Protocol {
 						err = rpc.NewTypeError((*[]RemindArg)(nil), args)
 						return
 					}
-					err = i.Remind(ctx, (*typedArgs)[0].Rs)
+					err = i.Remind(ctx, (*typedArgs)[0].R)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -44,8 +44,8 @@ type RemindClient struct {
 	Cli rpc.GenericClient
 }
 
-func (c RemindClient) Remind(ctx context.Context, rs []Reminder) (err error) {
-	__arg := RemindArg{Rs: rs}
+func (c RemindClient) Remind(ctx context.Context, r Reminder) (err error) {
+	__arg := RemindArg{R: r}
 	err = c.Cli.Call(ctx, "gregor.1.remind.remind", []interface{}{__arg}, nil)
 	return
 }

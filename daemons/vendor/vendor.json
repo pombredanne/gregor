@@ -87,8 +87,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/protocol/gregor1",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
+			"revision": "02e98d0727f2d6a6f8207c985fa260ac3fd9b585",
+			"revisionTime": "2016-04-28T13:54:05-07:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/rpc",
