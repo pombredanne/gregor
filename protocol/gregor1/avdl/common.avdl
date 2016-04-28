@@ -43,13 +43,18 @@ protocol common {
 	record Item {
 		Category category;
 		TimeOrOffset dtime;
-		array<TimeOrOffset> notifyTimes;
+		array<TimeOrOffset> remindTimes;
 		Body body;
 	}
 
 	record ItemAndMetadata {
 		union { null, Metadata } md;
 		union { null, Item } item;
+	}
+
+	record Reminder {
+		ItemAndMetadata item;
+		Time ntime;
 	}
 
 	record OutOfBandMessage {

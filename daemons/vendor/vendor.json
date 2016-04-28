@@ -1,0 +1,206 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"origin": "github.com/keybase/gregor/daemons/vendor/github.com/cenkalti/backoff",
+			"path": "github.com/cenkalti/backoff",
+			"revision": "32cd0c5b3aef12c76ed64aaf678f6c79736be7dc",
+			"revisionTime": "2015-08-27T15:34:15+03:00"
+		},
+		{
+			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
+			"path": "github.com/davecgh/go-spew/spew",
+			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1",
+			"revisionTime": "2016-04-18T23:58:27+01:00"
+		},
+		{
+			"path": "github.com/go-sql-driver/mysql",
+			"revision": "1421caf44f6464fd2ee8de694c7508ee13f92964",
+			"revisionTime": "2016-03-29T11:03:53+02:00"
+		},
+		{
+			"path": "github.com/goamz/goamz/aws",
+			"revision": "1d57d6d101ac4b69c12d54e7b5567192fcb87df5",
+			"revisionTime": "2016-03-25T20:55:43+01:00"
+		},
+		{
+			"path": "github.com/goamz/goamz/s3",
+			"revision": "1d57d6d101ac4b69c12d54e7b5567192fcb87df5",
+			"revisionTime": "2016-03-25T20:55:43+01:00"
+		},
+		{
+			"path": "github.com/golang/snappy",
+			"revision": "5f1c01d9f64b941dd9582c638279d046eda6ca31",
+			"revisionTime": "2016-03-04T16:48:22+11:00"
+		},
+		{
+			"path": "github.com/jonboulle/clockwork",
+			"revision": "ed104f61ea4877bea08af6f759805674861e968d",
+			"revisionTime": "2015-11-20T16:16:58-08:00"
+		},
+		{
+			"path": "github.com/keybase/client/go/protocol",
+			"revision": "b9e157c28856998f1fd59c6c912b9fc2bddbc0f1",
+			"revisionTime": "2016-04-18T14:31:43-07:00"
+		},
+		{
+			"path": "github.com/keybase/go-codec/codec",
+			"revision": "8a39c1d1f00af239dd650a292922fa4f46a39fa2",
+			"revisionTime": "2016-04-04T17:08:33-07:00"
+		},
+		{
+			"path": "github.com/keybase/go-framed-msgpack-rpc",
+			"revision": "ce99c5fda63dd59f4c00b722aebd6d71d02d1c9a",
+			"revisionTime": "2016-04-21T11:24:03-07:00"
+		},
+		{
+			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
+			"path": "github.com/keybase/go-jsonw",
+			"revision": "7bf51294cf911c68a70bdfc02137a9154462723a",
+			"revisionTime": "2016-04-21T10:04:43-07:00"
+		},
+		{
+			"path": "github.com/keybase/go-logging",
+			"revision": "f3c7c3c1605e29ebcce430bb1e0d048faf4081ce",
+			"revisionTime": "2016-03-23T15:35:38-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/daemons",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/daemons/gregord",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/daemons/naggerd",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/protocol/gregor1",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/rpc",
+			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
+			"revisionTime": "2016-04-25T15:40:58-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/storage",
+			"revision": "16599b357ed89429a2bacb703b0637413b91efda",
+			"revisionTime": "2016-04-27T14:45:08-07:00"
+		},
+		{
+			"path": "github.com/keybase/gregor/test",
+			"revision": "743038f678abeaf867019bae99c1461fd75f9341",
+			"revisionTime": "2016-04-27T13:04:34-07:00"
+		},
+		{
+			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
+			"path": "github.com/pmezard/go-difflib/difflib",
+			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1",
+			"revisionTime": "2016-04-18T23:58:27+01:00"
+		},
+		{
+			"path": "github.com/stretchr/testify/assert",
+			"revision": "6fe211e493929a8aac0469b93f28b1d0688a9a3a",
+			"revisionTime": "2016-03-05T16:54:46Z"
+		},
+		{
+			"path": "github.com/stretchr/testify/require",
+			"revision": "6fe211e493929a8aac0469b93f28b1d0688a9a3a",
+			"revisionTime": "2016-03-05T16:54:46Z"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/cache",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/comparer",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/errors",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/filter",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/iterator",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/journal",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/memdb",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/opt",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/storage",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/table",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/syndtr/goleveldb/leveldb/util",
+			"revision": "93fc893f2dadb96ffde441c7546cc67ea290a3a8",
+			"revisionTime": "2016-03-27T18:39:39+07:00"
+		},
+		{
+			"path": "github.com/vaughan0/go-ini",
+			"revision": "a98ad7ee00ec53921f08832bc06ecf7fd600e6a1",
+			"revisionTime": "2013-09-23T16:52:12+02:00"
+		},
+		{
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "9a94098432bb3ed6aff94809cae818d55f2cdc4c",
+			"revisionTime": "2016-03-12T11:09:07-08:00"
+		},
+		{
+			"checksumSHA1": "pancewZW3HwGvpDwfH5Imrbadc4=",
+			"path": "golang.org/x/net/context",
+			"revision": "815d315ead425c4365077d904a2331ee9e179820",
+			"revisionTime": "2016-04-20T16:37:57+10:00"
+		},
+		{
+			"path": "golang.org/x/net/context",
+			"revision": "815d315ead425c4365077d904a2331ee9e179820",
+			"revisionTime": "2016-04-20T16:37:57+10:00"
+		}
+	]
+}
