@@ -74,5 +74,6 @@ func NewLogger() rpc.LogOutput {
 
 	logger := logging.MustGetLogger("gregord")
 	logger.SetBackend(logging.MultiLogger(backends...))
+	logger.ExtraCalldepth = 1
 	return &GoLoggingWrapperForRPC{logger}
 }
