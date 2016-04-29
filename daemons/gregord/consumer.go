@@ -2,15 +2,14 @@ package main
 
 import (
 	"database/sql"
-	"errors"
-	"net/url"
 
-	_ "github.com/go-sql-driver/mysql"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 )
+
+var of gregor1.ObjFactory
 
 type consumer struct {
 	db *sql.DB
@@ -19,47 +18,19 @@ type consumer struct {
 	log rpc.LogOutput
 }
 
-func newConsumer(dsn *url.URL, log rpc.LogOutput) (*consumer, error) {
-	if dsn == nil {
-		return nil, errors.New("nil mysql dsn provided to newConsumer")
+func newConsumer(db *sql.DB, log rpc.LogOutput) *consumer {
+	c := &consumer{
+		db:  db,
+		log: log,
+		sm:  storage.NewMySQLEngine(db, of),
 	}
-	c := &consumer{log: log}
-	if err := c.setup(dsn); err != nil {
-		return nil, err
-	}
-	return c, nil
-}
-
-func (c *consumer) setup(dsn *url.URL) error {
-	if err := c.createDB(dsn); err != nil {
-		return err
-	}
-	if err := c.createStateMachine(); err != nil {
-		return err
-	}
-	return nil
+	c.IncomingInterface = gregor1.NewLocalIncoming(c.sm)
+	return c
 }
 
 func (c *consumer) shutdown() {
+	c.log.Info("shutting down consumer")
 	if c.db != nil {
 		c.db.Close()
 	}
-}
-
-func (c *consumer) createDB(dsn *url.URL) error {
-	dsn = storage.ForceParseTime(dsn)
-	c.log.Info("opening mysql connection to %s", dsn)
-	db, err := sql.Open("mysql", dsn.String())
-	if err != nil {
-		return err
-	}
-	c.db = db
-	return nil
-}
-
-func (c *consumer) createStateMachine() error {
-	var of gregor1.ObjFactory
-	c.sm = storage.NewMySQLEngine(c.db, of)
-	c.IncomingInterface = gregor1.NewLocalIncoming(c.sm)
-	return nil
 }

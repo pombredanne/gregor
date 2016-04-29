@@ -2,17 +2,16 @@ package main
 
 import (
 	"database/sql"
-	"errors"
-	"net/url"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 	"golang.org/x/net/context"
 )
+
+var of gregor1.ObjFactory
 
 type nagger struct {
 	db     *sql.DB
@@ -21,25 +20,12 @@ type nagger struct {
 	log    rpc.LogOutput
 }
 
-func newNagger(dsn *url.URL, remind gregor1.RemindInterface, log rpc.LogOutput) (*nagger, error) {
-	if dsn == nil {
-		return nil, errors.New("nil mysql dsn provided to newConsumer")
-	}
-
-	dsn = storage.ForceParseTime(dsn)
-	log.Info("opening mysql connection to %s", dsn)
-	db, err := sql.Open("mysql", dsn.String())
-	if err != nil {
-		return nil, err
-	}
-
-	var of gregor1.ObjFactory
-	sm := storage.NewMySQLEngine(db, of)
-	return &nagger{db, sm, remind, log}, nil
+func newNagger(db *sql.DB, remind gregor1.RemindInterface, log rpc.LogOutput) *nagger {
+	return &nagger{db, storage.NewMySQLEngine(db, of), remind, log}
 }
 
 func (n *nagger) shutdown() {
-	n.log.Info("shutting down nagger.")
+	n.log.Info("shutting down nagger")
 	if n.db != nil {
 		n.db.Close()
 	}
@@ -63,5 +49,6 @@ func (n *nagger) sendReminders() error {
 			}
 		}
 	}
+	n.log.Debug("reminders sent succesfully")
 	return nil
 }

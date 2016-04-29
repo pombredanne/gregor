@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 type Options struct {
 	RemindServer   *rpc.FMPURI
 	RemindDuration time.Duration
-	MysqlDSN       *url.URL
+	MysqlDSN       string
 	Debug          bool
 }
 
@@ -72,7 +71,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok || options.MysqlDSN == nil {
+	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
 		return nil, daemons.BadUsage("Error parsing mysql DSN")
 	}
 

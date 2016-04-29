@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/url"
 	"os"
 	"strconv"
 
@@ -17,7 +16,7 @@ import (
 type Options struct {
 	SessionServer *rpc.FMPURI
 	BindAddress   string
-	MysqlDSN      *url.URL
+	MysqlDSN      string
 	Debug         bool
 	TLSConfig     *tls.Config
 	MockAuth      bool
@@ -112,7 +111,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok || options.MysqlDSN == nil {
+	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
 		return nil, daemons.BadUsage("Error parsing mysql DSN")
 	}
 

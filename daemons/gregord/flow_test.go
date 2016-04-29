@@ -2,8 +2,8 @@ package main
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"net"
-	"net/url"
 	"os"
 	"testing"
 	"time"
@@ -29,10 +29,10 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 			t.Logf("cleared artifical sleep")
 		}()
 	}
-	storage.AcquireTestDB(t)
+	db := storage.AcquireTestDB(t)
 	defer storage.ReleaseTestDB()
 
-	srvAddr, events, cleanup := startTestGregord(t)
+	srvAddr, events, cleanup := startTestGregord(t, db)
 	defer cleanup()
 
 	t.Logf("gregord server started on %v", srvAddr)
@@ -81,34 +81,14 @@ func maybeSleep() {
 	}
 }
 
-func startTestGregord(t *testing.T) (net.Addr, *test.Events, func()) {
-	name := os.Getenv("TEST_MYSQL_DSN")
-	if name == "" {
-		t.Skip("TEST_MYSQL_DSN not set")
-	}
-	u, err := url.Parse(name)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	opts := Options{
-		MockAuth:    true,
-		MysqlDSN:    u,
-		BindAddress: "127.0.0.1:0",
-		Debug:       true,
-	}
-
+func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func()) {
 	srv := grpc.NewServer(rpc.SimpleLogOutput{})
 	srv.SetAuthenticator(mockAuth{})
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
-	consumer, err := newConsumer(u, rpc.SimpleLogOutput{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ms := newMainServer(&opts, srv)
+	consumer := newConsumer(db, rpc.SimpleLogOutput{})
+	ms := newMainServer(&Options{BindAddress: "127.0.0.1:0"}, srv)
 	ms.stopCh = make(chan struct{})
 	cleanup := func() {
 		consumer.shutdown()

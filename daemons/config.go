@@ -12,6 +12,7 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor/storage"
 )
 
 type ErrBadUsage string
@@ -139,11 +140,11 @@ func (v *FMPURIGetter) String() string {
 type DSNGetter struct {
 	S      string
 	S3conf *S3Config
-	val    *url.URL
+	val    string
 }
 
 func (v *DSNGetter) Get() interface{} {
-	if v.val == nil && v.S != "" {
+	if v.val == "" && v.S != "" {
 		if err := v.Set(v.S); err != nil {
 			return err
 		}
@@ -160,11 +161,11 @@ func (v *DSNGetter) Set(s string) error {
 		}
 		s = strings.TrimSpace(string(b))
 	}
-	val, err := url.Parse(s)
+	dsn, err := url.Parse(s)
 	if err != nil {
 		return err
 	}
-	v.val = val
+	v.val = storage.ForceParseTime(dsn).String()
 	return nil
 }
 
