@@ -16,6 +16,7 @@ import (
 func TestNagger(t *testing.T) {
 	remind := new(mockRemind)
 	n := newMockNagger(t, remind)
+	defer storage.ReleaseTestDB()
 	fc, ok := n.sm.Clock().(clockwork.FakeClock)
 	if !ok {
 		t.Fatal("state machine doesn't have a FakeClock")
@@ -58,7 +59,7 @@ func TestNagger(t *testing.T) {
 
 func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
 	var of gregor1.ObjFactory
-	db := storage.InitMySQLEngine(t)
+	db := storage.AcquireTestDB(t)
 	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, daemons.NewLogger()}
 }
 
@@ -66,8 +67,8 @@ type mockRemind struct {
 	rms []gregor1.Reminder
 }
 
-func (m *mockRemind) Remind(_ context.Context, rms []gregor1.Reminder) error {
-	m.rms = append(m.rms, rms...)
+func (m *mockRemind) Remind(_ context.Context, r gregor1.Reminder) error {
+	m.rms = append(m.rms, r)
 	return nil
 }
 

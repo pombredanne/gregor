@@ -29,7 +29,8 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 			t.Logf("cleared artifical sleep")
 		}()
 	}
-	storage.InitMySQLEngine(t)
+	storage.AcquireTestDB(t)
+	defer storage.ReleaseTestDB()
 
 	srvAddr, events, cleanup := startTestGregord(t)
 	defer cleanup()

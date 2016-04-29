@@ -31,5 +31,6 @@ func TestSqliteEngine(t *testing.T) {
 
 // Test with: TEST_MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
 func TestMySQLEngine(t *testing.T) {
-	testEngine(t, InitMySQLEngine(t), mysqlTimeWriter{})
+	testEngine(t, AcquireTestDB(t), mysqlTimeWriter{})
+	ReleaseTestDB()
 }

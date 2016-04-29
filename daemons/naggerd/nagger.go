@@ -52,24 +52,16 @@ func (n *nagger) sendReminders() error {
 	}
 
 	n.log.Debug("sending %d reminders", len(reminders))
-	var reminders1 []gregor1.Reminder
-	for _, rm := range reminders {
-		if rm, ok := rm.(gregor1.Reminder); ok {
-			reminders1 = append(reminders1, rm)
-		}
-	}
-
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	if err := n.remind.Remind(ctx, reminders1); err != nil {
-		return err
-	}
-
-	n.log.Debug("deleting %d reminders", len(reminders))
 	for _, rm := range reminders {
 		if err := n.sm.DeleteReminder(rm); err != nil {
 			return err
 		}
+		if rm, ok := rm.(gregor1.Reminder); ok {
+			ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := n.remind.Remind(ctx, rm); err != nil {
+				return err
+			}
+		}
 	}
-	n.log.Debug("reminders deleted")
 	return nil
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/url"
 	"os"
+	"sync"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -14,6 +15,7 @@ func createDb(engine string, name string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	tx, err := db.Begin()
 	if err != nil {
 		return db, err
@@ -31,12 +33,17 @@ func createDb(engine string, name string) (*sql.DB, error) {
 	return db, nil
 }
 
-func InitMySQLEngine(t *testing.T) *sql.DB {
+var (
+	db     *sql.DB
+	dbLock sync.Mutex
+)
+
+// AcquireTestDB returns a MySQL DB and acquires a lock be released with ReleaseTestDB.
+func AcquireTestDB(t *testing.T) *sql.DB {
 	name := os.Getenv("TEST_MYSQL_DSN")
 	if name == "" {
 		t.Skip("TEST_MYSQL_DSN not set")
 	}
-
 	// We need to have parseTime=true as one of our DSN paramenters,
 	// so if it's not there, add it on. This way, in sql_scan, we'll get
 	// time.Time values back from MySQL.
@@ -45,9 +52,19 @@ func InitMySQLEngine(t *testing.T) *sql.DB {
 		t.Fatalf("couldn't parse TEST_MYSQL_DSN: %v", err)
 	}
 	u = ForceParseTime(u)
-	db, err := createDb("mysql", u.String())
-	if err != nil {
-		t.Fatal(err)
+
+	dbLock.Lock()
+	if db == nil {
+		db, err = createDb("mysql", u.String())
+		if err != nil {
+			dbLock.Unlock()
+			t.Fatal(err)
+		}
 	}
 	return db
+}
+
+// ReleaseTestDB releases a lock acquired by AcquireTestDB.
+func ReleaseTestDB() {
+	dbLock.Unlock()
 }
