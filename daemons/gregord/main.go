@@ -16,22 +16,27 @@ import (
 func main() {
 	log := daemons.NewLogger()
 
+	log.Debug("Parsing options...")
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(1)
 	}
 
+	log.Debug("Options Parsed. Creating server...")
 	srv := grpc.NewServer(log)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(mockAuth{})
 	} else {
+		log.Debug("Dialing session server %s", opts.SessionServer.String())
 		conn, err := opts.SessionServer.Dial()
 		if err != nil {
 			log.Error("%#v", err)
 			os.Exit(2)
 		}
+		log.Debug("Setting authenticator")
+
 		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
 		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
@@ -39,6 +44,7 @@ func main() {
 	}
 
 	// create a message consumer state machine
+	log.Debug("Create message consumer state machine")
 	consumer, err := newConsumer(opts.MysqlDSN, log)
 	if err != nil {
 		log.Error("%#v", err)
@@ -47,6 +53,7 @@ func main() {
 	defer consumer.shutdown()
 	go srv.Serve(consumer)
 
+	log.Debug("Calling mainServer.listenAndServe()")
 	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
 	os.Exit(4)
 }
