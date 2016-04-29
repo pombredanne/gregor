@@ -12,7 +12,7 @@ addons:
     - mysql-client-core-5.6
     - mysql-client-5.6
 env:
-  - TEST_MYSQL_DSN=root:@/test 
+  - MYSQL_DSN=root:@/test 
 notifications:
   slack:
     rooms:
