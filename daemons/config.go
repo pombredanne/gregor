@@ -3,6 +3,7 @@ package daemons
 import (
 	"crypto/tls"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -172,3 +173,8 @@ func (v *DSNGetter) Set(s string) error {
 func (v *DSNGetter) String() string {
 	return v.S
 }
+
+var (
+	_ flag.Getter = (*FMPURIGetter)(nil)
+	_ flag.Getter = (*DSNGetter)(nil)
+)
