@@ -107,8 +107,8 @@ func (o ObjFactory) MakeReminder(i gregor.Item, t time.Time) (gregor.Reminder, e
 		return nil, errors.New("item is not gregor1.ItemAndMetadata")
 	}
 	return Reminder{
-		Item_:  it,
-		Ntime_: ToTime(t),
+		Item_:       it,
+		RemindTime_: ToTime(t),
 	}, nil
 }
 

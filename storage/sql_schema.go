@@ -34,9 +34,9 @@ var schema = []string{
 	`CREATE TABLE reminders (
 		uid   CHAR(32) NOT NULL,
 		msgid CHAR(32) NOT NULL,
-		ntime DATETIME(6) NOT NULL,
+		rtime DATETIME(6) NOT NULL,
 		FOREIGN KEY(uid, msgid) REFERENCES messages (uid, msgid) ON DELETE CASCADE,
-		PRIMARY KEY(uid, msgid, ntime)
+		PRIMARY KEY(uid, msgid, rtime)
 	)`,
 
 	`CREATE TABLE dismissals_by_id (
