@@ -114,6 +114,11 @@ type FMPURIGetter struct {
 }
 
 func (v *FMPURIGetter) Get() interface{} {
+	if v.val == nil && v.S != "" {
+		if err := v.Set(v.S); err != nil {
+			return err
+		}
+	}
 	return v.val
 }
 
@@ -138,6 +143,11 @@ type DSNGetter struct {
 }
 
 func (v *DSNGetter) Get() interface{} {
+	if v.val == nil && v.S != "" {
+		if err := v.Set(v.S); err != nil {
+			return err
+		}
+	}
 	return v.val
 }
 
