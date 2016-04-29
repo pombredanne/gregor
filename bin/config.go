@@ -1,8 +1,9 @@
-package daemons
+package bin
 
 import (
 	"crypto/tls"
 	"errors"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -139,11 +140,11 @@ func (v *FMPURIGetter) String() string {
 type DSNGetter struct {
 	S      string
 	S3conf *S3Config
-	val    *url.URL
+	val    string
 }
 
 func (v *DSNGetter) Get() interface{} {
-	if v.val == nil && v.S != "" {
+	if v.val == "" && v.S != "" {
 		if err := v.Set(v.S); err != nil {
 			return err
 		}
@@ -153,21 +154,31 @@ func (v *DSNGetter) Get() interface{} {
 
 func (v *DSNGetter) Set(s string) error {
 	v.S = s
-	if v.S3conf.AWSRegion != "" {
+	if v.S3conf != nil && v.S3conf.AWSRegion != "" {
 		b, err := readFromS3Config(v.S3conf, s)
 		if err != nil {
 			return err
 		}
 		s = strings.TrimSpace(string(b))
 	}
-	val, err := url.Parse(s)
+	dsn, err := url.Parse(s)
 	if err != nil {
 		return err
 	}
-	v.val = val
+
+	query := dsn.Query()
+	query.Set("parseTime", "true")
+	dsn.RawQuery = query.Encode()
+
+	v.val = dsn.String()
 	return nil
 }
 
 func (v *DSNGetter) String() string {
 	return v.S
 }
+
+var (
+	_ flag.Getter = (*FMPURIGetter)(nil)
+	_ flag.Getter = (*DSNGetter)(nil)
+)

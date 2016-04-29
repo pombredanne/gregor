@@ -1,17 +1,19 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 )
 
 func main() {
-	log := daemons.NewLogger()
+	log := bin.NewLogger()
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
@@ -26,15 +28,17 @@ func main() {
 	}
 
 	Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
-	n, err := newNagger(opts.MysqlDSN, gregor1.RemindClient{Cli}, log)
+	db, err := sql.Open("mysql", opts.MysqlDSN)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
-	defer n.shutdown()
+
+	nagger := newNagger(db, gregor1.RemindClient{Cli}, log)
+	defer nagger.shutdown()
 
 	for _ = range time.Tick(opts.RemindDuration) {
-		if err := n.sendReminders(); err != nil {
+		if err := nagger.sendReminders(); err != nil {
 			log.Error("%#v", err)
 			os.Exit(4)
 		}

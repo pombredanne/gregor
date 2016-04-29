@@ -4,18 +4,17 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"time"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 )
 
 type Options struct {
 	RemindServer   *rpc.FMPURI
 	RemindDuration time.Duration
-	MysqlDSN       *url.URL
+	MysqlDSN       string
 	Debug          bool
 }
 
@@ -49,9 +48,9 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	var options Options
-	var s3conf daemons.S3Config
-	remindServer := &daemons.FMPURIGetter{S: os.Getenv("REMIND_SERVER")}
-	mysqlDSN := &daemons.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
+	var s3conf bin.S3Config
+	remindServer := &bin.FMPURIGetter{S: os.Getenv("REMIND_SERVER")}
+	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
@@ -60,11 +59,11 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 
 	if err := fs.Parse(argv[1:]); err != nil {
-		return nil, daemons.BadUsage(err.Error())
+		return nil, bin.BadUsage(err.Error())
 	}
 
 	if len(fs.Args()) != 0 {
-		return nil, daemons.BadUsage("no non-flag arguments expected")
+		return nil, bin.BadUsage("no non-flag arguments expected")
 	}
 
 	if err := s3conf.Validate(); err != nil {
@@ -72,12 +71,12 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok || options.MysqlDSN == nil {
-		return nil, daemons.BadUsage("Error parsing mysql DSN")
+	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
+		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
 	if options.RemindServer, ok = remindServer.Get().(*rpc.FMPURI); !ok || options.RemindServer == nil {
-		return nil, daemons.BadUsage("Error parsing session server URI")
+		return nil, bin.BadUsage("Error parsing session server URI")
 	}
 
 	return &options, nil

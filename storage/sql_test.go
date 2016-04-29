@@ -22,14 +22,14 @@ func testEngine(t *testing.T, db *sql.DB, w sqlTimeWriter) {
 func TestSqliteEngine(t *testing.T) {
 	name := "./gregor.db"
 	os.Remove(name)
-	db, err := createDb("sqlite3", "./gregor.db")
+	db, err := CreateDB("sqlite3", "./gregor.db")
 	if err != nil {
 		t.Fatal(err)
 	}
 	testEngine(t, db, sqliteTimeWriter{})
 }
 
-// Test with: TEST_MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
+// Test with: MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
 func TestMySQLEngine(t *testing.T) {
 	testEngine(t, AcquireTestDB(t), mysqlTimeWriter{})
 	ReleaseTestDB()

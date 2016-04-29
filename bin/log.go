@@ -1,4 +1,4 @@
-package daemons
+package bin
 
 import (
 	"fmt"

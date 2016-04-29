@@ -1,20 +1,22 @@
 package main
 
 import (
+	"database/sql"
 	"os"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 	"golang.org/x/net/context"
 )
 
 func main() {
-	log := daemons.NewLogger()
+	log := bin.NewLogger()
 
 	log.Debug("Parsing options...")
 	opts, err := ParseOptions(os.Args)
@@ -43,13 +45,15 @@ func main() {
 		defer sc.Close()
 	}
 
-	// create a message consumer state machine
-	log.Debug("Create message consumer state machine")
-	consumer, err := newConsumer(opts.MysqlDSN, log)
+	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)
+	db, err := sql.Open("mysql", opts.MysqlDSN)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
+
+	log.Debug("Create message consumer state machine")
+	consumer := newConsumer(db, log)
 	defer consumer.shutdown()
 	go srv.Serve(consumer)
 

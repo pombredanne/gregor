@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/url"
 	"os"
 	"strconv"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 )
 
 type Options struct {
 	SessionServer *rpc.FMPURI
 	BindAddress   string
-	MysqlDSN      *url.URL
+	MysqlDSN      string
 	Debug         bool
 	TLSConfig     *tls.Config
 	MockAuth      bool
@@ -69,10 +68,10 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	var options Options
-	var s3conf daemons.S3Config
+	var s3conf bin.S3Config
 	var tlsKey, tlsCert string
-	sessionServer := &daemons.FMPURIGetter{S: os.Getenv("SESSION_SERVER")}
-	mysqlDSN := &daemons.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
+	sessionServer := &bin.FMPURIGetter{S: os.Getenv("SESSION_SERVER")}
+	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
@@ -85,11 +84,11 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 
 	if err := fs.Parse(argv[1:]); err != nil {
-		return nil, daemons.BadUsage(err.Error())
+		return nil, bin.BadUsage(err.Error())
 	}
 
 	if len(fs.Args()) != 0 {
-		return nil, daemons.BadUsage("no non-flag arguments expected")
+		return nil, bin.BadUsage("no non-flag arguments expected")
 	}
 
 	if err := s3conf.Validate(); err != nil {
@@ -97,27 +96,27 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	}
 
 	if options.BindAddress == "" {
-		return nil, daemons.BadUsage("No valid bind-address specified")
+		return nil, bin.BadUsage("No valid bind-address specified")
 	}
 
 	if _, port, err := net.SplitHostPort(options.BindAddress); err != nil {
-		return nil, daemons.BadUsage("bad bind-address: %s", err)
+		return nil, bin.BadUsage("bad bind-address: %s", err)
 	} else if _, err := strconv.ParseUint(port, 10, 16); err != nil {
-		return nil, daemons.BadUsage("bad port (%q) in bind-address: %s", port, err)
+		return nil, bin.BadUsage("bad port (%q) in bind-address: %s", port, err)
 	}
 
 	var err error
-	if options.TLSConfig, err = daemons.ParseTLSConfig(&s3conf, tlsCert, tlsKey); err != nil {
+	if options.TLSConfig, err = bin.ParseTLSConfig(&s3conf, tlsCert, tlsKey); err != nil {
 		return nil, err
 	}
 
 	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(*url.URL); !ok || options.MysqlDSN == nil {
-		return nil, daemons.BadUsage("Error parsing mysql DSN")
+	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
+		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
 	if options.SessionServer, ok = sessionServer.Get().(*rpc.FMPURI); !ok || options.SessionServer == nil {
-		return nil, daemons.BadUsage("Error parsing session server URI")
+		return nil, bin.BadUsage("Error parsing session server URI")
 	}
 
 	return &options, nil

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"net"
 	"os"
 	"os/signal"
@@ -18,6 +19,13 @@ type mainServer struct {
 
 func newMainServer(o *Options, m gregor.MainLoopServer) *mainServer {
 	return &mainServer{opts: o, mls: m, addr: make(chan net.Addr, 1)}
+}
+
+func (m *mainServer) listen() (net.Listener, error) {
+	if m.opts.TLSConfig != nil {
+		return tls.Listen("tcp", m.opts.BindAddress, m.opts.TLSConfig)
+	}
+	return net.Listen("tcp", m.opts.BindAddress)
 }
 
 func (m *mainServer) listenAndServe() error {
