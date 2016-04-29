@@ -2,15 +2,22 @@ package storage
 
 import (
 	"database/sql"
-	"net/url"
+	"log"
 	"os"
 	"sync"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/keybase/gregor/daemons"
 )
 
-func createDb(engine string, name string) (*sql.DB, error) {
+var (
+	db     *sql.DB
+	dbLock sync.Mutex
+)
+
+// CreateDB connects to a DB and initializes it with Gregor Schema.
+func CreateDB(engine string, name string) (*sql.DB, error) {
 	db, err := sql.Open(engine, name)
 	if err != nil {
 		return nil, err
@@ -18,53 +25,48 @@ func createDb(engine string, name string) (*sql.DB, error) {
 
 	tx, err := db.Begin()
 	if err != nil {
-		return db, err
+		return nil, err
 	}
-	schema := Schema(engine)
-	for _, stmt := range schema {
-		if _, err = tx.Exec(stmt); err != nil {
-			return db, err
+
+	for _, stmt := range Schema(engine) {
+		if _, err := tx.Exec(stmt); err != nil {
+			return nil, err
 		}
 	}
 
-	if err = tx.Commit(); err != nil {
-		return db, err
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
+
 	return db, nil
 }
 
-var (
-	db     *sql.DB
-	dbLock sync.Mutex
-)
-
 // AcquireTestDB returns a MySQL DB and acquires a lock be released with ReleaseTestDB.
 func AcquireTestDB(t *testing.T) *sql.DB {
-	name := os.Getenv("TEST_MYSQL_DSN")
-	if name == "" {
-		t.Skip("TEST_MYSQL_DSN not set")
+	mysqlDSN := &daemons.DSNGetter{S: os.Getenv("MYSQL_DSN")}
+	dsn, ok := mysqlDSN.Get().(string)
+	if !ok || dsn == "" {
+		t.Skip("Error parsing MYSQL_DSN")
 	}
-	// We need to have parseTime=true as one of our DSN paramenters,
-	// so if it's not there, add it on. This way, in sql_scan, we'll get
-	// time.Time values back from MySQL.
-	u, err := url.Parse(name)
-	if err != nil {
-		t.Fatalf("couldn't parse TEST_MYSQL_DSN: %v", err)
-	}
-	u = ForceParseTime(u)
 
 	dbLock.Lock()
+	log.Println("Acquiring Test DB")
 	if db == nil {
-		db, err = createDb("mysql", u.String())
+		log.Println("Connecting to Test DB")
+		var err error
+		db, err = sql.Open("mysql", dsn)
 		if err != nil {
 			dbLock.Unlock()
 			t.Fatal(err)
 		}
+	} else {
+		log.Println("Reusing connection to Test DB")
 	}
 	return db
 }
 
 // ReleaseTestDB releases a lock acquired by AcquireTestDB.
 func ReleaseTestDB() {
+	log.Println("Releasing Test DB")
 	dbLock.Unlock()
 }

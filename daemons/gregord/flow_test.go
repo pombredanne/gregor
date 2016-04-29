@@ -16,7 +16,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-// Test with: TEST_MYSQL_DSN=gregor:@/gregor_test
+// Test with: MYSQL_DSN=gregor:@/gregor_test
 // (if you use MYSQL_DSN and test everything in this
 // package, you'll get an error because a flag test
 // will be incorrect due to the env var)

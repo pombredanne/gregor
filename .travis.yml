@@ -12,7 +12,7 @@ addons:
     - mysql-client-core-5.6
     - mysql-client-5.6
 env:
-  - TEST_MYSQL_DSN=root:@/test 
+  - MYSQL_DSN=root:@/test 
 notifications:
   slack:
     rooms:
@@ -28,6 +28,7 @@ before_install:
   - mysql -e "create database IF NOT EXISTS test;" -uroot
 before_script:
   - (cd protocol && npm i && git diff --quiet --exit-code)
+  - (cd daemons/dbinit && go build && ./dbinit)
 script:
   - go test -v ./...
   - (cd daemons/gregord && go build && docker build -t kbgregor .)

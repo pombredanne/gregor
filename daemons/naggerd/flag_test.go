@@ -23,8 +23,6 @@ func testGoodUsage(t *testing.T, args []string) {
 
 func TestUsage(t *testing.T) {
 	ebu := daemons.ErrBadUsage("")
-	testBadUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000"},
-		ebu, "Error parsing mysql DSN")
 	testBadUsage(t, []string{"naggerd", "-remind-server", "XXXXX://localhost:30000",
 		"-mysql-dsn", "gregor:@/gregor_test"}, ebu, "invalid framed msgpack rpc scheme")
 	testBadUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-aws-region", "foo",

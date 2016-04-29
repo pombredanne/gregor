@@ -13,7 +13,6 @@ import (
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/storage"
 )
 
 type ErrBadUsage string
@@ -155,7 +154,7 @@ func (v *DSNGetter) Get() interface{} {
 
 func (v *DSNGetter) Set(s string) error {
 	v.S = s
-	if v.S3conf.AWSRegion != "" {
+	if v.S3conf != nil && v.S3conf.AWSRegion != "" {
 		b, err := readFromS3Config(v.S3conf, s)
 		if err != nil {
 			return err
@@ -166,7 +165,12 @@ func (v *DSNGetter) Set(s string) error {
 	if err != nil {
 		return err
 	}
-	v.val = storage.ForceParseTime(dsn).String()
+
+	query := dsn.Query()
+	query.Set("parseTime", "true")
+	dsn.RawQuery = query.Encode()
+
+	v.val = dsn.String()
 	return nil
 }
 
