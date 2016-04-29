@@ -54,7 +54,7 @@ protocol common {
 
 	record Reminder {
 		ItemAndMetadata item;
-		Time ntime;
+		Time remindTime;
 	}
 
 	record OutOfBandMessage {

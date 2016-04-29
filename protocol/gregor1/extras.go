@@ -215,7 +215,7 @@ func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 }
 
 func (r Reminder) Item() gregor.Item     { return r.Item_ }
-func (r Reminder) RemindTime() time.Time { return FromTime(r.Ntime_) }
+func (r Reminder) RemindTime() time.Time { return FromTime(r.RemindTime_) }
 
 type State struct {
 	items []ItemAndMetadata

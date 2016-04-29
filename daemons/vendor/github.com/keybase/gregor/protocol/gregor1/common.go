@@ -58,8 +58,8 @@ type ItemAndMetadata struct {
 }
 
 type Reminder struct {
-	Item_  ItemAndMetadata `codec:"item" json:"item"`
-	Ntime_ Time            `codec:"ntime" json:"ntime"`
+	Item_       ItemAndMetadata `codec:"item" json:"item"`
+	RemindTime_ Time            `codec:"remindTime" json:"remindTime"`
 }
 
 type OutOfBandMessage struct {

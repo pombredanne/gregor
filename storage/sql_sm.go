@@ -130,7 +130,7 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, i gregor.Item) error {
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("INSERT INTO reminders(uid, msgid, ntime) VALUES(?,?,", hexEnc(md.UID()), hexEnc(md.MsgID()))
+		nqb.Build("INSERT INTO reminders(uid, msgid, rtime) VALUES(?,?,", hexEnc(md.UID()), hexEnc(md.MsgID()))
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -319,15 +319,15 @@ func (s *SQLEngine) rowToReminder(rows *sql.Rows) (gregor.Reminder, error) {
 	body := bodyScanner{o: s.objFactory}
 	var dtime timeScanner
 	var ctime timeScanner
-	var ntime timeScanner
-	if err := rows.Scan(&uid, &msgID, &deviceID, &category, &dtime, &body, &ctime, &ntime); err != nil {
+	var rtime timeScanner
+	if err := rows.Scan(&uid, &msgID, &deviceID, &category, &dtime, &body, &ctime, &rtime); err != nil {
 		return nil, err
 	}
 	it, err := s.objFactory.MakeItem(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
 	if err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeReminder(it, ntime.Time())
+	return s.objFactory.MakeReminder(it, rtime.Time())
 }
 
 func (s *SQLEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {
@@ -541,11 +541,11 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 }
 
 func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
-	qry := `SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.ntime
+	qry := `SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.rtime
 	        FROM items AS i
 	        INNER JOIN messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
 	        INNER JOIN reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
-	        WHERE i.dtime IS NULL AND r.ntime <= ?`
+	        WHERE i.dtime IS NULL AND r.rtime <= ?`
 	rows, err := s.driver.Query(qry, s.clock.Now())
 	if err != nil {
 		return nil, err
@@ -564,7 +564,7 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 
 func (s *SQLEngine) DeleteReminder(r gregor.Reminder) error {
 	qry := `DELETE FROM reminders WHERE 
-			uid = ? AND msgid = ? AND ntime = ?`
+			uid = ? AND msgid = ? AND rtime = ?`
 	_, err := s.driver.Exec(qry, hexEnc(r.Item().Metadata().UID()), hexEnc(r.Item().Metadata().MsgID()), r.RemindTime())
 	return err
 }
