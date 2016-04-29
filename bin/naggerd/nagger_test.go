@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
@@ -60,7 +60,7 @@ func TestNagger(t *testing.T) {
 func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
 	var of gregor1.ObjFactory
 	db := storage.AcquireTestDB(t)
-	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, daemons.NewLogger()}
+	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, bin.NewLogger()}
 }
 
 type mockRemind struct {

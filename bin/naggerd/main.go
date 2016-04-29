@@ -8,12 +8,12 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 )
 
 func main() {
-	log := daemons.NewLogger()
+	log := bin.NewLogger()
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {

@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +22,7 @@ func testGoodUsage(t *testing.T, args []string) {
 }
 
 func TestUsage(t *testing.T) {
-	ebu := daemons.ErrBadUsage("")
+	ebu := bin.ErrBadUsage("")
 	testBadUsage(t, []string{"naggerd", "-remind-server", "XXXXX://localhost:30000",
 		"-mysql-dsn", "gregor:@/gregor_test"}, ebu, "invalid framed msgpack rpc scheme")
 	testBadUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-aws-region", "foo",

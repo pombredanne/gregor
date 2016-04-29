@@ -6,13 +6,13 @@ import (
 	"os"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/storage"
 )
 
 var (
-	s3conf   daemons.S3Config
-	mysqlDSN = &daemons.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
+	s3conf   bin.S3Config
+	mysqlDSN = &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 )
 
 func init() {

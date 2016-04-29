@@ -3,7 +3,7 @@
 	"ignore": "test",
 	"package": [
 		{
-			"origin": "github.com/keybase/gregor/daemons/vendor/github.com/cenkalti/backoff",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/cenkalti/backoff",
 			"path": "github.com/cenkalti/backoff",
 			"revision": "32cd0c5b3aef12c76ed64aaf678f6c79736be7dc",
 			"revisionTime": "2015-08-27T15:34:15+03:00"
@@ -71,17 +71,17 @@
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor/daemons",
+			"path": "github.com/keybase/gregor/bin",
 			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor/daemons/gregord",
+			"path": "github.com/keybase/gregor/bin/gregord",
 			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor/daemons/naggerd",
+			"path": "github.com/keybase/gregor/bin/naggerd",
 			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
@@ -97,8 +97,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "ed3b572436a6ccd3dd7473450e94edf0c92638a9",
-			"revisionTime": "2016-04-29T14:06:41-07:00"
+			"revision": "c56dd3996af32925d813ba5fff60b20b50da11dc",
+			"revisionTime": "2016-04-29T14:40:17-07:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/test",

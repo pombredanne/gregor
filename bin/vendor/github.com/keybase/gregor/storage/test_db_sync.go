@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 )
 
 var (
@@ -43,7 +43,7 @@ func CreateDB(engine string, name string) (*sql.DB, error) {
 
 // AcquireTestDB returns a MySQL DB and acquires a lock be released with ReleaseTestDB.
 func AcquireTestDB(t *testing.T) *sql.DB {
-	mysqlDSN := &daemons.DSNGetter{S: os.Getenv("MYSQL_DSN")}
+	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN")}
 	dsn, ok := mysqlDSN.Get().(string)
 	if !ok || dsn == "" {
 		t.Skip("Error parsing MYSQL_DSN")

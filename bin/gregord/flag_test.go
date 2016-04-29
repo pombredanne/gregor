@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/keybase/gregor/daemons"
+	"github.com/keybase/gregor/bin"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,7 +24,7 @@ func testGoodUsage(t *testing.T, args []string) {
 }
 
 func TestUsage(t *testing.T) {
-	ebu := daemons.ErrBadUsage("")
+	ebu := bin.ErrBadUsage("")
 	testBadUsage(t, []string{"gregor"}, ebu, "No valid bind-address specified")
 	testBadUsage(t, []string{"gregor", "-bind-address", "aabb"}, ebu, "bad bind-address: missing port in address aabb")
 	testBadUsage(t, []string{"gregor", "-bind-address", "localhost:aabb"}, ebu, "bad port (\"aabb\") in bind-address")
@@ -42,7 +42,7 @@ func TestUsage(t *testing.T) {
 	testBadUsage(t, []string{"gregor", "-bind-address", ":4000", "-session-server", "fmprpc://localhost:30000", "-tls-key", "hi",
 		"-tls-cert", "bye", "-s3-config-bucket", "foo", "-mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "-bind-address", ":4000", "-session-server", "fmprpc://localhost:30000", "-tls-key", "hi",
-		"-tls-cert", "file:///does/not/exist", "-mysql-dsn", "gregor:@/gregor_test"}, daemons.ErrBadConfig(""), "no such file or directory")
+		"-tls-cert", "file:///does/not/exist", "-mysql-dsn", "gregor:@/gregor_test"}, bin.ErrBadConfig(""), "no such file or directory")
 
 	testGoodUsage(t, []string{"gregor", "-session-server", "fmprpc://localhost:30000", "-bind-address", ":4000", "-mysql-dsn", "gregor:@/gregor_test"})
 	testGoodUsage(t, []string{"gregor", "-session-server", "fmprpc://localhost:30000", "-bind-address", "127.0.0.1:4000", "-mysql-dsn", "gregor:@/gregor_test"})

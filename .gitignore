@@ -1,6 +1,7 @@
 gregor.db
 protocol/go-build-stamp
 protocol/node_modules/
-daemons/gregord/gregord
-daemons/naggerd/naggerd
-test/gregorcli/gregorcli
+bin/dbinit/dbinit
+bin/gregord/gregord
+bin/naggerd/naggerd
+bin/gregorcli/gregorcli
