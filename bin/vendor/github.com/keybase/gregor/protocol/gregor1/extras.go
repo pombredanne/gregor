@@ -61,27 +61,27 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 	return ret
 }
 
-func (m Metadata) CTime() time.Time     { return FromTime(m.Ctime_) }
-func (m Metadata) SetCTime(t time.Time) { m.Ctime_ = ToTime(t) }
-func (m Metadata) UID() gregor.UID {
+func (m *Metadata) CTime() time.Time     { return FromTime(m.Ctime_) }
+func (m *Metadata) SetCTime(t time.Time) { m.Ctime_ = ToTime(t) }
+func (m *Metadata) UID() gregor.UID {
 	if m.Uid_ == nil {
 		return nil
 	}
 	return m.Uid_
 }
-func (m Metadata) MsgID() gregor.MsgID {
+func (m *Metadata) MsgID() gregor.MsgID {
 	if m.MsgID_ == nil {
 		return nil
 	}
 	return m.MsgID_
 }
-func (m Metadata) DeviceID() gregor.DeviceID {
+func (m *Metadata) DeviceID() gregor.DeviceID {
 	if m.DeviceID_ == nil {
 		return nil
 	}
 	return m.DeviceID_
 }
-func (m Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
+func (m *Metadata) InBandMsgType() gregor.InBandMsgType { return gregor.InBandMsgType(m.InBandMsgType_) }
 
 func (i ItemAndMetadata) Metadata() gregor.Metadata {
 	if i.Md_ == nil {
@@ -121,7 +121,7 @@ func (s StateUpdateMessage) Creation() gregor.Item {
 	if s.Creation_ == nil {
 		return nil
 	}
-	return ItemAndMetadata{Md_: &s.Md_, Item_: s.Creation_}
+	return ItemAndMetadata{Md_: s.Md_, Item_: s.Creation_}
 }
 func (s StateUpdateMessage) Dismissal() gregor.Dismissal {
 	if s.Dismissal_ == nil {
@@ -336,7 +336,7 @@ var _ gregor.System = System("")
 var _ gregor.Body = Body{}
 var _ gregor.Category = Category("")
 var _ gregor.TimeOrOffset = TimeOrOffset{}
-var _ gregor.Metadata = Metadata{}
+var _ gregor.Metadata = &Metadata{}
 var _ gregor.StateSyncMessage = StateSyncMessage{}
 var _ gregor.MsgRange = MsgRange{}
 var _ gregor.Dismissal = Dismissal{}

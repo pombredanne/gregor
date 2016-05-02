@@ -26,13 +26,13 @@ type InBandMessage struct {
 }
 
 type StateUpdateMessage struct {
-	Md_        Metadata   `codec:"md" json:"md"`
+	Md_        *Metadata  `codec:"md" json:"md"`
 	Creation_  *Item      `codec:"creation,omitempty" json:"creation,omitempty"`
 	Dismissal_ *Dismissal `codec:"dismissal,omitempty" json:"dismissal,omitempty"`
 }
 
 type StateSyncMessage struct {
-	Md_ Metadata `codec:"md" json:"md"`
+	Md_ *Metadata `codec:"md" json:"md"`
 }
 
 type MsgRange struct {
