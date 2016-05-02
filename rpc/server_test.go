@@ -208,7 +208,7 @@ func newUpdateMessage(uid gregor1.UID) gregor1.Message {
 	return gregor1.Message{
 		Ibm_: &gregor1.InBandMessage{
 			StateUpdate_: &gregor1.StateUpdateMessage{
-				Md_: gregor1.Metadata{
+				Md_: &gregor1.Metadata{
 					Uid_: uid,
 				},
 			},

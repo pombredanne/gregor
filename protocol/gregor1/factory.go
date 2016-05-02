@@ -63,17 +63,17 @@ func timeToTimeOrOffset(timeIn *time.Time) (too TimeOrOffset) {
 	return
 }
 
-func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, i gregor.InBandMsgType) (Metadata, error) {
+func (o ObjFactory) makeMetadata(uid gregor.UID, msgid gregor.MsgID, devid gregor.DeviceID, ctime time.Time, i gregor.InBandMsgType) (*Metadata, error) {
 	uid2, e := castUID(uid)
 	if e != nil {
-		return Metadata{}, e
+		return &Metadata{}, e
 	}
 	devid2, e := castDeviceID(devid)
 	if e != nil {
-		return Metadata{}, e
+		return &Metadata{}, e
 	}
 
-	return Metadata{
+	return &Metadata{
 		Uid_:           uid2,
 		MsgID_:         MsgID(msgid.Bytes()),
 		Ctime_:         ToTime(ctime),
@@ -96,7 +96,7 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 		return nil, err
 	}
 	return ItemAndMetadata{
-		Md_:   &md,
+		Md_:   md,
 		Item_: o.makeItem(c, dtime, body),
 	}, nil
 }
@@ -207,7 +207,7 @@ func (o ObjFactory) MakeInBandMessageFromItem(i gregor.Item) (gregor.InBandMessa
 	}
 	return InBandMessage{
 		StateUpdate_: &StateUpdateMessage{
-			Md_:       *ourItem.Md_,
+			Md_:       ourItem.Md_,
 			Creation_: ourItem.Item_,
 		},
 	}, nil
