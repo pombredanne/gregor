@@ -204,14 +204,14 @@ func (m Message) ToInBandMessage() gregor.InBandMessage {
 	if m.Ibm_ == nil {
 		return nil
 	}
-	return m.Ibm_
+	return *m.Ibm_
 }
 
 func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 	if m.Oobm_ == nil {
 		return nil
 	}
-	return m.Oobm_
+	return *m.Oobm_
 }
 
 func (r Reminder) Item() gregor.Item     { return r.Item_ }
@@ -311,8 +311,11 @@ func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, er
 	}
 
 	for _, msg := range msgs {
-		if msg, ok := msg.(*InBandMessage); ok {
-			res.Msgs = append(res.Msgs, *msg)
+		if msg, ok := msg.(InBandMessage); ok {
+			res.Msgs = append(res.Msgs, msg)
+		} else {
+			// TODO: Avoid making this cast entirely.
+			panic("This cast should never fail.")
 		}
 	}
 
