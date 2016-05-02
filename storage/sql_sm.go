@@ -212,12 +212,12 @@ func checkMetadataForInsert(m gregor.Metadata) error {
 	return nil
 }
 
-func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata, t gregor.InBandMsgType) error {
+func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata, t gregor.InBandMsgType) (gregor.Metadata, error) {
 	if err := checkMetadataForInsert(md); err != nil {
-		return err
+		return nil, err
 	}
 	if t != gregor.InBandMsgTypeUpdate && t != gregor.InBandMsgTypeSync {
-		return fmt.Errorf("bad metadata: unrecognized msg type")
+		return nil, fmt.Errorf("bad metadata: unrecognized msg type")
 	}
 	qb := s.newQueryBuilder()
 	qb.Build("INSERT INTO messages(uid, msgid, mtype, devid, ctime) VALUES(?, ?, ?, ?,",
@@ -229,21 +229,19 @@ func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata,
 	}
 	qb.Build(")")
 	if err := qb.Exec(tx); err != nil {
-		return err
+		return nil, err
 	}
 
 	if !md.CTime().IsZero() {
-		return nil
+		return md, nil
 	}
 
 	// get the inserted ctime
 	ctime, err := s.ctimeFromMessage(tx, md.UID(), md.MsgID())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	md.SetCTime(ctime)
-
-	return nil
+	return s.objFactory.MakeMetadata(md.UID(), md.MsgID(), md.DeviceID(), ctime, md.InBandMsgType())
 }
 
 func (s *SQLEngine) ConsumeMessage(m gregor.Message) error {
@@ -278,7 +276,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err 
 	}()
 
 	md := m.Metadata()
-	if err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
+	if md, err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
 		return err
 	}
 	if m.Creation() != nil {
@@ -478,7 +476,7 @@ func (s *SQLEngine) Clear() error {
 }
 
 func (s *SQLEngine) LatestCTime(u gregor.UID, d gregor.DeviceID) *time.Time {
-	qry := `SELECT MAX(ctime) 
+	qry := `SELECT MAX(ctime)
 			FROM messages
 			WHERE uid = ? AND (devid = ? OR devid IS NULL)`
 	var ctime timeScanner
@@ -563,7 +561,7 @@ func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
 }
 
 func (s *SQLEngine) DeleteReminder(r gregor.Reminder) error {
-	qry := `DELETE FROM reminders WHERE 
+	qry := `DELETE FROM reminders WHERE
 			uid = ? AND msgid = ? AND rtime = ?`
 	_, err := s.driver.Exec(qry, hexEnc(r.Item().Metadata().UID()), hexEnc(r.Item().Metadata().MsgID()), r.RemindTime())
 	return err
