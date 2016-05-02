@@ -304,8 +304,27 @@ func (i *localIncoming) ConsumeMessage(_ context.Context, msg Message) error {
 	return i.sm.ConsumeMessage(msg)
 }
 
+// DeviceID returns the deviceID in a SyncArc, or interface nil
+// (and not gregor1.DeviceID(nil)) if not was specified.
+func (s SyncArg) DeviceID() gregor.DeviceID {
+	if s.Deviceid == nil {
+		return nil
+	}
+	return s.Deviceid
+}
+
+// UID returns the UID in a SyncArc, or interface nil
+// (and not gregor1.UID(nil)) if not was specified.
+func (s SyncArg) UID() gregor.UID {
+	if s.Uid == nil {
+		return nil
+	}
+	return s.Uid
+}
+
 func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, err error) {
-	msgs, err := i.sm.InBandMessagesSince(arg.Uid, arg.Deviceid, FromTime(arg.Ctime))
+
+	msgs, err := i.sm.InBandMessagesSince(arg.UID(), arg.DeviceID(), FromTime(arg.Ctime))
 	if err != nil {
 		return
 	}
@@ -316,7 +335,7 @@ func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, er
 		}
 	}
 
-	state, err := i.sm.State(arg.Uid, arg.Deviceid, nil)
+	state, err := i.sm.State(arg.UID(), arg.DeviceID(), nil)
 	if err != nil {
 		return
 	}
