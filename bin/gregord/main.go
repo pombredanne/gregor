@@ -24,6 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	rpcopts := bin.NewRPCLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
 	srv := grpc.NewServer(log)
@@ -39,7 +40,7 @@ func main() {
 		}
 		log.Debug("Setting authenticator")
 
-		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError), keybase1.ErrorUnwrapper{})
+		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, rpcopts), keybase1.WrapError), keybase1.ErrorUnwrapper{})
 		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
 		defer sc.Close()

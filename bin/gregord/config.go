@@ -20,11 +20,13 @@ type Options struct {
 	Debug         bool
 	TLSConfig     *tls.Config
 	MockAuth      bool
+	RPCDebug      string
 }
 
 const usageStr = `Usage:
 gregord -session-server=<uri> -bind-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
+    [-rpc-debug=<debug str>]
 
 Configuring TLS
 
@@ -48,6 +50,7 @@ Environment Variables
     -tls-cert or TLS_CERT
     -aws-region or AWS_REGION
     -s3-config-bucket or S3_CONFIG_BUCKET
+    -rpc-debug OR GREGOR_RPC_DEBUG
 `
 
 func ParseOptions(argv []string) (*Options, error) {
@@ -82,6 +85,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.StringVar(&tlsCert, "tls-cert", os.Getenv("TLS_CERT"), "file or S3 bucket or raw TLS Cert")
 	fs.Var(sessionServer, "session-server", "host:port of the session server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
+	fs.StringVar(&options.RPCDebug, "rpc-debug", os.Getenv("GREGOR_RPC_DEBUG"), "RPC debug options")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())
