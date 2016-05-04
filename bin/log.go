@@ -17,33 +17,42 @@ import (
 // running inside the client. Here in the server we implement the LogOutput
 // interface using the go-logging library.
 
-type GoLoggingWrapperForRPC struct {
-	inner *logging.Logger
+type StandardLogger struct {
+	inner  *logging.Logger
+	module string
 }
 
-var _ rpc.LogOutput = (*GoLoggingWrapperForRPC)(nil)
+var _ rpc.LogOutput = (*StandardLogger)(nil)
 
-func (g *GoLoggingWrapperForRPC) Error(s string, args ...interface{}) {
+func (g *StandardLogger) Error(s string, args ...interface{}) {
 	g.inner.Errorf(s, args...)
 }
-func (g *GoLoggingWrapperForRPC) Warning(s string, args ...interface{}) {
+func (g *StandardLogger) Warning(s string, args ...interface{}) {
 	g.inner.Warningf(s, args...)
 }
-func (g *GoLoggingWrapperForRPC) Info(s string, args ...interface{}) {
+func (g *StandardLogger) Info(s string, args ...interface{}) {
 	g.inner.Infof(s, args...)
 }
-func (g *GoLoggingWrapperForRPC) Debug(s string, args ...interface{}) {
+func (g *StandardLogger) Debug(s string, args ...interface{}) {
 	g.inner.Debugf(s, args...)
 }
-func (g *GoLoggingWrapperForRPC) Profile(s string, args ...interface{}) {
+func (g *StandardLogger) Profile(s string, args ...interface{}) {
 	g.inner.Debugf(s, args...)
+}
+
+func (g *StandardLogger) Configure(debug bool) {
+	if debug {
+		logging.SetLevel(logging.DEBUG, g.module)
+	} else {
+		logging.SetLevel(logging.INFO, g.module)
+	}
 }
 
 var noColorFormat = `%{level:.4s} %{time:15:04:05.000} %{shortfile} %{message}`
 
 var colorFormat = "%{color}" + noColorFormat + "%{color:reset}"
 
-func NewLogger() rpc.LogOutput {
+func NewLogger(module string) *StandardLogger {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
 	var format string
 	if terminal.IsTerminal(int(os.Stdout.Fd())) {
@@ -72,8 +81,8 @@ func NewLogger() rpc.LogOutput {
 		backends = append(backends, formattedSyslog)
 	}
 
-	logger := logging.MustGetLogger("gregord")
+	logger := logging.MustGetLogger(module)
 	logger.SetBackend(logging.MultiLogger(backends...))
 	logger.ExtraCalldepth = 1
-	return &GoLoggingWrapperForRPC{logger}
+	return &StandardLogger{logger, module}
 }

@@ -16,15 +16,15 @@ import (
 )
 
 func main() {
-	log := bin.NewLogger()
+	log := bin.NewLogger("gregord")
 
-	log.Debug("Parsing options...")
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(1)
 	}
 
+	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
 	srv := grpc.NewServer(log)
 
