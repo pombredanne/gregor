@@ -50,7 +50,7 @@ Environment Variables
     -tls-cert or TLS_CERT
     -aws-region or AWS_REGION
     -s3-config-bucket or S3_CONFIG_BUCKET
-    -rpc-debug OR GREGOR_RPC_DEBUG
+    -rpc-debug or GREGOR_RPC_DEBUG
 `
 
 func ParseOptions(argv []string) (*Options, error) {
