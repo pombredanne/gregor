@@ -24,7 +24,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	rpcopts := bin.NewRPCLogOptions(opts.RPCDebug, log)
+	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
 	srv := grpc.NewServer(log)
