@@ -94,7 +94,6 @@ type RPCLogOptions struct {
 	verboseTrace   bool
 	connectionInfo bool
 	noAddress      bool
-	log            rpc.LogOutput
 }
 
 func (r *RPCLogOptions) ShowAddress() bool    { return !r.noAddress }
@@ -113,7 +112,6 @@ func NewRPCLogOptions(opts string, log rpc.LogOutput) rpc.LogOptions {
 	r.verboseTrace = false
 	r.connectionInfo = false
 	r.noAddress = false
-	r.log = log
 	for _, c := range opts {
 		switch c {
 		case 'A':
@@ -129,7 +127,7 @@ func NewRPCLogOptions(opts string, log rpc.LogOutput) rpc.LogOptions {
 		case 'p':
 			r.profile = true
 		default:
-			r.log.Warning("Unknown local RPC logging flag: %c", c)
+			log.Warning("Unknown local RPC logging flag: %c", c)
 		}
 	}
 	return &r
