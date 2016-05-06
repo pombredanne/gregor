@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	log := bin.NewLogger()
+	log := bin.NewLogger("naggerd")
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
