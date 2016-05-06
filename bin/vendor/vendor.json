@@ -69,8 +69,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
+			"revision": "28c38ba709098c260d03fd9be84a41c3fab6d1e6",
+			"revisionTime": "2016-05-02T13:03:58-04:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/bin",
@@ -99,8 +99,8 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "c56dd3996af32925d813ba5fff60b20b50da11dc",
-			"revisionTime": "2016-04-29T14:40:17-07:00"
+			"revision": "28c38ba709098c260d03fd9be84a41c3fab6d1e6",
+			"revisionTime": "2016-05-02T13:03:58-04:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/test",

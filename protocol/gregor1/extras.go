@@ -62,7 +62,6 @@ func (d Dismissal) MsgIDsToDismiss() []gregor.MsgID {
 }
 
 func (m Metadata) CTime() time.Time     { return FromTime(m.Ctime_) }
-func (m Metadata) SetCTime(t time.Time) { m.Ctime_ = ToTime(t) }
 func (m Metadata) UID() gregor.UID {
 	if m.Uid_ == nil {
 		return nil
