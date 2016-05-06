@@ -14,6 +14,7 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
+	gregor "github.com/keybase/gregor"
 	"golang.org/x/net/context"
 )
 
@@ -40,9 +41,9 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 	return
 }
 
-func newMockIncomingInterface() gregor1.IncomingInterface {
+func newStorageStateMachine() gregor.StateMachine{
 	var of gregor1.ObjFactory
-	return gregor1.NewLocalIncoming(storage.NewMemEngine(of, clockwork.NewRealClock()))
+	return storage.NewMemEngine(of, clockwork.NewRealClock())
 }
 
 const (
@@ -76,14 +77,15 @@ var mockAuthenticator gregor1.AuthInterface = mockAuth{
 	},
 }
 
-func startTestServer(incoming gregor1.IncomingInterface) (*Server, net.Listener, *test.Events) {
+func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Events) {
 	ev := test.NewEvents()
 	s := NewServer(rpc.SimpleLogOutput{})
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)
+	s.SetStorageStateMachine(ssm)
 	l := newLocalListener()
-	go s.Serve(incoming)
+	go s.Serve()
 	go s.ListenLoop(l)
 	return s, l, ev
 }
@@ -244,7 +246,7 @@ func TestBroadcast(t *testing.T) {
 }
 
 func TestConsume(t *testing.T) {
-	incoming := newMockIncomingInterface()
+	incoming := newStorageStateMachine()
 	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
@@ -261,7 +263,7 @@ func TestConsume(t *testing.T) {
 }
 
 func TestImpersonation(t *testing.T) {
-	incoming := newMockIncomingInterface()
+	incoming := newStorageStateMachine()
 	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
@@ -278,7 +280,7 @@ func TestImpersonation(t *testing.T) {
 }
 
 func TestSuperUser(t *testing.T) {
-	incoming := newMockIncomingInterface()
+	incoming := newStorageStateMachine()
 	s, l, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()

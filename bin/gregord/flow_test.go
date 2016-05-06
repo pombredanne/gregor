@@ -87,15 +87,16 @@ func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func())
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
-	consumer := newConsumer(db, rpc.SimpleLogOutput{})
 	ms := newMainServer(&Options{BindAddress: "127.0.0.1:0"}, srv)
 	ms.stopCh = make(chan struct{})
 	cleanup := func() {
-		consumer.shutdown()
+		db.Close()
 		close(ms.stopCh)
 	}
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	srv.SetStorageStateMachine(sm)
 
-	go srv.Serve(consumer)
+	go srv.Serve()
 	go func() {
 		maybeSleep()
 		if err := ms.listenAndServe(); err != nil {

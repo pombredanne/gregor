@@ -56,7 +56,10 @@ type Stats struct {
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
-	incoming gregor1.IncomingInterface
+	// At first we only allow one state machine, but there might be a need to
+	// chain them together.
+	storage  gregor.StateMachine
+
 	auth     gregor1.AuthInterface
 	clock    clockwork.Clock
 
@@ -112,6 +115,10 @@ func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 
 func (s *Server) SetEventHandler(e EventHandler) {
 	s.events = e
+}
+
+func (s *Server) SetStorageStateMachine(sm gregor.StateMachine) {
+	s.storage = sm
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
@@ -267,17 +274,18 @@ func (s *Server) consume(c context.Context, m gregor1.Message) error {
 	return nil
 }
 
-func (s *Server) serve() error {
+// Serve starts the serve loop for Server.
+func (s *Server) Serve() error {
 	for {
 		select {
 		case c := <-s.newConnectionCh:
 			s.logError("addUIDConnection", s.addUIDConnection(c))
 		case a := <-s.consumeCh:
-			err := s.incoming.ConsumeMessage(a.c, a.m)
+			err := s.storage.ConsumeMessage(a.m)
 			a.retCh <- err
 		case a := <-s.syncCh:
 			var ret syncRet
-			ret.res, ret.err = s.incoming.Sync(a.c, a.a)
+			ret.res, ret.err = s.serveSync(a.a)
 			a.retCh <- ret
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
@@ -289,12 +297,6 @@ func (s *Server) serve() error {
 			return nil
 		}
 	}
-}
-
-// Serve starts the serve loop for Server.
-func (s *Server) Serve(i gregor1.IncomingInterface) error {
-	s.incoming = i
-	return s.serve()
 }
 
 func (s *Server) handleNewConnection(c net.Conn) error {
@@ -323,6 +325,30 @@ func (s *Server) ListenLoop(l net.Listener) error {
 
 		go s.handleNewConnection(c)
 	}
+}
+
+func (s *Server) serveSync(arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	var res gregor1.SyncResult
+	msgs, err := s.storage.InBandMessagesSince(arg.UID(), arg.DeviceID(), arg.CTime())
+	if err != nil {
+		return res, err
+	}
+
+	for _, msg := range msgs {
+		if msg, ok := msg.(gregor1.InBandMessage); ok {
+			res.Msgs = append(res.Msgs, msg)
+		} else {
+			s.log.Warning("Bad cast in serveSync (type=%T): %+v", msg)
+		}
+	}
+
+	state, err := s.storage.State(arg.UID(), arg.DeviceID(), nil)
+	if err != nil {
+		return res, err
+	}
+
+	res.Hash, err = state.Hash()
+	return res, err
 }
 
 // Shutdown tells the server to stop its Serve loop.

@@ -13,6 +13,7 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 	"golang.org/x/net/context"
+	"github.com/keybase/gregor/storage"
 )
 
 func main() {
@@ -48,15 +49,19 @@ func main() {
 
 	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)
 	db, err := sql.Open("mysql", opts.MysqlDSN)
+
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
+	defer func() {
+		log.Info("DB close on clean shutdown")
+		db.Close()
+	}()
 
-	log.Debug("Create message consumer state machine")
-	consumer := newConsumer(db, log)
-	defer consumer.shutdown()
-	go srv.Serve(consumer)
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	srv.SetStorageStateMachine(sm)
+	go srv.Serve()
 
 	log.Debug("Calling mainServer.listenAndServe()")
 	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
