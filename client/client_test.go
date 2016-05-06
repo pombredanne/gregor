@@ -5,14 +5,17 @@ import (
 	"os"
 	"testing"
 	"time"
+	"errors"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	storage "github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
+	grpc "github.com/keybase/gregor/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
-
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	context "golang.org/x/net/context"
 )
 
 type clientServerSM struct {
@@ -26,8 +29,8 @@ func NewClientServerSM() *clientServerSM {
 	var of gregor1.ObjFactory
 	fc := clockwork.NewFakeClock()
 	return &clientServerSM{
-		client:      NewMemEngine(of, fc),
-		server:      NewMemEngine(of, fc),
+		client:      storage.NewMemEngine(of, fc),
+		server:      storage.NewMemEngine(of, fc),
 		clientOF:    of,
 		clientClock: fc,
 	}
@@ -85,6 +88,20 @@ func (sm *clientServerSM) Clock() clockwork.Clock {
 
 var _ gregor.StateMachine = (*clientServerSM)(nil)
 
+type mockLocalIncoming struct {
+	sm gregor.StateMachine
+}
+
+func (m mockLocalIncoming) Sync(_ context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	return grpc.Sync(m.sm, rpc.SimpleLogOutput{}, arg)
+}
+func (m mockLocalIncoming) ConsumeMessage(_ context.Context, _ gregor1.Message) error {
+	return errors.New("unimplemented")
+}
+func (m mockLocalIncoming) Ping(_ context.Context) (string, error) {
+	return "pong", nil
+}
+
 func TestLevelDBClient(t *testing.T) {
 	fname, err := ioutil.TempDir("", "gregor")
 	if err != nil {
@@ -100,7 +117,7 @@ func TestLevelDBClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, gregor1.NewLocalIncoming(sm.server), rpc.SimpleLogOutput{})
+	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, mockLocalIncoming{sm.server}, rpc.SimpleLogOutput{})
 
 	if err := c.Save(); err != nil {
 		t.Fatal(err)

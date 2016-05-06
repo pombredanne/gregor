@@ -328,27 +328,7 @@ func (s *Server) ListenLoop(l net.Listener) error {
 }
 
 func (s *Server) serveSync(arg gregor1.SyncArg) (gregor1.SyncResult, error) {
-	var res gregor1.SyncResult
-	msgs, err := s.storage.InBandMessagesSince(arg.UID(), arg.DeviceID(), arg.CTime())
-	if err != nil {
-		return res, err
-	}
-
-	for _, msg := range msgs {
-		if msg, ok := msg.(gregor1.InBandMessage); ok {
-			res.Msgs = append(res.Msgs, msg)
-		} else {
-			s.log.Warning("Bad cast in serveSync (type=%T): %+v", msg)
-		}
-	}
-
-	state, err := s.storage.State(arg.UID(), arg.DeviceID(), nil)
-	if err != nil {
-		return res, err
-	}
-
-	res.Hash, err = state.Hash()
-	return res, err
+	return Sync(s.storage, s.log, arg)
 }
 
 // Shutdown tells the server to stop its Serve loop.

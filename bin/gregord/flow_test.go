@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
@@ -124,12 +125,12 @@ func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
 		t.Fatal(err)
 	}
 	maybeSleep()
-	tr := rpc.NewTransport(c, nil, nil)
+	tr := rpc.NewTransport(c, nil, keybase1.WrapError)
 
 	x := &client{
 		conn: c,
 		tr:   tr,
-		cli:  rpc.NewClient(tr, nil),
+		cli:  rpc.NewClient(tr, keybase1.ErrorUnwrapper{}),
 	}
 
 	maybeSleep()
