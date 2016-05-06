@@ -107,12 +107,19 @@ func (c *connection) checkUIDAuth(ctx context.Context, uid gregor1.UID) error {
 }
 
 func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) error {
-	if m.ToInBandMessage() != nil {
-		if err := c.checkUIDAuth(ctx, m.ToInBandMessage().Metadata().UID().Bytes()); err != nil {
+	if ibm := m.ToInBandMessage(); ibm != nil {
+		if ibm.Metadata() == nil || ibm.Metadata().UID() == nil {
+			return errors.New("no valid UID in message")
+		}
+		if err := c.checkUIDAuth(ctx, ibm.Metadata().UID().Bytes()); err != nil {
 			return err
 		}
-	} else if m.ToOutOfBandMessage() != nil {
-		if err := c.checkUIDAuth(ctx, m.ToOutOfBandMessage().UID().Bytes()); err != nil {
+	}
+	if oobm := m.ToOutOfBandMessage(); oobm != nil {
+		if oobm.UID() == nil {
+			return errors.New("no valid UID in message")
+		}
+		if err := c.checkUIDAuth(ctx, oobm.UID().Bytes()); err != nil {
 			return err
 		}
 	}

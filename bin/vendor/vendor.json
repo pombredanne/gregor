@@ -89,13 +89,13 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/protocol/gregor1",
-			"revision": "7460d6bfb4bd79252aa03ccaf8c2093878c98d07",
-			"revisionTime": "2016-05-02T13:52:31-04:00"
+			"revision": "b0a5e44fe1aba537fc85215ad9e1fd569375c5c8",
+			"revisionTime": "2016-05-05T22:01:37-04:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/rpc",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
+			"revision": "b0a5e44fe1aba537fc85215ad9e1fd569375c5c8",
+			"revisionTime": "2016-05-05T22:01:37-04:00"
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
