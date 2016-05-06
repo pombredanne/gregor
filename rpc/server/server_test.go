@@ -11,10 +11,10 @@ import (
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	gregor "github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
-	gregor "github.com/keybase/gregor"
 	"golang.org/x/net/context"
 )
 
@@ -41,7 +41,7 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 	return
 }
 
-func newStorageStateMachine() gregor.StateMachine{
+func newStorageStateMachine() gregor.StateMachine {
 	var of gregor1.ObjFactory
 	return storage.NewMemEngine(of, clockwork.NewRealClock())
 }

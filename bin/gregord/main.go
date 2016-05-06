@@ -11,9 +11,9 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
-	grpc "github.com/keybase/gregor/rpc"
-	"golang.org/x/net/context"
+	server "github.com/keybase/gregor/rpc/server"
 	"github.com/keybase/gregor/storage"
+	"golang.org/x/net/context"
 )
 
 func main() {
@@ -28,7 +28,7 @@ func main() {
 	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
-	srv := grpc.NewServer(log)
+	srv := server.NewServer(log)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(mockAuth{})
@@ -42,7 +42,7 @@ func main() {
 		log.Debug("Setting authenticator")
 
 		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, rpcopts), keybase1.WrapError), keybase1.ErrorUnwrapper{})
-		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
+		sc := server.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
 		defer sc.Close()
 	}

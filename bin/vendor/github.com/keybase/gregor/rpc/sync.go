@@ -1,9 +1,9 @@
 package rpc
 
 import (
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
-	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 // Sync is used by both the main server, and functions mocking the main server. So

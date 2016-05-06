@@ -11,7 +11,7 @@ import (
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
-	grpc "github.com/keybase/gregor/rpc"
+	server "github.com/keybase/gregor/rpc/server"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
@@ -83,7 +83,7 @@ func maybeSleep() {
 }
 
 func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func()) {
-	srv := grpc.NewServer(rpc.SimpleLogOutput{})
+	srv := server.NewServer(rpc.SimpleLogOutput{})
 	srv.SetAuthenticator(mockAuth{})
 	e := test.NewEvents()
 	srv.SetEventHandler(e)

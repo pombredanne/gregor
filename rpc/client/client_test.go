@@ -1,20 +1,20 @@
 package storage
 
 import (
+	"errors"
 	"io/ioutil"
 	"os"
 	"testing"
 	"time"
-	"errors"
 
 	"github.com/jonboulle/clockwork"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	grpc "github.com/keybase/gregor/rpc"
 	storage "github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
-	grpc "github.com/keybase/gregor/rpc"
 	"github.com/syndtr/goleveldb/leveldb"
-	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	context "golang.org/x/net/context"
 )
 

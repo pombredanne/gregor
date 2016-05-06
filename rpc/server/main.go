@@ -9,8 +9,8 @@ import (
 	"github.com/jonboulle/clockwork"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
-	grpc "github.com/keybase/gregor/rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	grpc "github.com/keybase/gregor/rpc"
 	"golang.org/x/net/context"
 )
 
@@ -59,10 +59,10 @@ type Stats struct {
 type Server struct {
 	// At first we only allow one state machine, but there might be a need to
 	// chain them together.
-	storage  gregor.StateMachine
+	storage gregor.StateMachine
 
-	auth     gregor1.AuthInterface
-	clock    clockwork.Clock
+	auth  gregor1.AuthInterface
+	clock clockwork.Clock
 
 	// key is the Hex-encoding of the binary UIDs
 	users map[string](*perUIDServer)
