@@ -9,6 +9,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
+	grpc "github.com/keybase/gregor/rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
@@ -285,7 +286,7 @@ func (s *Server) Serve() error {
 			a.retCh <- err
 		case a := <-s.syncCh:
 			var ret syncRet
-			ret.res, ret.err = s.serveSync(a.a)
+			ret.res, ret.err = grpc.Sync(s.storage, s.log, a.a)
 			a.retCh <- ret
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
@@ -325,10 +326,6 @@ func (s *Server) ListenLoop(l net.Listener) error {
 
 		go s.handleNewConnection(c)
 	}
-}
-
-func (s *Server) serveSync(arg gregor1.SyncArg) (gregor1.SyncResult, error) {
-	return Sync(s.storage, s.log, arg)
 }
 
 // Shutdown tells the server to stop its Serve loop.
