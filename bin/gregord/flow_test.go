@@ -8,9 +8,10 @@ import (
 	"testing"
 	"time"
 
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
-	grpc "github.com/keybase/gregor/rpc"
+	server "github.com/keybase/gregor/rpc/server"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
@@ -82,20 +83,21 @@ func maybeSleep() {
 }
 
 func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func()) {
-	srv := grpc.NewServer(rpc.SimpleLogOutput{})
+	srv := server.NewServer(rpc.SimpleLogOutput{})
 	srv.SetAuthenticator(mockAuth{})
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
-	consumer := newConsumer(db, rpc.SimpleLogOutput{})
 	ms := newMainServer(&Options{BindAddress: "127.0.0.1:0"}, srv)
 	ms.stopCh = make(chan struct{})
 	cleanup := func() {
-		consumer.shutdown()
+		db.Close()
 		close(ms.stopCh)
 	}
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	srv.SetStorageStateMachine(sm)
 
-	go srv.Serve(consumer)
+	go srv.Serve()
 	go func() {
 		maybeSleep()
 		if err := ms.listenAndServe(); err != nil {
@@ -123,12 +125,12 @@ func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
 		t.Fatal(err)
 	}
 	maybeSleep()
-	tr := rpc.NewTransport(c, nil, nil)
+	tr := rpc.NewTransport(c, nil, keybase1.WrapError)
 
 	x := &client{
 		conn: c,
 		tr:   tr,
-		cli:  rpc.NewClient(tr, nil),
+		cli:  rpc.NewClient(tr, keybase1.ErrorUnwrapper{}),
 	}
 
 	maybeSleep()

@@ -8,7 +8,6 @@ import (
 
 	"github.com/keybase/go-codec/codec"
 	"github.com/keybase/gregor"
-	"golang.org/x/net/context"
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
@@ -292,44 +291,26 @@ func FormatTime(t Time) string {
 	return FromTime(t).Format(layout)
 }
 
-type localIncoming struct {
-	sm gregor.StateMachine
-}
-
-func NewLocalIncoming(sm gregor.StateMachine) IncomingInterface {
-	return &localIncoming{sm}
-}
-
-func (i *localIncoming) ConsumeMessage(_ context.Context, msg Message) error {
-	return i.sm.ConsumeMessage(msg)
-}
-
-func (i *localIncoming) Sync(_ context.Context, arg SyncArg) (res SyncResult, err error) {
-	msgs, err := i.sm.InBandMessagesSince(arg.Uid, arg.Deviceid, FromTime(arg.Ctime))
-	if err != nil {
-		return
+// DeviceID returns the deviceID in a SyncArc, or interface nil
+// (and not gregor1.DeviceID(nil)) if not was specified.
+func (s SyncArg) DeviceID() gregor.DeviceID {
+	if s.Deviceid == nil {
+		return nil
 	}
-
-	for _, msg := range msgs {
-		if msg, ok := msg.(InBandMessage); ok {
-			res.Msgs = append(res.Msgs, msg)
-		} else {
-			// TODO: Avoid making this cast entirely.
-			panic("This cast should never fail.")
-		}
-	}
-
-	state, err := i.sm.State(arg.Uid, arg.Deviceid, nil)
-	if err != nil {
-		return
-	}
-
-	res.Hash, err = state.Hash()
-	return
+	return s.Deviceid
 }
 
-func (i *localIncoming) Ping(_ context.Context) (string, error) {
-	return "pong", nil
+// UID returns the UID in a SyncArc, or interface nil
+// (and not gregor1.UID(nil)) if not was specified.
+func (s SyncArg) UID() gregor.UID {
+	if s.Uid == nil {
+		return nil
+	}
+	return s.Uid
+}
+
+func (s SyncArg) CTime() time.Time {
+	return FromTime(s.Ctime)
 }
 
 var _ gregor.UID = UID{}

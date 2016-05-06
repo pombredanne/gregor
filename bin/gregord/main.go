@@ -11,7 +11,8 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
-	grpc "github.com/keybase/gregor/rpc"
+	server "github.com/keybase/gregor/rpc/server"
+	"github.com/keybase/gregor/storage"
 	"golang.org/x/net/context"
 )
 
@@ -27,7 +28,7 @@ func main() {
 	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
-	srv := grpc.NewServer(log)
+	srv := server.NewServer(log)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(mockAuth{})
@@ -41,22 +42,26 @@ func main() {
 		log.Debug("Setting authenticator")
 
 		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, rpcopts), keybase1.WrapError), keybase1.ErrorUnwrapper{})
-		sc := grpc.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
+		sc := server.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
 		srv.SetAuthenticator(sc)
 		defer sc.Close()
 	}
 
 	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)
 	db, err := sql.Open("mysql", opts.MysqlDSN)
+
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
+	defer func() {
+		log.Info("DB close on clean shutdown")
+		db.Close()
+	}()
 
-	log.Debug("Create message consumer state machine")
-	consumer := newConsumer(db, log)
-	defer consumer.shutdown()
-	go srv.Serve(consumer)
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	srv.SetStorageStateMachine(sm)
+	go srv.Serve()
 
 	log.Debug("Calling mainServer.listenAndServe()")
 	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
