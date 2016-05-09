@@ -53,18 +53,6 @@ func (i *authInfo) clear(sid gregor1.SessionID) bool {
 	return true
 }
 
-type UnauthenticatedError struct {
-	p string
-}
-
-func NewUnauthenticatedError() UnauthenticatedError {
-	return UnauthenticatedError{p: "Connection is not authenticated"}
-}
-
-func (e UnauthenticatedError) Error() string {
-	return e.p
-}
-
 type connection struct {
 	c      net.Conn
 	xprt   rpc.Transporter
@@ -142,8 +130,12 @@ func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.S
 
 	c.log.Info("Authenticate: %+v", tok)
 	if tok == "" {
+		var UnauthenticatedSessionError = keybase1.Status{
+			Name: "BAD_SESSION",
+			Code: int(keybase1.StatusCode_SCBadSession),
+			Desc: "unauthed session"}
 		c.log.Error("Authenticate: blank session token for connection!")
-		return gregor1.AuthResult{}, NewUnauthenticatedError()
+		return gregor1.AuthResult{}, UnauthenticatedSessionError
 	}
 
 	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
