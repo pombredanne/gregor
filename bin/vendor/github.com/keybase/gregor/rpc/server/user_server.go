@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"io"
+	"sync"
 	"time"
 
 	keybase1 "github.com/keybase/client/go/protocol"
@@ -106,6 +107,8 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 }
 
 func (s *perUIDServer) broadcast(a messageArgs) {
+	var errCh = make(chan connectionArgs)
+	var wg sync.WaitGroup
 	for id, conn := range s.conns {
 		s.log.Info("uid %x broadcast to %d", s.uid, id)
 		if err := conn.checkMessageAuth(a.c, a.m); err != nil {
@@ -116,20 +119,34 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, keybase1.ErrorUnwrapper{})}
 		// Two interesting things going on here:
 		// 1.) All broadcast calls time out after 10 seconds in case
-		//     of a super slow/buggy  client never getting back to us
+		//     of a super slow/buggy client never getting back to us
 		// 2.) Spawn each call into it's own goroutine so a slow device doesn't
 		//     prevent faster devices from getting these messages timely.
-		go func() {
+		wg.Add(1)
+		go func(conn *connection, id connectionID) {
+			defer wg.Done()
 			ctx, cancel := context.WithTimeout(a.c, 10000*time.Millisecond)
 			defer cancel()
 			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
 				s.log.Info("[connection %d]: %s", id, err)
 
+				// Push these onto a channel to clean up afterward
 				if s.isConnDown(err) {
-					s.removeConnection(conn, id)
+					errCh <- connectionArgs{conn, id}
 				}
 			}
-		}()
+		}(conn, id)
+	}
+
+	// Wait on all the calls
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	// Clean up all the connections we determined are dead
+	for ca := range errCh {
+		s.removeConnection(ca.c, ca.id)
 	}
 
 	if s.events != nil {
