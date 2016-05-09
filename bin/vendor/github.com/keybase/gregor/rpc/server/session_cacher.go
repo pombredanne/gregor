@@ -77,6 +77,10 @@ type sizeReq struct {
 	resp chan int
 }
 
+func (sc *SessionCacher) ResetAuthInterface(a gregor1.AuthInterface) {
+	sc.parent = a
+}
+
 // clearExpiryQueue removes all currently expired sessions.
 func (sc *SessionCacher) clearExpiryQueue() {
 	now := sc.cl.Now()

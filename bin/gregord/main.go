@@ -15,6 +15,7 @@ import (
 	"github.com/keybase/gregor/storage"
 )
 
+// Main entry point or gregord
 func main() {
 	log := bin.NewLogger("gregord")
 
@@ -32,18 +33,25 @@ func main() {
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
-		log.Debug("Dialing session server %s", opts.SessionServer.String())
-		conn, err := opts.SessionServer.Dial()
-		if err != nil {
-			log.Error("%#v", err)
-			os.Exit(2)
-		}
-		log.Debug("Setting authenticator")
+		transport := NewConnTransport(log, rpcopts, opts.SessionServer)
+		handler := NewAuthdHandler(log)
 
-		Cli := rpc.NewClient(rpc.NewTransport(conn, rpc.NewSimpleLogFactory(log, rpcopts), keybase1.WrapError), keybase1.ErrorUnwrapper{})
-		sc := server.NewSessionCacher(gregor1.AuthClient{Cli}, clockwork.NewRealClock(), 10*time.Minute)
-		srv.SetAuthenticator(sc)
+		log.Debug("Connecting to session server %s", opts.SessionServer.String())
+		rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
+			true, keybase1.WrapError, log, nil)
+
+		cli := <-handler.connectCh
+		sc := server.NewSessionCacher(gregor1.AuthClient{cli}, clockwork.NewRealClock(), 10*time.Minute)
 		defer sc.Close()
+		go func() {
+			for {
+				log.Debug("Setting authenticator")
+				srv.SetAuthenticator(sc)
+
+				cli = <-handler.connectCh
+				sc.ResetAuthInterface(gregor1.AuthClient{cli})
+			}
+		}()
 	}
 
 	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)
