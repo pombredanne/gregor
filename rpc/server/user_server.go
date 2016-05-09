@@ -2,10 +2,12 @@ package rpc
 
 import (
 	"io"
+	"time"
 
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"golang.org/x/net/context"
 )
 
 type connectionArgs struct {
@@ -112,13 +114,22 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 			continue
 		}
 		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, keybase1.ErrorUnwrapper{})}
-		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
-			s.log.Info("[connection %d]: %s", id, err)
+		// Two interesting things going on here:
+		// 1.) All broadcast calls time out after 10 seconds in case
+		//     of a super slow/buggy  client never getting back to us
+		// 2.) Spawn each call into it's own goroutine so a slow device doesn't
+		//     prevent faster devices from getting these messages timely.
+		go func() {
+			ctx, cancel := context.WithTimeout(a.c, 10000*time.Millisecond)
+			defer cancel()
+			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
+				s.log.Info("[connection %d]: %s", id, err)
 
-			if s.isConnDown(err) {
-				s.removeConnection(conn, id)
+				if s.isConnDown(err) {
+					s.removeConnection(conn, id)
+				}
 			}
-		}
+		}()
 	}
 
 	if s.events != nil {

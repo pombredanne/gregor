@@ -271,7 +271,9 @@ func (s *Server) consume(c context.Context, m gregor1.Message) error {
 	if err := <-retCh; err != nil {
 		return err
 	}
-	s.broadcastCh <- args
+	// Spawn this off so we don't block the main thread if the per UID
+	// server is not going to respond immediatley
+	go func() { s.broadcastCh <- args }()
 	return nil
 }
 
