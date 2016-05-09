@@ -53,6 +53,18 @@ func (i *authInfo) clear(sid gregor1.SessionID) bool {
 	return true
 }
 
+type UnauthenticatedError struct {
+	p string
+}
+
+func NewUnauthenticatedError() UnauthenticatedError {
+	return UnauthenticatedError{p: "Connection is not authenticated"}
+}
+
+func (e UnauthenticatedError) Error() string {
+	return e.p
+}
+
 type connection struct {
 	c      net.Conn
 	xprt   rpc.Transporter
@@ -127,7 +139,13 @@ func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) er
 }
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
+
 	c.log.Info("Authenticate: %+v", tok)
+	if tok == "" {
+		c.log.Error("Authenticate: blank session token for connection!")
+		return gregor1.AuthResult{}, NewUnauthenticatedError()
+	}
+
 	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
 		c.authInfo.set(tok, res, c.parent.clock.Now())
@@ -163,7 +181,6 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	c.log.Info("ConsumeMessage: %+v", m)
 	if err := c.checkMessageAuth(ctx, m); err != nil {
-		c.close()
 		return err
 	}
 
