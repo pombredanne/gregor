@@ -127,7 +127,17 @@ func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) er
 }
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
+
 	c.log.Info("Authenticate: %+v", tok)
+	if tok == "" {
+		var UnauthenticatedSessionError = keybase1.Status{
+			Name: "BAD_SESSION",
+			Code: int(keybase1.StatusCode_SCBadSession),
+			Desc: "unauthed session"}
+		c.log.Error("Authenticate: blank session token for connection!")
+		return gregor1.AuthResult{}, UnauthenticatedSessionError
+	}
+
 	res, err := c.parent.auth.AuthenticateSessionToken(ctx, tok)
 	if err == nil {
 		c.authInfo.set(tok, res, c.parent.clock.Now())
@@ -163,7 +173,6 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
 	c.log.Info("ConsumeMessage: %+v", m)
 	if err := c.checkMessageAuth(ctx, m); err != nil {
-		c.close()
 		return err
 	}
 
