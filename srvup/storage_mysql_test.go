@@ -13,7 +13,7 @@ func connectMysql(t *testing.T) *StorageMysql {
 	if len(dsn) == 0 {
 		t.Skip("No MYSQL_DSN env variable, skipping test")
 	}
-	s, err := NewStorageMysql(dsn)
+	s, err := NewStorageMysql(dsn, &defaultLogger{})
 	if err != nil {
 		t.Fatal(err)
 	}

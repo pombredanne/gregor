@@ -5,6 +5,7 @@ package srvup
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql" // for mysql driver
@@ -14,24 +15,34 @@ import (
 // StorageMysql is an implementation of srvup.Storage that uses
 // mysql to store the server status information.
 type StorageMysql struct {
-	db     *sql.DB
-	update *sql.Stmt
-	alive  *sql.Stmt
-	clock  clockwork.Clock
+	db      *sql.DB
+	update  *sql.Stmt
+	alive   *sql.Stmt
+	cleanup *sql.Stmt
+	clock   clockwork.Clock
+	log     Logger
+	done    chan struct{}
 }
 
 // NewStorageMysql creates a StorageMysql object.
-func NewStorageMysql(dsn string) (*StorageMysql, error) {
-	s := &StorageMysql{}
+func NewStorageMysql(dsn string, log Logger) (*StorageMysql, error) {
+	s := &StorageMysql{
+		log:  log,
+		done: make(chan struct{}),
+	}
 	if err := s.initialize(dsn); err != nil {
 		return nil, err
 	}
+
+	go s.cleanLoop()
+
 	return s, nil
 }
 
 // Shutdown releases any resources that this StorageMysql object is
 // using. This object is not usable after Shutdown.
 func (s *StorageMysql) Shutdown() error {
+	close(s.done)
 	if s.db == nil {
 		return nil
 	}
@@ -99,6 +110,31 @@ func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]st
 	}
 
 	return hosts, nil
+}
+
+func (s *StorageMysql) cleanLoop() {
+	for {
+		select {
+		case <-s.done:
+			return
+		case <-time.After(time.Minute):
+			if err := s.clean(); err != nil {
+				s.log.Warning("clean error: %s", err)
+			}
+		}
+	}
+}
+
+func (s *StorageMysql) clean() error {
+	if s.cleanup == nil {
+		stmt, err := s.db.Prepare("DELETE FROM server_status WHERE hbtime < DATE_SUB(?, INTERVAL 1 HOUR)")
+		if err != nil {
+			return fmt.Errorf("prepare error: %s", err)
+		}
+		s.cleanup = stmt
+	}
+	_, err := s.cleanup.Exec(s.now())
+	return err
 }
 
 func (s *StorageMysql) now() string {
