@@ -10,11 +10,33 @@ import (
 	"github.com/jonboulle/clockwork"
 )
 
-func setup() (*Status, clockwork.FakeClock) {
+func setupMem(t *testing.T) (*Status, clockwork.FakeClock) {
 	c := clockwork.NewFakeClock()
 	s := New("gregord", 1*time.Second, 2*time.Second, newMemstore(c))
 	s.setClock(c)
 	return s, c
+}
+
+func setupMysql(t *testing.T) (*Status, clockwork.FakeClock) {
+	c := clockwork.NewFakeClock()
+	m := connectMysql(t)
+	m.setClock(c)
+	s := New("gregord", 1*time.Second, 2*time.Second, m)
+	s.setClock(c)
+	return s, c
+}
+
+var engines = []func(*testing.T) (*Status, clockwork.FakeClock){
+	setupMem,
+	setupMysql,
+}
+
+func testAll(t *testing.T, f func(*testing.T, *Status, clockwork.FakeClock)) {
+	for _, e := range engines {
+		s, c := e(t)
+		f(t, s, c)
+		s.Shutdown()
+	}
 }
 
 func aliveCheck(t *testing.T, s *Status, n int) {
@@ -29,20 +51,24 @@ func aliveCheck(t *testing.T, s *Status, n int) {
 }
 
 func TestBasics(t *testing.T) {
-	s, c := setup()
-	defer s.Shutdown()
+	testAll(t, basics)
+}
 
+func basics(t *testing.T, s *Status, c clockwork.FakeClock) {
 	aliveCheck(t, s, 0)
-	s.heartbeat("localhost:9911")
+	if err := s.heartbeat("localhost:9911"); err != nil {
+		t.Fatal(err)
+	}
 	aliveCheck(t, s, 1)
 	c.Advance(3 * time.Second)
 	aliveCheck(t, s, 0)
 }
 
 func TestPingLoop(t *testing.T) {
-	s, c := setup()
-	defer s.Shutdown()
+	testAll(t, pingLoop)
+}
 
+func pingLoop(t *testing.T, s *Status, c clockwork.FakeClock) {
 	aliveCheck(t, s, 0)
 
 	s.HeartbeatLoop("localhost:9911")
@@ -56,11 +82,14 @@ func TestPingLoop(t *testing.T) {
 }
 
 func TestAliveCache(t *testing.T) {
-	s, _ := setup()
-	defer s.Shutdown()
+	testAll(t, aliveCache)
+}
 
+func aliveCache(t *testing.T, s *Status, c clockwork.FakeClock) {
 	aliveCheck(t, s, 0)
-	s.heartbeat("localhost:9911")
+	if err := s.heartbeat("localhost:9911"); err != nil {
+		t.Fatal(err)
+	}
 	aliveCheck(t, s, 1)
 
 	// remove the storage engine from Status to check that the cache works

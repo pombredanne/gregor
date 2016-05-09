@@ -23,6 +23,7 @@ type Status struct {
 	heartbeatInterval  time.Duration
 	aliveThreshold     time.Duration
 	storage            Storage
+	log                Logger
 	done               chan struct{}
 	clock              clockwork.Clock
 	aliveCacheMu       sync.RWMutex
@@ -42,6 +43,7 @@ func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storag
 		done:               make(chan struct{}),
 		clock:              clockwork.NewRealClock(),
 		aliveCacheDuration: 1 * time.Second,
+		log:                defaultLogger{},
 	}
 }
 
@@ -88,7 +90,9 @@ func (s *Status) HeartbeatLoop(hostname string) {
 		defer s.wg.Done()
 		for {
 			start := s.clock.Now()
-			s.heartbeat(hostname)
+			if err := s.heartbeat(hostname); err != nil {
+				s.log.Warning("heartbat error: %s", err)
+			}
 			sleepDur := s.heartbeatInterval - s.since(start)
 			if sleepDur < 0 {
 				sleepDur = 0
@@ -108,6 +112,7 @@ func (s *Status) heartbeat(hostname string) error {
 	return s.storage.UpdateServerStatus(s.group, hostname)
 }
 
+// Shutdown stops the HeartbeatLoop and waits for it to finish.
 func (s *Status) Shutdown() {
 	close(s.done)
 	s.wg.Wait()
@@ -115,6 +120,11 @@ func (s *Status) Shutdown() {
 
 func (s *Status) setClock(c clockwork.Clock) {
 	s.clock = c
+}
+
+// SetLogger sets the logger for Status.
+func (s *Status) SetLogger(l Logger) {
+	s.log = l
 }
 
 func (s *Status) since(t time.Time) time.Duration {

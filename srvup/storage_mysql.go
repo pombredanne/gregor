@@ -5,14 +5,19 @@ package srvup
 
 import (
 	"database/sql"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql" // for mysql driver
+	"github.com/jonboulle/clockwork"
 )
 
 // StorageMysql is an implementation of srvup.Storage that uses
 // mysql to store the server status information.
 type StorageMysql struct {
-	db *sql.DB
+	db     *sql.DB
+	update *sql.Stmt
+	alive  *sql.Stmt
+	clock  clockwork.Clock
 }
 
 // NewStorageMysql creates a StorageMysql object.
@@ -26,11 +31,11 @@ func NewStorageMysql(dsn string) (*StorageMysql, error) {
 
 // Shutdown releases any resources that this StorageMysql object is
 // using. This object is not usable after Shutdown.
-func (s *StorageMysql) Shutdown() {
+func (s *StorageMysql) Shutdown() error {
 	if s.db == nil {
-		return
+		return nil
 	}
-	s.db.Close()
+	return s.db.Close()
 }
 
 func (s *StorageMysql) initialize(dsn string) error {
@@ -43,12 +48,75 @@ func (s *StorageMysql) initialize(dsn string) error {
 	return s.createSchema()
 }
 
+// setClock stores a clock for use in testing.  See s.now().
+func (s *StorageMysql) setClock(c clockwork.Clock) {
+	s.clock = c
+}
+
+// UpdateServerStatus implements Storage.UpdateServerStatus.
+func (s *StorageMysql) UpdateServerStatus(group, hostname string) error {
+	if s.update == nil {
+		stmt, err := s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+		if err != nil {
+			return err
+		}
+		s.update = stmt
+	}
+
+	now := s.now()
+	_, err := s.update.Exec(group, hostname, now, now, now)
+	return err
+}
+
+// AliveServers implements Storage.AliveServers.
+func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]string, error) {
+	if s.alive == nil {
+		stmt, err := s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
+		if err != nil {
+			return nil, err
+		}
+		s.alive = stmt
+	}
+
+	rows, err := s.alive.Query(group, s.now(), int(threshold/time.Second))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var hosts []string
+	for rows.Next() {
+		var h string
+		err = rows.Scan(&h)
+		if err != nil {
+			return nil, err
+		}
+		hosts = append(hosts, h)
+	}
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return hosts, nil
+}
+
+func (s *StorageMysql) now() string {
+	if s.clock == nil {
+		return "NOW()"
+	}
+
+	res := s.clock.Now().Format("2006-01-02 15:04:05")
+	return res
+}
+
 func (s *StorageMysql) createSchema() error {
 	for _, stmt := range schema {
 		if _, err := s.db.Exec(stmt); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
