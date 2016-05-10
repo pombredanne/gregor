@@ -2,10 +2,13 @@ package rpc
 
 import (
 	"io"
+	"sync"
+	"time"
 
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"golang.org/x/net/context"
 )
 
 type connectionArgs struct {
@@ -28,21 +31,24 @@ type perUIDServer struct {
 	events           EventHandler
 
 	log rpc.LogOutput
+
+	broadcastTimeout time.Duration // in MS
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, bt time.Duration) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
 		newConnectionCh:  make(chan *connectionArgs, 1),
-		sendBroadcastCh:  make(chan messageArgs, 1),
-		tryShutdownCh:    make(chan bool, 1),    // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error, 100), // each connection uses the same closeListenCh, so buffer it more than 1
+		sendBroadcastCh:  make(chan messageArgs, 1000), // make this a huge queue for slow devices
+		tryShutdownCh:    make(chan bool, 1),           // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error, 100),        // each connection uses the same closeListenCh, so buffer it more than 1
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
 		selfShutdownCh:   make(chan struct{}),
 		events:           events,
 		log:              log,
+		broadcastTimeout: bt,
 	}
 
 	go s.serve()
@@ -104,6 +110,8 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 }
 
 func (s *perUIDServer) broadcast(a messageArgs) {
+	var errCh = make(chan connectionArgs)
+	var wg sync.WaitGroup
 	for id, conn := range s.conns {
 		s.log.Info("uid %x broadcast to %d", s.uid, id)
 		if err := conn.checkMessageAuth(a.c, a.m); err != nil {
@@ -112,13 +120,36 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 			continue
 		}
 		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, keybase1.ErrorUnwrapper{})}
-		if err := oc.BroadcastMessage(a.c, a.m); err != nil {
-			s.log.Info("[connection %d]: %s", id, err)
+		// Two interesting things going on here:
+		// 1.) All broadcast calls time out after 10 seconds in case
+		//     of a super slow/buggy client never getting back to us
+		// 2.) Spawn each call into it's own goroutine so a slow device doesn't
+		//     prevent faster devices from getting these messages timely.
+		wg.Add(1)
+		go func(conn *connection, id connectionID) {
+			defer wg.Done()
+			ctx, cancel := context.WithTimeout(a.c, s.broadcastTimeout)
+			defer cancel()
+			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
+				s.log.Info("[connection %d]: %s", id, err)
 
-			if s.isConnDown(err) {
-				s.removeConnection(conn, id)
+				// Push these onto a channel to clean up afterward
+				if s.isConnDown(err) {
+					errCh <- connectionArgs{conn, id}
+				}
 			}
-		}
+		}(conn, id)
+	}
+
+	// Wait on all the calls
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	// Clean up all the connections we determined are dead
+	for ca := range errCh {
+		s.removeConnection(ca.c, ca.id)
 	}
 
 	if s.events != nil {

@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
@@ -79,7 +80,7 @@ var mockAuthenticator gregor1.AuthInterface = mockAuth{
 
 func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Events) {
 	ev := test.NewEvents()
-	s := NewServer(rpc.SimpleLogOutput{})
+	s := NewServer(rpc.SimpleLogOutput{}, 10000*time.Millisecond)
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)
@@ -109,7 +110,7 @@ type client struct {
 	sync.Mutex
 }
 
-func newClient(addr net.Addr) *client {
+func newClientOneway(addr net.Addr) *client {
 	c, err := net.Dial(addr.Network(), addr.String())
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test server: %s", err))
@@ -121,12 +122,15 @@ func newClient(addr net.Addr) *client {
 		tr:   t,
 		cli:  rpc.NewClient(t, keybase1.ErrorUnwrapper{}),
 	}
+	return x
+}
 
-	srv := rpc.NewServer(t, keybase1.WrapError)
+func newClient(addr net.Addr) *client {
+	x := newClientOneway(addr)
+	srv := rpc.NewServer(x.tr, keybase1.WrapError)
 	if err := srv.Register(gregor1.OutgoingProtocol(x)); err != nil {
 		panic(err.Error())
 	}
-
 	return x
 }
 
@@ -155,6 +159,33 @@ func (c *client) BroadcastMessage(ctx context.Context, m gregor1.Message) error 
 	}
 	c.broadcasts = append(c.broadcasts, m)
 	return nil
+}
+
+type slowClient struct {
+	cli          *client
+	responseTime int
+}
+
+func (c *slowClient) AuthClient() gregor1.AuthClient {
+	return gregor1.AuthClient{Cli: c.cli.cli}
+}
+
+func newSlowClient(addr net.Addr, responseTime int) *slowClient {
+	cli := newClientOneway(addr)
+	x := &slowClient{
+		cli:          cli,
+		responseTime: responseTime,
+	}
+	srv := rpc.NewServer(x.cli.tr, keybase1.WrapError)
+	if err := srv.Register(gregor1.OutgoingProtocol(x)); err != nil {
+		panic(err.Error())
+	}
+	return x
+}
+
+func (c *slowClient) BroadcastMessage(ctx context.Context, m gregor1.Message) error {
+	time.Sleep(time.Duration(c.responseTime) * time.Millisecond)
+	return c.cli.BroadcastMessage(ctx, m)
 }
 
 func TestAuthentication(t *testing.T) {
@@ -293,6 +324,111 @@ func TestSuperUser(t *testing.T) {
 
 	if err := c.IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(goodUID)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// Test to make sure gregord functions for other users if a user is slow
+func TestBlockedUser(t *testing.T) {
+	incoming := newStorageStateMachine()
+	s, l, ev := startTestServer(incoming)
+	defer l.Close()
+	defer s.Shutdown()
+
+	// Start up a slow client to annoy the server
+	slowCli := newSlowClient(l.Addr(), 20000)
+	if _, err := slowCli.AuthClient().AuthenticateSessionToken(context.TODO(), evilToken); err != nil {
+		t.Fatal(err)
+	}
+
+	cli := newClient(l.Addr())
+	if _, err := cli.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	<-ev.ConnCreated
+	<-ev.ConnCreated
+
+	// should broadcast right away
+	if err := cli.IncomingClient().ConsumeMessage(context.TODO(),
+		newUpdateMessage(goodUID)); err != nil {
+		t.Fatal(err)
+	}
+
+	// Spawn a bunch of these on the slow client to try and overwhelm and
+	// saturate the broadcast channel in the perUIDServer
+	done := make(chan struct{})
+	go func() {
+		for i := 0; i < 20; i++ {
+			if err := slowCli.cli.IncomingClient().ConsumeMessage(context.TODO(),
+				newUpdateMessage(evilUID)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		done <- struct{}{}
+	}()
+	<-done
+
+	// In a broken state, this user could get blocked
+	go func() {
+		if err := cli.IncomingClient().ConsumeMessage(context.TODO(),
+			newUpdateMessage(goodUID)); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Give the whole thing 2 seconds to work or we consider it a failure
+	success := 0
+	for i := 0; i < 2; i++ {
+		select {
+		case <-ev.BcastSent:
+			success++
+		case <-time.After(2 * time.Second):
+		}
+	}
+
+	if success < 2 {
+		t.Errorf("broadcasts sent: %d, expected 2", success)
+	}
+
+}
+
+// Test that a single user device won't completely block the perUIDServer
+// if it is slow
+func TestBroadcastTimeout(t *testing.T) {
+	s, l, ev := startTestServer(nil)
+	defer l.Close()
+	defer s.Shutdown()
+
+	s.broadcastTimeout = 500
+	slowCli := newSlowClient(l.Addr(), 19000)
+	cli := newClient(l.Addr())
+
+	if _, err := slowCli.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := cli.AuthClient().AuthenticateSessionToken(context.TODO(), goodToken); err != nil {
+		t.Fatal(err)
+	}
+
+	<-ev.ConnCreated
+	<-ev.ConnCreated
+
+	// broadcast a message to goodUID
+	m := newOOBMessage(goodUID, "sys", nil)
+	if err := s.BroadcastMessage(context.TODO(), m); err != nil {
+		t.Logf("broadcast error: %s", err)
+	}
+
+	success := 0
+	select {
+	case <-ev.BcastSent:
+		success++
+	case <-time.After(2 * time.Second):
+	}
+
+	if success == 0 {
+		t.Errorf("broadcasts sent: %d, expected 1", success)
 	}
 }
 

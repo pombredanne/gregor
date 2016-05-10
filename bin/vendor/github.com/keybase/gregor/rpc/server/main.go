@@ -88,23 +88,28 @@ type Server struct {
 	useDeadlocker bool
 
 	log rpc.LogOutput
+
+	// The amount of time a perUIDServer should wait on a BroadcastMessage
+	// response (in MS)
+	broadcastTimeout time.Duration
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration) *Server {
 	s := &Server{
-		clock:           clockwork.NewRealClock(),
-		users:           make(map[string]*perUIDServer),
-		lastConns:       make(map[string]connectionID),
-		newConnectionCh: make(chan *connection),
-		statsCh:         make(chan chan *Stats, 1),
-		syncCh:          make(chan syncArgs),
-		consumeCh:       make(chan messageArgs),
-		broadcastCh:     make(chan messageArgs),
-		closeCh:         make(chan struct{}),
-		confirmCh:       make(chan confirmUIDShutdownArgs),
-		log:             log,
+		clock:            clockwork.NewRealClock(),
+		users:            make(map[string]*perUIDServer),
+		lastConns:        make(map[string]connectionID),
+		newConnectionCh:  make(chan *connection),
+		statsCh:          make(chan chan *Stats, 1),
+		syncCh:           make(chan syncArgs),
+		consumeCh:        make(chan messageArgs),
+		broadcastCh:      make(chan messageArgs),
+		closeCh:          make(chan struct{}),
+		confirmCh:        make(chan confirmUIDShutdownArgs),
+		log:              log,
+		broadcastTimeout: broadcastTimeout,
 	}
 
 	return s
@@ -162,7 +167,7 @@ func (s *Server) addUIDConnection(c *connection) error {
 	}
 
 	if usrv == nil {
-		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log)
+		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log, s.broadcastTimeout)
 		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
 			return err
 		}
@@ -253,7 +258,15 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 		}
 		return nil
 	}
-	srv.sendBroadcastCh <- messageArgs{c, m, nil}
+
+	// If this is going to block, we just drop the broadcast. It means that
+	// the user has a device that is not responding fast enough
+	select {
+	case srv.sendBroadcastCh <- messageArgs{c, m, nil}:
+	default:
+		s.log.Error("user super slow receiving broadcasts, rejecting!")
+		return errors.New("broadcast queue full, rejected")
+	}
 	return nil
 }
 
