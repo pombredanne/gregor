@@ -110,7 +110,7 @@
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "863181cd55d077df442b3e08d9baf8e098d9d306",
+			"revision": "b65fdc7a0d2a620e1de7851b0e12097ff8c0e5f9",
 			"revisionTime": "2016-05-09T21:37:01-04:00"
 		},
 		{
@@ -205,12 +205,12 @@
 			"revisionTime": "2016-03-12T11:09:07-08:00"
 		},
 		{
-			"checksumSHA1": "pancewZW3HwGvpDwfH5Imrbadc4=",
 			"path": "golang.org/x/net/context",
 			"revision": "815d315ead425c4365077d904a2331ee9e179820",
 			"revisionTime": "2016-04-20T16:37:57+10:00"
 		},
 		{
+			"checksumSHA1": "pancewZW3HwGvpDwfH5Imrbadc4=",
 			"path": "golang.org/x/net/context",
 			"revision": "815d315ead425c4365077d904a2331ee9e179820",
 			"revisionTime": "2016-04-20T16:37:57+10:00"
