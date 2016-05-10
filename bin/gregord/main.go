@@ -59,9 +59,29 @@ func main() {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
-	status := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
+	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
 	defer status.Shutdown()
-	status.HeartbeatLoop(opts.BindAddress)
+
+	alive, err := statusGroup.Alive()
+	if err != nil {
+		// bad enough to quit:
+		log.Error("%#v", err)
+		os.Exit(3)
+	}
+	// start sending heartbeats
+	statusGroup.HeartbeatLoop(opts.BindAddress)
+
+	if len(alive) > 0 {
+		// there are other gregors up
+		log.Debug("existing gregord servers: %v", alive)
+		log.Debug("sleeping for alive threshold (%s) before starting server", opts.AliveThreshold)
+		time.Sleep(opts.AliveThreshold)
+		log.Debug("sleep complete, proceeding with server initialization")
+	} else {
+		log.Debug("self is first gregord server alive, proceeding directly to server initialization")
+	}
+
+	srv.SetStatusGroup(statusGroup)
 
 	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
 	srv.SetStorageStateMachine(sm)

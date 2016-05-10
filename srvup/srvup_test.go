@@ -12,7 +12,7 @@ import (
 
 func setupMem(t *testing.T) (*Status, clockwork.FakeClock) {
 	c := clockwork.NewFakeClock()
-	s := New("gregord", 1*time.Second, 2*time.Second, newMemstore(c))
+	s := New("gregord", 1*time.Second, 2*time.Second, NewStorageMem(c))
 	s.setClock(c)
 	return s, c
 }

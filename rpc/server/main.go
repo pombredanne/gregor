@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -55,6 +56,12 @@ type Stats struct {
 
 type storageReq interface{}
 
+// Aliver is an interface to an object that can tell Server which
+// other servers are alive.
+type Aliver interface {
+	Alive() ([]string, error)
+}
+
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
@@ -73,11 +80,18 @@ type Server struct {
 
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
+	syncCh            chan syncArgs
 	broadcastCh       chan messageArgs
+	publishCh         chan messageArgs
 	closeCh           chan struct{}
 	confirmCh         chan confirmUIDShutdownArgs
 	storageDispatchCh chan storageReq
 	nextConnectionID  connectionID
+
+	// used to determine which other servers are alive
+	statusGroup Aliver
+	addr        net.Addr
+	authToken   gregor1.SessionToken
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
@@ -104,7 +118,9 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		lastConns:         make(map[string]connectionID),
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
+		syncCh:            make(chan syncArgs),
 		broadcastCh:       make(chan messageArgs),
+		publishCh:         make(chan messageArgs, 1000),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
 		storageDispatchCh: make(chan storageReq, storageQueueSize),
@@ -115,6 +131,8 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 	for i := 0; i < storageHandlers; i++ {
 		go s.storageDispatchHandler()
 	}
+
+	s.publishSpawn()
 
 	return s
 }
@@ -129,6 +147,10 @@ func (s *Server) SetEventHandler(e EventHandler) {
 
 func (s *Server) SetStorageStateMachine(sm gregor.StateMachine) {
 	s.storage = sm
+}
+
+func (s *Server) SetStatusGroup(g Aliver) {
+	s.statusGroup = g
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
@@ -293,6 +315,86 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	}
 	s.broadcastConsumeMessage(c, m)
 
+	select {
+	case s.publishCh <- messageArgs{c: c, m: m}:
+	default:
+		s.log.Warning("publishCh full: %d", len(s.publishCh))
+	}
+	return nil
+}
+
+// consumePub handles published messages from other gregord
+// servers.  It doesn't store to db or publish.
+func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
+	s.broadcastCh <- messageArgs{c: c, m: m}
+	return nil
+}
+
+func (s *Server) publishSpawn() {
+	for i := 0; i < 10; i++ {
+		go s.publishReceive()
+	}
+}
+
+func (s *Server) publishReceive() {
+	for {
+		select {
+		case marg := <-s.publishCh:
+			if err := s.publish(marg); err != nil {
+				s.log.Warning("publish error: %s", err)
+				// XXX retry?
+			}
+		case <-s.closeCh:
+			return
+		}
+	}
+}
+
+func (s *Server) publish(marg messageArgs) error {
+	s.log.Debug("publish: %+v", marg)
+	if s.statusGroup == nil {
+		return errors.New("rpc server has no statusGroup")
+	}
+
+	// start with inefficient version: make new connections every time.
+	alive, err := s.statusGroup.Alive()
+	if err != nil {
+		return err
+	}
+	for _, host := range alive {
+		s.log.Debug("host: %s", host)
+		if host == s.addr.String() {
+			continue
+		}
+
+		c, err := net.Dial("tcp", host)
+		if err != nil {
+			// XXX more here
+			s.log.Warning("dial host %q error: %s", err)
+			continue
+		}
+		t := rpc.NewTransport(c, nil, keybase1.WrapError)
+		cli := rpc.NewClient(t, keybase1.ErrorUnwrapper{})
+		ac := gregor1.AuthClient{Cli: cli}
+		if _, err := ac.AuthenticateSessionToken(context.TODO(), s.authToken); err != nil {
+			// XXX more here
+			s.log.Warning("host %q auth error: %s", host, err)
+			continue
+		}
+
+		ic := gregor1.IncomingClient{Cli: cli}
+		if err := ic.ConsumePubMessage(marg.c, marg.m); err != nil {
+			// XXX more here
+			s.log.Warning("host %q broadcast error: %s", host, err)
+			continue
+		}
+		s.log.Debug("publish broadcast to %s success", host)
+	}
+
+	if s.events != nil {
+		s.events.PublishSent(marg.m)
+	}
+
 	return nil
 }
 
@@ -401,6 +503,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
+	s.addr = l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {

@@ -4,27 +4,31 @@
 package srvup
 
 import (
+	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 )
 
-// memstore implements srvup.Storage.
-type memstore struct {
+// StorageMem implements srvup.Storage.
+type StorageMem struct {
 	groups map[string]groupMap
 	clock  clockwork.Clock
+	sync.Mutex
 }
 
 type groupMap map[string]time.Time
 
-func newMemstore(c clockwork.Clock) *memstore {
-	return &memstore{
+func NewStorageMem(c clockwork.Clock) *StorageMem {
+	return &StorageMem{
 		groups: make(map[string]groupMap),
 		clock:  c,
 	}
 }
 
-func (m *memstore) UpdateServerStatus(group, hostname string) error {
+func (m *StorageMem) UpdateServerStatus(group, hostname string) error {
+	m.Lock()
+	defer m.Unlock()
 	g, ok := m.groups[group]
 	if !ok {
 		g = make(groupMap)
@@ -34,7 +38,9 @@ func (m *memstore) UpdateServerStatus(group, hostname string) error {
 	return nil
 }
 
-func (m *memstore) AliveServers(group string, threshold time.Duration) ([]string, error) {
+func (m *StorageMem) AliveServers(group string, threshold time.Duration) ([]string, error) {
+	m.Lock()
+	defer m.Unlock()
 	g, ok := m.groups[group]
 	if !ok {
 		return nil, nil

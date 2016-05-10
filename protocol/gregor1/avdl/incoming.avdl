@@ -7,5 +7,6 @@ protocol incoming {
 	}
 	SyncResult sync(UID uid, DeviceID deviceid, Time ctime);
 	void consumeMessage(Message m);
+	void consumePubMessage(Message m);
 	string ping();
 }

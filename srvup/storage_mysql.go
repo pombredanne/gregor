@@ -143,24 +143,18 @@ func (s *StorageMysql) cleanLoop() {
 
 func (s *StorageMysql) clean() error {
 	if s.cleanup == nil {
-		stmt, err := s.db.Prepare("DELETE FROM server_status WHERE hbtime < DATE_SUB(?, INTERVAL 1 HOUR)")
+		stmt, err := s.db.Prepare("DELETE FROM server_status WHERE hbtime < DATE_SUB(NOW(), INTERVAL 1 HOUR)")
 		if err != nil {
 			return fmt.Errorf("prepare error: %s", err)
 		}
 		s.cleanup = stmt
 	}
-	// _, err := s.cleanup.Exec(s.now())
-	_, err := s.cleanup.Exec(NewNow())
+	_, err := s.cleanup.Exec()
 	return err
 }
 
 func (s *StorageMysql) now() string {
-	if s.clock == nil {
-		return "NOW()"
-	}
-
-	res := s.clock.Now().Format("2006-01-02 15:04:05")
-	return res
+	return s.clock.Now().Format("2006-01-02 15:04:05")
 }
 
 func (s *StorageMysql) createSchema() error {
