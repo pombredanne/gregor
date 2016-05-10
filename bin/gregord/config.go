@@ -15,16 +15,18 @@ import (
 )
 
 type Options struct {
-	SessionServer    *rpc.FMPURI
-	BindAddress      string
-	MysqlDSN         string
-	Debug            bool
-	TLSConfig        *tls.Config
-	MockAuth         bool
-	RPCDebug         string
-	BroadcastTimeout time.Duration
-	StorageHandlers  int
-	StorageQueueSize int
+	SessionServer     *rpc.FMPURI
+	BindAddress       string
+	MysqlDSN          string
+	Debug             bool
+	TLSConfig         *tls.Config
+	MockAuth          bool
+	RPCDebug          string
+	BroadcastTimeout  time.Duration
+	HeartbeatInterval time.Duration
+	AliveThreshold    time.Duration
+	StorageHandlers   int
+	StorageQueueSize  int
 }
 
 const usageStr = `Usage:
@@ -94,6 +96,9 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		"Timeout on client broadcasts")
 	fs.IntVar(&options.StorageHandlers, "storage-handlers", 40, "Number of threads handling storage requests")
 	fs.IntVar(&options.StorageQueueSize, "storage-queue-size", 10000, "Length of the queue for requests to StorageMachine")
+
+	fs.DurationVar(&options.HeartbeatInterval, "heartbeat-interval", 1*time.Second, "How often to send alive heartbeats")
+	fs.DurationVar(&options.AliveThreshold, "alive-threshold", 2*time.Second, "Server alive threshold")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

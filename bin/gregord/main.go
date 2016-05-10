@@ -11,6 +11,7 @@ import (
 	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 	server "github.com/keybase/gregor/rpc/server"
+	"github.com/keybase/gregor/srvup"
 	"github.com/keybase/gregor/storage"
 )
 
@@ -52,6 +53,15 @@ func main() {
 		log.Info("DB close on clean shutdown")
 		db.Close()
 	}()
+
+	mstore, err := srvup.NewStorageMysql(opts.MysqlDSN, log)
+	if err != nil {
+		log.Error("%#v", err)
+		os.Exit(3)
+	}
+	status := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
+	defer status.Shutdown()
+	status.HeartbeatLoop(opts.BindAddress)
 
 	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
 	srv.SetStorageStateMachine(sm)

@@ -66,30 +66,47 @@ func (s *StorageMysql) setClock(c clockwork.Clock) {
 
 // UpdateServerStatus implements Storage.UpdateServerStatus.
 func (s *StorageMysql) UpdateServerStatus(group, hostname string) error {
+	var err error
 	if s.update == nil {
-		stmt, err := s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+		if s.clock != nil {
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+		} else {
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
+		}
 		if err != nil {
 			return err
 		}
-		s.update = stmt
 	}
 
-	now := s.now()
-	_, err := s.update.Exec(group, hostname, now, now, now)
+	if s.clock != nil {
+		now := s.now()
+		_, err = s.update.Exec(group, hostname, now, now, now)
+	} else {
+		_, err = s.update.Exec(group, hostname)
+	}
 	return err
 }
 
 // AliveServers implements Storage.AliveServers.
 func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]string, error) {
+	var err error
 	if s.alive == nil {
-		stmt, err := s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
+		if s.clock != nil {
+			s.alive, err = s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
+		} else {
+			s.alive, err = s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(NOW(), INTERVAL ? SECOND)")
+		}
 		if err != nil {
 			return nil, err
 		}
-		s.alive = stmt
 	}
 
-	rows, err := s.alive.Query(group, s.now(), int(threshold/time.Second))
+	var rows *sql.Rows
+	if s.clock != nil {
+		rows, err = s.alive.Query(group, s.now(), int(threshold/time.Second))
+	} else {
+		rows, err = s.alive.Query(group, int(threshold/time.Second))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -104,8 +121,7 @@ func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]st
 		}
 		hosts = append(hosts, h)
 	}
-	err = rows.Err()
-	if err != nil {
+	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +149,8 @@ func (s *StorageMysql) clean() error {
 		}
 		s.cleanup = stmt
 	}
-	_, err := s.cleanup.Exec(s.now())
+	// _, err := s.cleanup.Exec(s.now())
+	_, err := s.cleanup.Exec(NewNow())
 	return err
 }
 
