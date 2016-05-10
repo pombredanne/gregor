@@ -60,7 +60,8 @@ func TestNagger(t *testing.T) {
 func newMockNagger(t *testing.T, remind gregor1.RemindInterface) *nagger {
 	var of gregor1.ObjFactory
 	db := storage.AcquireTestDB(t)
-	return &nagger{db, storage.NewTestMySQLEngine(db, of), remind, bin.NewLogger("naggerd")}
+	sm, _ := storage.NewTestMySQLEngine(db, of)
+	return &nagger{db, sm, remind, bin.NewLogger("naggerd")}
 }
 
 type mockRemind struct {

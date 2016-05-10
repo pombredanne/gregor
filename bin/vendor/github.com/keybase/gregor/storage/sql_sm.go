@@ -32,8 +32,10 @@ func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
 	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
 }
 
-func NewTestMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewFakeClock())
+func NewTestMySQLEngine(d *sql.DB, of gregor.ObjFactory) (*SQLEngine, clockwork.FakeClock) {
+	clock := clockwork.NewFakeClock()
+	eng := NewSQLEngine(d, of, mysqlTimeWriter{}, clock)
+	return eng, clock
 }
 
 func NewTestSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {

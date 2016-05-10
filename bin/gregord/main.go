@@ -13,7 +13,6 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	server "github.com/keybase/gregor/rpc/server"
 	"github.com/keybase/gregor/storage"
-	"golang.org/x/net/context"
 )
 
 func main() {
@@ -31,7 +30,7 @@ func main() {
 	srv := server.NewServer(log)
 
 	if opts.MockAuth {
-		srv.SetAuthenticator(mockAuth{})
+		srv.SetAuthenticator(newMockAuth())
 	} else {
 		log.Debug("Dialing session server %s", opts.SessionServer.String())
 		conn, err := opts.SessionServer.Dial()
@@ -67,14 +66,3 @@ func main() {
 	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
 	os.Exit(4)
 }
-
-type mockAuth struct{}
-
-func (m mockAuth) AuthenticateSessionToken(_ context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
-	return gregor1.AuthResult{Uid: gregor1.UID("gooduid"), Sid: gregor1.SessionID("1")}, nil
-}
-func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.SessionID) error {
-	return nil
-}
-
-var _ gregor1.AuthInterface = mockAuth{}
