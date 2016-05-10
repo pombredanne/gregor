@@ -91,12 +91,12 @@ type Server struct {
 
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
-	broadcastTimeout int
+	broadcastTimeout time.Duration
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout int) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration) *Server {
 	s := &Server{
 		clock:            clockwork.NewRealClock(),
 		users:            make(map[string]*perUIDServer),

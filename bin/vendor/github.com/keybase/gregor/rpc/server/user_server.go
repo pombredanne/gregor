@@ -32,10 +32,10 @@ type perUIDServer struct {
 
 	log rpc.LogOutput
 
-	broadcastTimeout int // in MS
+	broadcastTimeout time.Duration // in MS
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, bt int) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, bt time.Duration) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
@@ -128,8 +128,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		wg.Add(1)
 		go func(conn *connection, id connectionID) {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(a.c,
-				time.Duration(s.broadcastTimeout)*time.Millisecond)
+			ctx, cancel := context.WithTimeout(a.c, s.broadcastTimeout)
 			defer cancel()
 			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
 				s.log.Info("[connection %d]: %s", id, err)
