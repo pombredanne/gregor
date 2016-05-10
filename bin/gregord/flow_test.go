@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"net"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -32,15 +34,24 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 	db := storage.AcquireTestDB(t)
 	defer storage.ReleaseTestDB()
+	auth := newMockAuth()
 
-	srvAddr, events, cleanup := startTestGregord(t, db)
+	srvAddr, events, clock, cleanup := startTestGregord(t, db, auth)
 	defer cleanup()
 
 	t.Logf("gregord server started on %v", srvAddr)
 
 	clients := make([]*client, 5)
+	tmp := make([]byte, 16)
+	if _, err := rand.Read(tmp); err != nil {
+		t.Fatalf("error making new UID: %s", err)
+	}
+	tok, _, err := auth.newUser()
+	if err != nil {
+		t.Fatalf("error in newUser: %s", err)
+	}
 	for i := 0; i < len(clients); i++ {
-		c, clean := startTestClient(t, srvAddr)
+		c, clean := startTestClient(t, tok, srvAddr)
 		defer clean()
 		clients[i] = c
 	}
@@ -50,7 +61,8 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 
 	// send a message to the server from clients[0]
-	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), newUpdateMessage(t, clients[0].uid)); err != nil {
+	m0 := newUpdateMessage(t, clients[0].uid)
+	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), m0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -64,13 +76,39 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 		}
 	}
 
-	post, clean := startTestClient(t, srvAddr)
+	post, clean := startTestClient(t, tok, srvAddr)
 	defer clean()
 
 	<-events.ConnCreated
 
 	if len(post.broadcasts) != 0 {
 		t.Errorf("client connected after broadcast, has %d broadcasts, expected 0", len(post.broadcasts))
+	}
+
+	clock.Advance(time.Minute)
+	t0 := clock.Now()
+	clock.Advance(time.Hour)
+
+	m1 := newUpdateMessage(t, clients[0].uid)
+	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), m1); err != nil {
+		t.Fatal(err)
+	}
+
+	syncArg := gregor1.SyncArg{
+		Uid:   clients[0].uid,
+		Ctime: gregor1.ToTime(t0),
+	}
+	state, err := clients[0].IncomingClient().Sync(context.TODO(), syncArg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(state.Msgs) != 1 {
+		t.Fatalf("Expected 1 msg; got %d\n", len(state.Msgs))
+	}
+	if !bytes.Equal(state.Msgs[0].ToStateUpdateMessage().Metadata().MsgID().Bytes(),
+		m1.ToInBandMessage().Metadata().MsgID().Bytes()) {
+		t.Fatal("Wrong msg ID returned in sync")
 	}
 }
 
@@ -82,9 +120,9 @@ func maybeSleep() {
 	}
 }
 
-func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func()) {
+func startTestGregord(t *testing.T, db *sql.DB, auth *mockAuth) (net.Addr, *test.Events, clockwork.FakeClock, func()) {
 	srv := server.NewServer(rpc.SimpleLogOutput{})
-	srv.SetAuthenticator(mockAuth{})
+	srv.SetAuthenticator(auth)
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
 
@@ -94,7 +132,7 @@ func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func())
 		db.Close()
 		close(ms.stopCh)
 	}
-	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	sm, clock := storage.NewTestMySQLEngine(db, gregor1.ObjFactory{})
 	srv.SetStorageStateMachine(sm)
 
 	go srv.Serve()
@@ -105,7 +143,7 @@ func startTestGregord(t *testing.T, db *sql.DB) (net.Addr, *test.Events, func())
 		}
 	}()
 
-	return <-ms.addr, e, cleanup
+	return <-ms.addr, e, clock, cleanup
 }
 
 type client struct {
@@ -117,7 +155,7 @@ type client struct {
 	sid        gregor1.SessionID
 }
 
-func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
+func startTestClient(t *testing.T, tok gregor1.SessionToken, addr net.Addr) (*client, func()) {
 	t.Logf("startTestClient dialing %v", addr)
 	maybeSleep()
 	c, err := net.Dial(addr.Network(), addr.String())
@@ -139,7 +177,7 @@ func startTestClient(t *testing.T, addr net.Addr) (*client, func()) {
 		t.Fatal(err)
 	}
 
-	res, err := x.AuthClient().AuthenticateSessionToken(context.TODO(), "anything")
+	res, err := x.AuthClient().AuthenticateSessionToken(context.TODO(), tok)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,6 +216,10 @@ func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {
 				Md_: gregor1.Metadata{
 					Uid_:   uid,
 					MsgID_: msgid,
+				},
+				Creation_: &gregor1.Item{
+					Category_: "testing",
+					Body_:     msgid,
 				},
 			},
 		},
