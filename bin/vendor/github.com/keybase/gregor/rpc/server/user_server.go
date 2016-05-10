@@ -31,21 +31,24 @@ type perUIDServer struct {
 	events           EventHandler
 
 	log rpc.LogOutput
+
+	broadcastTimeout int // in MS
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, bt int) *perUIDServer {
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
 		newConnectionCh:  make(chan *connectionArgs, 1),
-		sendBroadcastCh:  make(chan messageArgs, 1),
-		tryShutdownCh:    make(chan bool, 1),    // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error, 100), // each connection uses the same closeListenCh, so buffer it more than 1
+		sendBroadcastCh:  make(chan messageArgs, 1000), // make this a huge queue for slow devices
+		tryShutdownCh:    make(chan bool, 1),           // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error, 100),        // each connection uses the same closeListenCh, so buffer it more than 1
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
 		selfShutdownCh:   make(chan struct{}),
 		events:           events,
 		log:              log,
+		broadcastTimeout: bt,
 	}
 
 	go s.serve()
@@ -125,7 +128,8 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		wg.Add(1)
 		go func(conn *connection, id connectionID) {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(a.c, 10000*time.Millisecond)
+			ctx, cancel := context.WithTimeout(a.c,
+				time.Duration(s.broadcastTimeout)*time.Millisecond)
 			defer cancel()
 			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
 				s.log.Info("[connection %d]: %s", id, err)

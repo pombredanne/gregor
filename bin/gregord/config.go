@@ -14,13 +14,14 @@ import (
 )
 
 type Options struct {
-	SessionServer *rpc.FMPURI
-	BindAddress   string
-	MysqlDSN      string
-	Debug         bool
-	TLSConfig     *tls.Config
-	MockAuth      bool
-	RPCDebug      string
+	SessionServer    *rpc.FMPURI
+	BindAddress      string
+	MysqlDSN         string
+	Debug            bool
+	TLSConfig        *tls.Config
+	MockAuth         bool
+	RPCDebug         string
+	BroadcastTimeout int
 }
 
 const usageStr = `Usage:
@@ -86,6 +87,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.Var(sessionServer, "session-server", "host:port of the session server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 	fs.StringVar(&options.RPCDebug, "rpc-debug", os.Getenv("GREGOR_RPC_DEBUG"), "RPC debug options")
+	fs.IntVar(&options.BroadcastTimeout, "broadcast-timeout", 10000, "Timeout on client broadcasts")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

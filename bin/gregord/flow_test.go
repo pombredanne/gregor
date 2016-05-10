@@ -121,7 +121,7 @@ func maybeSleep() {
 }
 
 func startTestGregord(t *testing.T, db *sql.DB, auth *mockAuth) (net.Addr, *test.Events, clockwork.FakeClock, func()) {
-	srv := server.NewServer(rpc.SimpleLogOutput{})
+	srv := server.NewServer(rpc.SimpleLogOutput{}, 10000)
 	srv.SetAuthenticator(auth)
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
