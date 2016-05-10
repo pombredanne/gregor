@@ -376,19 +376,13 @@ func TestBlockedUser(t *testing.T) {
 		}
 	}()
 
-	timeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(2 * time.Second)
-		timeout <- true
-	}()
-
 	// Give the whole thing 2 seconds to work or we consider it a failure
 	success := 0
 	for i := 0; i < 2; i++ {
 		select {
 		case <-ev.BcastSent:
 			success++
-		case <-timeout:
+		case <-time.After(2 * time.Second):
 		}
 	}
 
@@ -426,17 +420,11 @@ func TestBroadcastTimeout(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
-	timeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(2 * time.Second)
-		timeout <- true
-	}()
-
 	success := 0
 	select {
 	case <-ev.BcastSent:
 		success++
-	case <-timeout:
+	case <-time.After(2 * time.Second):
 	}
 
 	if success == 0 {

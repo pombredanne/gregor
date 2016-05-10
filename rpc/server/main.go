@@ -264,7 +264,8 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	select {
 	case srv.sendBroadcastCh <- messageArgs{c, m, nil}:
 	default:
-		s.log.Error("user super slow receiving broadcasts, rejecting!")
+		s.log.Error("user %s super slow receiving broadcasts, rejecting!",
+			gregor.UIDFromMessage(m))
 		return errors.New("broadcast queue full, rejected")
 	}
 	return nil
