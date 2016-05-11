@@ -50,11 +50,10 @@
 			"revisionTime": "2016-04-04T17:08:33-07:00"
 		},
 		{
-			"checksumSHA1": "6edef8vS25ipdcY6O7qW2rb4pWY=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/go-framed-msgpack-rpc",
+			"checksumSHA1": "GsL/Xszx3T2Bwa8VaeIas7T5eIc=",
 			"path": "github.com/keybase/go-framed-msgpack-rpc",
-			"revision": "181d6fc1a759db5c6b95a95e154334d22b2e4f45",
-			"revisionTime": "2016-05-05T15:33:12Z"
+			"revision": "72cdc158d2cb6bf5b0221e6247a54a1c3cfefea4",
+			"revisionTime": "2016-05-11T00:49:11Z"
 		},
 		{
 			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
@@ -103,10 +102,10 @@
 			"revisionTime": "2016-05-05T22:29:01-04:00"
 		},
 		{
-			"checksumSHA1": "JQNtMZkBZf9IBmxlhbLr1QgLAZ4=",
+			"checksumSHA1": "VkqckWcDoCDEOFjNS/88thx+/Rs=",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "7cf11225cf122a183b5d1d5d62124dad0b79d139",
-			"revisionTime": "2016-05-10T19:26:10Z"
+			"revision": "1bfccdda073d5c37bde33d493ed89abffd2522df",
+			"revisionTime": "2016-05-10T22:20:09Z"
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
