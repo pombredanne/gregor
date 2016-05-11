@@ -1,4 +1,4 @@
-package main
+package rpc
 
 import (
 	"time"
@@ -24,10 +24,6 @@ func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) authdH
 		log:        log,
 		connectCh:  make(chan rpc.GenericClient),
 	}
-}
-
-func (a *authdHandler) SetAuthServer(authserver gregor1.AuthInterface) {
-	a.authserver = authserver
 }
 
 func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.GenericClient, srv *rpc.Server) error {
