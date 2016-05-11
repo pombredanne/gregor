@@ -42,13 +42,11 @@ func main() {
 
 		cli := <-handler.connectCh
 		sc := server.NewSessionCacher(gregor1.AuthClient{cli}, clockwork.NewRealClock(), 10*time.Minute)
+		log.Debug("Setting authenticator")
+		srv.SetAuthenticator(sc)
 		defer sc.Close()
 		go func() {
-			for {
-				log.Debug("Setting authenticator")
-				srv.SetAuthenticator(sc)
-
-				cli = <-handler.connectCh
+			for cli = range handler.connectCh {
 				sc.ResetAuthInterface(gregor1.AuthClient{cli})
 			}
 		}()
