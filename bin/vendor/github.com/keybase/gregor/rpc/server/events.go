@@ -10,4 +10,5 @@ type EventHandler interface {
 	UIDServerCreated(gregor1.UID)
 	UIDServerDestroyed(gregor1.UID)
 	BroadcastSent(gregor1.Message)
+	PublishSent(gregor1.Message)
 }

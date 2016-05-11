@@ -116,7 +116,7 @@ func (c *Client) syncFromTime(t *time.Time) error {
 func (c *Client) Sync() error {
 	if err := c.syncFromTime(c.sm.LatestCTime(c.user, c.device)); err != nil {
 		if _, ok := err.(errHashMismatch); ok {
-			c.log.Info("Sync failure: %v\nReseting StateMachine and retrying", err)
+			c.log.Info("Sync failure: %v\nResetting StateMachine and retrying", err)
 			c.sm.Clear()
 			err = c.syncFromTime(nil)
 		}

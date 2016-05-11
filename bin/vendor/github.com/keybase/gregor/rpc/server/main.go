@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -55,6 +56,12 @@ type Stats struct {
 
 type storageReq interface{}
 
+// Aliver is an interface to an object that can tell Server which
+// other servers are alive.
+type Aliver interface {
+	Alive() ([]string, error)
+}
+
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
@@ -74,10 +81,18 @@ type Server struct {
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
 	broadcastCh       chan messageArgs
+	publishCh         chan messageArgs
 	closeCh           chan struct{}
 	confirmCh         chan confirmUIDShutdownArgs
 	storageDispatchCh chan storageReq
 	nextConnectionID  connectionID
+
+	// used to determine which other servers are alive
+	statusGroup Aliver
+	addr        net.Addr
+	authToken   gregor1.SessionToken
+	groupOnce   sync.Once
+	group       *aliveGroup
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
@@ -105,6 +120,7 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
 		broadcastCh:       make(chan messageArgs),
+		publishCh:         make(chan messageArgs, 1000),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
 		storageDispatchCh: make(chan storageReq, storageQueueSize),
@@ -115,6 +131,8 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 	for i := 0; i < storageHandlers; i++ {
 		go s.storageDispatchHandler()
 	}
+
+	s.publishSpawn()
 
 	return s
 }
@@ -129,6 +147,10 @@ func (s *Server) SetEventHandler(e EventHandler) {
 
 func (s *Server) SetStorageStateMachine(sm gregor.StateMachine) {
 	s.storage = sm
+}
+
+func (s *Server) SetStatusGroup(g Aliver) {
+	s.statusGroup = g
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
@@ -293,6 +315,56 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	}
 	s.broadcastConsumeMessage(c, m)
 
+	select {
+	case s.publishCh <- messageArgs{c: c, m: m}:
+	default:
+		s.log.Warning("publishCh full: %d", len(s.publishCh))
+	}
+	return nil
+}
+
+// consumePub handles published messages from other gregord
+// servers.  It doesn't store to db or publish.
+func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
+	s.broadcastCh <- messageArgs{c: c, m: m}
+	return nil
+}
+
+func (s *Server) publishSpawn() {
+	for i := 0; i < 10; i++ {
+		go s.publishReceive()
+	}
+}
+
+func (s *Server) publishReceive() {
+	for {
+		select {
+		case marg := <-s.publishCh:
+			if err := s.publish(marg); err != nil {
+				s.log.Warning("publish error: %s", err)
+				// XXX retry?
+			}
+		case <-s.closeCh:
+			return
+		}
+	}
+}
+
+func (s *Server) publish(marg messageArgs) error {
+	s.log.Debug("publish: %+v", marg)
+	s.groupOnce.Do(func() {
+		s.log.Debug("creating new aliveGroup")
+		s.group = newAliveGroup(s.statusGroup, s.addr.String(), s.authToken, s.clock, s.closeCh, s.log)
+	})
+
+	if err := s.group.Publish(marg.c, marg.m); err != nil {
+		return err
+	}
+
+	if s.events != nil {
+		s.events.PublishSent(marg.m)
+	}
+
 	return nil
 }
 
@@ -401,6 +473,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
+	s.addr = l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {

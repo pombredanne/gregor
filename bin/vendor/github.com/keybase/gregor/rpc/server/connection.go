@@ -179,6 +179,16 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 	return c.parent.runConsumeMessageMainSequence(ctx, m)
 }
 
+func (c *connection) ConsumePubMessage(ctx context.Context, m gregor1.Message) error {
+	c.log.Info("ConsumePubMessage: %+v", m)
+	if err := c.checkMessageAuth(ctx, m); err != nil {
+		c.close()
+		return err
+	}
+
+	return c.parent.consumePub(ctx, m)
+}
+
 func (c *connection) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }
