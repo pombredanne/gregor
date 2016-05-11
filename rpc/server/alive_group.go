@@ -140,6 +140,8 @@ func (a *aliveGroup) update() error {
 	for host, _ := range a.group {
 		if _, exists := newgroup[host]; !exists {
 			a.log.Debug("gregord on host %q no longer alive, shutting connection down", host)
+			// TODO: don't use GenericClient, so that we can shut down the
+			// connection:
 			// cli.Shutdown()
 		}
 	}
