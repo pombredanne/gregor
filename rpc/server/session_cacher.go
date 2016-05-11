@@ -167,7 +167,7 @@ func (sc *SessionCacher) RevokeSessionIDs(ctx context.Context, sessionIDs []greg
 			return ctx.Err()
 		}
 	}
-	return sc.parent.RevokeSessionIDs(ctx, sessionIDs)
+	return nil
 }
 
 var _ gregor1.AuthInterface = (*SessionCacher)(nil)

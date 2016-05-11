@@ -34,7 +34,7 @@ func main() {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
 		transport := NewConnTransport(log, rpcopts, opts.SessionServer)
-		handler := NewAuthdHandler(log)
+		handler := NewAuthdHandler(nil, log) // Need to set auth server later
 
 		log.Debug("Connecting to session server %s", opts.SessionServer.String())
 		rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
@@ -44,6 +44,7 @@ func main() {
 		sc := server.NewSessionCacher(gregor1.AuthClient{cli}, clockwork.NewRealClock(), 10*time.Minute)
 		log.Debug("Setting authenticator")
 		srv.SetAuthenticator(sc)
+		handler.SetAuthServer(sc)
 		defer sc.Close()
 		go func() {
 			for cli = range handler.connectCh {

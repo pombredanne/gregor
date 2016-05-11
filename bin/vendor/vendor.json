@@ -102,10 +102,10 @@
 			"revisionTime": "2016-05-05T22:29:01-04:00"
 		},
 		{
-			"checksumSHA1": "VkqckWcDoCDEOFjNS/88thx+/Rs=",
+			"checksumSHA1": "DdAx7IOLQcnOaKgRh0qbK2s1/e4=",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "1bfccdda073d5c37bde33d493ed89abffd2522df",
-			"revisionTime": "2016-05-10T22:20:09Z"
+			"revision": "69617ea46882eec6175bc4dce609af1933004868",
+			"revisionTime": "2016-05-11T14:54:39Z"
 		},
 		{
 			"path": "github.com/keybase/gregor/storage",
