@@ -45,7 +45,7 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 	return sc
 }
 
-func NewSessionCacherURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
+func NewSessionCacherFromURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
 	log rpc.LogOutput, rpcopts rpc.LogOptions) *SessionCacher {
 
 	sc := NewSessionCacher(nil, cl, timeout)
@@ -56,7 +56,7 @@ func NewSessionCacherURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Durati
 	log.Debug("Connecting to session server %s", ss.String())
 	rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
-	sc.parent = gregor1.AuthClient{<-handler.connectCh}
+	sc.parent = gregor1.AuthClient{Cli: <-handler.connectCh}
 
 	go sc.reconnectAuthdHandler(handler)
 
@@ -97,6 +97,14 @@ type sizeReq struct {
 	resp chan int
 }
 
+type setAuthReq struct {
+	cli gregor1.AuthClient
+}
+
+type authReq struct {
+	resp chan gregor1.AuthInterface
+}
+
 // clearExpiryQueue removes all currently expired sessions.
 func (sc *SessionCacher) clearExpiryQueue() {
 	now := sc.cl.Now()
@@ -112,7 +120,7 @@ func (sc *SessionCacher) clearExpiryQueue() {
 
 func (sc *SessionCacher) reconnectAuthdHandler(handler authdHandler) {
 	for cli := range handler.connectCh {
-		sc.parent = gregor1.AuthClient{cli}
+		sc.reqCh <- setAuthReq{cli: gregor1.AuthClient{Cli: cli}}
 	}
 }
 
@@ -132,6 +140,10 @@ func (sc *SessionCacher) requestHandler() {
 			sc.deleteSID(req.sid)
 		case sizeReq:
 			req.resp <- len(sc.sessions)
+		case setAuthReq:
+			sc.parent = req.cli
+		case authReq:
+			req.resp <- sc.parent
 		}
 	}
 }
@@ -145,6 +157,12 @@ func (sc *SessionCacher) Close() {
 func (sc *SessionCacher) Size() int {
 	respCh := make(chan int)
 	sc.reqCh <- sizeReq{respCh}
+	return <-respCh
+}
+
+func (sc *SessionCacher) auth() gregor1.AuthInterface {
+	respCh := make(chan gregor1.AuthInterface)
+	sc.reqCh <- authReq{respCh}
 	return <-respCh
 }
 
@@ -171,7 +189,7 @@ func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 		return
 	}
 
-	if res, err = sc.parent.AuthenticateSessionToken(ctx, tok); err == nil {
+	if res, err = sc.auth().AuthenticateSessionToken(ctx, tok); err == nil {
 		select {
 		case sc.reqCh <- setResReq{tok, &res}:
 		case <-ctx.Done():

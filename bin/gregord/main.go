@@ -32,7 +32,7 @@ func main() {
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
-		sc := server.NewSessionCacherURI(opts.SessionServer, clockwork.NewRealClock(),
+		sc := server.NewSessionCacherFromURI(opts.SessionServer, clockwork.NewRealClock(),
 			10*time.Minute, log, rpcopts)
 		defer sc.Close()
 
