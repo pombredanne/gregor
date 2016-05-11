@@ -77,11 +77,6 @@
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor/bin/naggerd",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
-		},
-		{
 			"checksumSHA1": "Fj0dNtnFeeezTTYIWDxpxW7NG6Y=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/protocol/gregor1",
 			"path": "github.com/keybase/gregor/protocol/gregor1",
