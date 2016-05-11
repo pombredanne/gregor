@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
-	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -92,6 +92,8 @@ type Server struct {
 	statusGroup Aliver
 	addr        net.Addr
 	authToken   gregor1.SessionToken
+	groupOnce   sync.Once
+	group       *aliveGroup
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
@@ -352,43 +354,13 @@ func (s *Server) publishReceive() {
 
 func (s *Server) publish(marg messageArgs) error {
 	s.log.Debug("publish: %+v", marg)
-	if s.statusGroup == nil {
-		return errors.New("rpc server has no statusGroup")
-	}
+	s.groupOnce.Do(func() {
+		s.log.Debug("creating new aliveGroup")
+		s.group = newAliveGroup(s.statusGroup, s.addr.String(), s.authToken, s.clock, s.closeCh, s.log)
+	})
 
-	// start with inefficient version: make new connections every time.
-	alive, err := s.statusGroup.Alive()
-	if err != nil {
+	if err := s.group.Publish(marg.c, marg.m); err != nil {
 		return err
-	}
-	for _, host := range alive {
-		s.log.Debug("host: %s", host)
-		if host == s.addr.String() {
-			continue
-		}
-
-		c, err := net.Dial("tcp", host)
-		if err != nil {
-			// XXX more here
-			s.log.Warning("dial host %q error: %s", err)
-			continue
-		}
-		t := rpc.NewTransport(c, nil, keybase1.WrapError)
-		cli := rpc.NewClient(t, keybase1.ErrorUnwrapper{})
-		ac := gregor1.AuthClient{Cli: cli}
-		if _, err := ac.AuthenticateSessionToken(context.TODO(), s.authToken); err != nil {
-			// XXX more here
-			s.log.Warning("host %q auth error: %s", host, err)
-			continue
-		}
-
-		ic := gregor1.IncomingClient{Cli: cli}
-		if err := ic.ConsumePubMessage(marg.c, marg.m); err != nil {
-			// XXX more here
-			s.log.Warning("host %q broadcast error: %s", host, err)
-			continue
-		}
-		s.log.Debug("publish broadcast to %s success", host)
 	}
 
 	if s.events != nil {
