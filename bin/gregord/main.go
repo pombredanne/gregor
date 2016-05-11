@@ -60,7 +60,7 @@ func main() {
 		os.Exit(3)
 	}
 	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
-	defer status.Shutdown()
+	defer statusGroup.Shutdown()
 
 	alive, err := statusGroup.Alive()
 	if err != nil {
