@@ -21,6 +21,7 @@ type UID interface {
 
 type MsgID interface {
 	Bytes() []byte
+	String() string
 }
 
 type DeviceID interface {

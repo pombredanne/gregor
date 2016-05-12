@@ -2,6 +2,7 @@ package gregor1
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -13,6 +14,7 @@ import (
 func (u UID) Bytes() []byte            { return []byte(u) }
 func (d DeviceID) Bytes() []byte       { return []byte(d) }
 func (m MsgID) Bytes() []byte          { return []byte(m) }
+func (m MsgID) String() string         { return hex.EncodeToString(m) }
 func (s System) String() string        { return string(s) }
 func (c Category) String() string      { return string(c) }
 func (b Body) Bytes() []byte           { return []byte(b) }
