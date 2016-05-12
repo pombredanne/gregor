@@ -278,7 +278,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	return nil
 }
 
-// This function gets called from the connection object that exists for each
+// startSync gets called from the connection object that exists for each
 // client of gregord for a sync call. It is on a different thread than
 // the main Serve loop
 func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
@@ -288,8 +288,10 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 	return ret.res, ret.err
 }
 
-// Like startSync, this function is called from connection, and is on a
-// different thread than Serve
+// startConsume is the main entry point to the gregor flow described in the
+// architecture documents. It receives a new message, writes it to the StateMachine,
+// and broadcasts it to the other clients. Like startSync, this function is called
+// from connection, and is on a different thread than Serve
 func (s *Server) startConsume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
 	s.storageConsumeMessage(m, retCh)
@@ -330,7 +332,7 @@ type syncReq struct {
 	respCh chan<- syncRet
 }
 
-// Schedule a Consume request on the dispatch handler
+// storageConsumeMessage schedules a Consume request on the dispatch handler
 func (s *Server) storageConsumeMessage(m gregor.Message, retCh chan<- error) {
 	req := consumeMessageReq{m: m, respCh: retCh}
 	err := s.storageDispatch(req)
@@ -339,7 +341,7 @@ func (s *Server) storageConsumeMessage(m gregor.Message, retCh chan<- error) {
 	}
 }
 
-// Schedule a Sync request on the dispatch handler
+// storageSync schedules a Sync request on the dispatch handler
 func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg gregor1.SyncArg,
 	retCh chan<- syncRet) {
 	req := syncReq{sm: sm, log: log, arg: arg, respCh: retCh}
@@ -352,7 +354,7 @@ func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg greg
 	}
 }
 
-// Dispatch a new StorageMachine request. The storageDispatchCh channel
+// storageDispatch dispatches a new StorageMachine request. The storageDispatchCh channel
 // is buffered with a lot of space, but in the case where the StorageMachine
 // is totally locked, we will fill the queue and possibly reject the request.
 func (s *Server) storageDispatch(req storageReq) error {
@@ -365,7 +367,7 @@ func (s *Server) storageDispatch(req storageReq) error {
 	return nil
 }
 
-// Handler function for pulling requests off the storageDispatchCh queue
+// storageDispatchHandler handles pulling requests off the storageDispatchCh queue
 // and routing them to the proper StorageMachine function. Many of these
 // run at once in different threads. This also makes it such that
 // any StorageMachine implementation must be thread safe.
