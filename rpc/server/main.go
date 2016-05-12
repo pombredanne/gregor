@@ -54,6 +54,8 @@ type Stats struct {
 	UserServerCount int
 }
 
+type storageReq interface{}
+
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
@@ -70,14 +72,15 @@ type Server struct {
 	// last connection added per UID
 	lastConns map[string]connectionID
 
-	newConnectionCh  chan *connection
-	statsCh          chan chan *Stats
-	syncCh           chan syncArgs
-	consumeCh        chan messageArgs
-	broadcastCh      chan messageArgs
-	closeCh          chan struct{}
-	confirmCh        chan confirmUIDShutdownArgs
-	nextConnectionID connectionID
+	newConnectionCh   chan *connection
+	statsCh           chan chan *Stats
+	syncCh            chan syncArgs
+	consumeCh         chan messageArgs
+	broadcastCh       chan messageArgs
+	closeCh           chan struct{}
+	confirmCh         chan confirmUIDShutdownArgs
+	storageDispatchCh chan storageReq
+	nextConnectionID  connectionID
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
@@ -92,24 +95,33 @@ type Server struct {
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
 	broadcastTimeout time.Duration
+
+	// Number of threads handling storage reqs
+	storageHandlers int
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int) *Server {
 	s := &Server{
-		clock:            clockwork.NewRealClock(),
-		users:            make(map[string]*perUIDServer),
-		lastConns:        make(map[string]connectionID),
-		newConnectionCh:  make(chan *connection),
-		statsCh:          make(chan chan *Stats, 1),
-		syncCh:           make(chan syncArgs),
-		consumeCh:        make(chan messageArgs),
-		broadcastCh:      make(chan messageArgs),
-		closeCh:          make(chan struct{}),
-		confirmCh:        make(chan confirmUIDShutdownArgs),
-		log:              log,
-		broadcastTimeout: broadcastTimeout,
+		clock:             clockwork.NewRealClock(),
+		users:             make(map[string]*perUIDServer),
+		lastConns:         make(map[string]connectionID),
+		newConnectionCh:   make(chan *connection),
+		statsCh:           make(chan chan *Stats, 1),
+		syncCh:            make(chan syncArgs),
+		consumeCh:         make(chan messageArgs),
+		broadcastCh:       make(chan messageArgs),
+		closeCh:           make(chan struct{}),
+		confirmCh:         make(chan confirmUIDShutdownArgs),
+		storageDispatchCh: make(chan storageReq, 10000),
+		log:               log,
+		broadcastTimeout:  broadcastTimeout,
+		storageHandlers:   storageHandlers,
+	}
+
+	for i := 0; i < storageHandlers; i++ {
+		go s.storageDispatchHandler()
 	}
 
 	return s
@@ -271,14 +283,19 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	return nil
 }
 
-func (s *Server) sync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+// This function gets called from the connection object that exists for each
+// client of gregord for a sync call. It is on a different thread than
+// the main Serve loop
+func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
 	retCh := make(chan syncRet)
 	s.syncCh <- syncArgs{c, arg, retCh}
 	ret := <-retCh
 	return ret.res, ret.err
 }
 
-func (s *Server) consume(c context.Context, m gregor1.Message) error {
+// Like startSync, this function is called from connection, and is on a
+// different thread than Serve
+func (s *Server) startConsume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
 	args := messageArgs{c, m, retCh}
 	s.consumeCh <- args
@@ -296,12 +313,9 @@ func (s *Server) Serve() error {
 		case c := <-s.newConnectionCh:
 			s.logError("addUIDConnection", s.addUIDConnection(c))
 		case a := <-s.consumeCh:
-			err := s.storage.ConsumeMessage(a.m)
-			a.retCh <- err
+			s.storageConsumeMessage(a.m, a.retCh)
 		case a := <-s.syncCh:
-			var ret syncRet
-			ret.res, ret.err = grpc.Sync(s.storage, s.log, a.a)
-			a.retCh <- ret
+			s.storageSync(s.storage, s.log, a.a, a.retCh)
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
@@ -310,6 +324,71 @@ func (s *Server) Serve() error {
 			s.confirmUIDShutdown(a)
 		case <-s.closeCh:
 			return nil
+		}
+	}
+}
+
+type consumeMessageReq struct {
+	m      gregor.Message
+	respCh chan<- error
+}
+
+type syncReq struct {
+	sm     gregor.StateMachine
+	log    rpc.LogOutput
+	arg    gregor1.SyncArg
+	respCh chan<- syncRet
+}
+
+// Schedule a Consume request on the dispatch handler
+func (s *Server) storageConsumeMessage(m gregor.Message, retCh chan<- error) {
+	req := consumeMessageReq{m: m, respCh: retCh}
+	err := s.storageDispatch(req)
+	if err != nil {
+		retCh <- err
+	}
+}
+
+// Schedule a Sync request on the dispatch handler
+func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg gregor1.SyncArg,
+	retCh chan<- syncRet) {
+	req := syncReq{sm: sm, log: log, arg: arg, respCh: retCh}
+	err := s.storageDispatch(req)
+	if err != nil {
+		retCh <- syncRet{
+			res: gregor1.SyncResult{Msgs: []gregor1.InBandMessage{}, Hash: []byte{}},
+			err: err,
+		}
+	}
+}
+
+// Dispatch a new StorageMachine request. The storageDispatchCh channel
+// is buffered with a lot of space, but in the case where the StorageMachine
+// is totally locked, we will fill the queue and possibly reject the request.
+func (s *Server) storageDispatch(req storageReq) error {
+	select {
+	case s.storageDispatchCh <- req:
+	default:
+		s.log.Error("XXX: dispatch queue full, rejecting!")
+		return errors.New("dispatch queue full, rejected")
+	}
+	return nil
+}
+
+// Handler function for pulling requests off the storageDispatchCh queue
+// and routing them to the proper StorageMachine function. Many of these
+// run at once in different threads. This also makes it such that
+// any StorageMachine implementation must be thread safe.
+func (s *Server) storageDispatchHandler() {
+	for req := range s.storageDispatchCh {
+		switch req := req.(type) {
+		case consumeMessageReq:
+			req.respCh <- s.storage.ConsumeMessage(req.m)
+		case syncReq:
+			res, err := grpc.Sync(req.sm, req.log, req.arg)
+			req.respCh <- syncRet{res: res, err: err}
+		default:
+			s.log.Error("storageDispatchHandler(): unknown request type!")
 		}
 	}
 }

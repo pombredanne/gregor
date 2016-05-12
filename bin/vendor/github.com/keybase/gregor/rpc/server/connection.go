@@ -167,7 +167,7 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 		return gregor1.SyncResult{}, err
 	}
 
-	return c.parent.sync(ctx, arg)
+	return c.parent.startSync(ctx, arg)
 }
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
@@ -176,7 +176,7 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 		return err
 	}
 
-	return c.parent.consume(ctx, m)
+	return c.parent.startConsume(ctx, m)
 }
 
 func (c *connection) Ping(ctx context.Context) (string, error) {

@@ -80,7 +80,7 @@ var mockAuthenticator gregor1.AuthInterface = mockAuth{
 
 func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Events) {
 	ev := test.NewEvents()
-	s := NewServer(rpc.SimpleLogOutput{}, 10000*time.Millisecond)
+	s := NewServer(rpc.SimpleLogOutput{}, 10000*time.Millisecond, 40)
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)
