@@ -290,9 +290,7 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 // and broadcasts it to the other clients. Like startSync, this function is called
 // from connection, and is on a different thread than Serve
 func (s *Server) startConsume(c context.Context, m gregor1.Message) error {
-	retCh := make(chan error)
-	s.storageConsumeMessage(m, retCh)
-	if err := <-retCh; err != nil {
+	if err := s.storageConsumeMessage(m); err != nil {
 		return err
 	}
 	s.broadcastCh <- messageArgs{c, m}
@@ -330,12 +328,13 @@ type syncReq struct {
 }
 
 // storageConsumeMessage schedules a Consume request on the dispatch handler
-func (s *Server) storageConsumeMessage(m gregor.Message, retCh chan<- error) {
+func (s *Server) storageConsumeMessage(m gregor.Message) error {
+	retCh := make(chan error)
 	req := consumeMessageReq{m: m, respCh: retCh}
-	err := s.storageDispatch(req)
-	if err != nil {
-		retCh <- err
+	if err := s.storageDispatch(req); err != nil {
+		return err
 	}
+	return <-retCh
 }
 
 // storageSync schedules a Sync request on the dispatch handler
