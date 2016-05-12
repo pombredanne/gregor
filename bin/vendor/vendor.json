@@ -102,15 +102,16 @@
 			"revisionTime": "2016-05-05T22:29:01-04:00"
 		},
 		{
-			"checksumSHA1": "1t5JwXnofMwRSO4WGdGrrQy62vc=",
+			"checksumSHA1": "xNGPW33H1pr2Rpe2kDiwzVhnOCw=",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "36c2d1f2ae23120e00939159a56dbf4e075cfede",
-			"revisionTime": "2016-05-11T19:01:23Z"
+			"revision": "d41f6942e42280e4377437fc634109480d154385",
+			"revisionTime": "2016-05-12T17:29:06Z"
 		},
 		{
+			"checksumSHA1": "IDX/pRrDpYavlECr6BqbFE0Hfko=",
 			"path": "github.com/keybase/gregor/storage",
-			"revision": "b65fdc7a0d2a620e1de7851b0e12097ff8c0e5f9",
-			"revisionTime": "2016-05-09T21:37:01-04:00"
+			"revision": "d41f6942e42280e4377437fc634109480d154385",
+			"revisionTime": "2016-05-12T17:29:06Z"
 		},
 		{
 			"path": "github.com/keybase/gregor/test",

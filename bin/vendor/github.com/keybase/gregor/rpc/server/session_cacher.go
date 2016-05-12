@@ -54,11 +54,9 @@ func NewSessionCacherFromURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Du
 	handler := NewAuthdHandler(sc, log)
 
 	log.Debug("Connecting to session server %s", ss.String())
-	rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
+	conn := rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
-	sc.parent = gregor1.AuthClient{Cli: <-handler.connectCh}
-
-	go sc.reconnectAuthdHandler(handler)
+	sc.parent = gregor1.AuthClient{Cli: conn.GetClient()}
 
 	return sc
 }
@@ -118,12 +116,6 @@ func (sc *SessionCacher) clearExpiryQueue() {
 	}
 }
 
-func (sc *SessionCacher) reconnectAuthdHandler(handler authdHandler) {
-	for cli := range handler.connectCh {
-		sc.reqCh <- setAuthReq{cli: gregor1.AuthClient{Cli: cli}}
-	}
-}
-
 // requestHandler runs in a single goroutine, handling all access requests and
 // periodic expiry of sessions.
 func (sc *SessionCacher) requestHandler() {
@@ -160,12 +152,6 @@ func (sc *SessionCacher) Size() int {
 	return <-respCh
 }
 
-func (sc *SessionCacher) auth() gregor1.AuthInterface {
-	respCh := make(chan gregor1.AuthInterface)
-	sc.reqCh <- authReq{respCh}
-	return <-respCh
-}
-
 // AuthenticateSessionToken authenticates a given session token, first against
 // the cache and the, if that fails, against the parent AuthInterface.
 func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
@@ -189,7 +175,7 @@ func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 		return
 	}
 
-	if res, err = sc.auth().AuthenticateSessionToken(ctx, tok); err == nil {
+	if res, err = sc.parent.AuthenticateSessionToken(ctx, tok); err == nil {
 		select {
 		case sc.reqCh <- setResReq{tok, &res}:
 		case <-ctx.Done():

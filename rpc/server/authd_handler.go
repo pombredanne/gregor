@@ -12,7 +12,6 @@ import (
 type authdHandler struct {
 	authserver gregor1.AuthInterface
 	log        rpc.LogOutput
-	connectCh  chan rpc.GenericClient
 }
 
 var _ rpc.ConnectionHandler = (*authdHandler)(nil)
@@ -22,17 +21,14 @@ func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) authdH
 	return authdHandler{
 		authserver: authserver,
 		log:        log,
-		connectCh:  make(chan rpc.GenericClient),
 	}
 }
 
 func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.GenericClient, srv *rpc.Server) error {
-	a.log.Debug("authd handler: connected and registering protocols")
+	a.log.Debug("authd handler: registering protocols")
 	if err := srv.Register(gregor1.AuthProtocol(a)); err != nil {
 		return err
 	}
-	// Let the main thread know about our new connection
-	a.connectCh <- conn.GetClient()
 	return nil
 }
 
