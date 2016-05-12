@@ -7,7 +7,6 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jonboulle/clockwork"
-	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
@@ -33,23 +32,12 @@ func main() {
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
-		transport := NewConnTransport(log, rpcopts, opts.SessionServer)
-		handler := NewAuthdHandler(log)
+		sc := server.NewSessionCacherFromURI(opts.SessionServer, clockwork.NewRealClock(),
+			10*time.Minute, log, rpcopts)
+		defer sc.Close()
 
-		log.Debug("Connecting to session server %s", opts.SessionServer.String())
-		rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
-			true, keybase1.WrapError, log, nil)
-
-		cli := <-handler.connectCh
-		sc := server.NewSessionCacher(gregor1.AuthClient{cli}, clockwork.NewRealClock(), 10*time.Minute)
 		log.Debug("Setting authenticator")
 		srv.SetAuthenticator(sc)
-		defer sc.Close()
-		go func() {
-			for cli = range handler.connectCh {
-				sc.ResetAuthInterface(gregor1.AuthClient{cli})
-			}
-		}()
 	}
 
 	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)

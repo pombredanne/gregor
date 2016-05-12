@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	keybase1 "github.com/keybase/client/go/protocol"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
@@ -43,6 +45,24 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 	return sc
 }
 
+func NewSessionCacherFromURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
+	log rpc.LogOutput, rpcopts rpc.LogOptions) *SessionCacher {
+
+	sc := NewSessionCacher(nil, cl, timeout)
+
+	transport := NewConnTransport(log, rpcopts, ss)
+	handler := NewAuthdHandler(sc, log)
+
+	log.Debug("Connecting to session server %s", ss.String())
+	rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
+		true, keybase1.WrapError, log, nil)
+	sc.parent = gregor1.AuthClient{Cli: <-handler.connectCh}
+
+	go sc.reconnectAuthdHandler(handler)
+
+	return sc
+}
+
 type request interface{}
 
 type setResReq struct {
@@ -77,8 +97,12 @@ type sizeReq struct {
 	resp chan int
 }
 
-func (sc *SessionCacher) ResetAuthInterface(a gregor1.AuthInterface) {
-	sc.parent = a
+type setAuthReq struct {
+	cli gregor1.AuthClient
+}
+
+type authReq struct {
+	resp chan gregor1.AuthInterface
 }
 
 // clearExpiryQueue removes all currently expired sessions.
@@ -91,6 +115,12 @@ func (sc *SessionCacher) clearExpiryQueue() {
 
 		sc.deleteSID(sc.expiryQueue[0].sid)
 		sc.expiryQueue = sc.expiryQueue[1:]
+	}
+}
+
+func (sc *SessionCacher) reconnectAuthdHandler(handler authdHandler) {
+	for cli := range handler.connectCh {
+		sc.reqCh <- setAuthReq{cli: gregor1.AuthClient{Cli: cli}}
 	}
 }
 
@@ -110,6 +140,10 @@ func (sc *SessionCacher) requestHandler() {
 			sc.deleteSID(req.sid)
 		case sizeReq:
 			req.resp <- len(sc.sessions)
+		case setAuthReq:
+			sc.parent = req.cli
+		case authReq:
+			req.resp <- sc.parent
 		}
 	}
 }
@@ -126,9 +160,16 @@ func (sc *SessionCacher) Size() int {
 	return <-respCh
 }
 
+func (sc *SessionCacher) auth() gregor1.AuthInterface {
+	respCh := make(chan gregor1.AuthInterface)
+	sc.reqCh <- authReq{respCh}
+	return <-respCh
+}
+
 // AuthenticateSessionToken authenticates a given session token, first against
 // the cache and the, if that fails, against the parent AuthInterface.
 func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
+
 	respCh := make(chan *gregor1.AuthResult)
 	select {
 	case sc.reqCh <- readTokReq{tok, respCh}:
@@ -148,7 +189,7 @@ func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 		return
 	}
 
-	if res, err = sc.parent.AuthenticateSessionToken(ctx, tok); err == nil {
+	if res, err = sc.auth().AuthenticateSessionToken(ctx, tok); err == nil {
 		select {
 		case sc.reqCh <- setResReq{tok, &res}:
 		case <-ctx.Done():
@@ -167,7 +208,7 @@ func (sc *SessionCacher) RevokeSessionIDs(ctx context.Context, sessionIDs []greg
 			return ctx.Err()
 		}
 	}
-	return sc.parent.RevokeSessionIDs(ctx, sessionIDs)
+	return nil
 }
 
 var _ gregor1.AuthInterface = (*SessionCacher)(nil)
