@@ -24,6 +24,7 @@ type Options struct {
 	RPCDebug         string
 	BroadcastTimeout time.Duration
 	StorageHandlers  int
+	StorageQueueSize int
 }
 
 const usageStr = `Usage:
@@ -92,6 +93,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.DurationVar(&options.BroadcastTimeout, "broadcast-timeout", 10000*time.Millisecond,
 		"Timeout on client broadcasts")
 	fs.IntVar(&options.StorageHandlers, "storage-handlers", 40, "Number of threads handling storage requests")
+	fs.IntVar(&options.StorageQueueSize, "storage-queue-size", 10000, "Length of the queue for requests to StorageMachine")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

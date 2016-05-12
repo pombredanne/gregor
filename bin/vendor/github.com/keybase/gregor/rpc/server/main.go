@@ -92,14 +92,12 @@ type Server struct {
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
 	broadcastTimeout time.Duration
-
-	// Number of threads handling storage reqs
-	storageHandlers int
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int,
+	storageQueueSize int) *Server {
 	s := &Server{
 		clock:             clockwork.NewRealClock(),
 		users:             make(map[string]*perUIDServer),
@@ -109,10 +107,9 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		broadcastCh:       make(chan messageArgs),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
-		storageDispatchCh: make(chan storageReq, 10000),
+		storageDispatchCh: make(chan storageReq, storageQueueSize),
 		log:               log,
 		broadcastTimeout:  broadcastTimeout,
-		storageHandlers:   storageHandlers,
 	}
 
 	for i := 0; i < storageHandlers; i++ {
