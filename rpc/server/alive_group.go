@@ -1,22 +1,18 @@
 package rpc
 
 import (
-	"fmt"
-	"net"
-	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/net/context"
 
 	"github.com/jonboulle/clockwork"
-	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 )
 
 type aliveGroup struct {
-	group     map[string]rpc.GenericClient
+	group     map[string]*sibConn
 	status    Aliver
 	authToken gregor1.SessionToken
 	selfHost  string
@@ -28,7 +24,7 @@ type aliveGroup struct {
 
 func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToken, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
 	a := &aliveGroup{
-		group:     make(map[string]rpc.GenericClient),
+		group:     make(map[string]*sibConn),
 		status:    status,
 		selfHost:  selfHost,
 		authToken: authToken,
@@ -45,9 +41,8 @@ func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 	a.RLock()
 	defer a.RUnlock()
 	perr := &pubErr{}
-	for host, cli := range a.group {
-		ic := gregor1.IncomingClient{Cli: cli}
-		if err := ic.ConsumePubMessage(ctx, msg); err != nil {
+	for host, conn := range a.group {
+		if err := conn.CallConsumePubMessage(ctx, msg); err != nil {
 			a.log.Warning("host %q consumePubMessage error: %s", host, err)
 			perr.Add(host, err)
 		} else {
@@ -118,31 +113,29 @@ func (a *aliveGroup) update() error {
 		return err
 	}
 
-	newgroup := make(map[string]rpc.GenericClient)
+	newgroup := make(map[string]*sibConn)
 
 	a.RLock()
 	for _, host := range alive {
 		if host == a.selfHost {
 			continue
 		}
-		if cli, ok := a.group[host]; ok {
-			newgroup[host] = cli
+		if conn, ok := a.group[host]; ok {
+			newgroup[host] = conn
 		} else {
-			newcli, err := a.connect(host)
+			newconn, err := NewSibConn(host, a.authToken, a.log)
 			if err != nil {
 				a.log.Warning("error connecting to %q: %s", host, err)
 			} else {
-				newgroup[host] = newcli
+				newgroup[host] = newconn
 			}
 		}
 	}
 
-	for host, _ := range a.group {
+	for host, conn := range a.group {
 		if _, exists := newgroup[host]; !exists {
 			a.log.Debug("gregord on host %q no longer alive, shutting connection down", host)
-			// TODO: don't use GenericClient, so that we can shut down the
-			// connection:
-			// cli.Shutdown()
+			conn.Shutdown()
 		}
 	}
 	a.RUnlock()
@@ -152,48 +145,4 @@ func (a *aliveGroup) update() error {
 	a.Unlock()
 
 	return nil
-}
-
-func (a *aliveGroup) connect(host string) (rpc.GenericClient, error) {
-	a.log.Debug("%s: connecting to gregord on host %q", a.selfHost, host)
-	c, err := net.Dial("tcp", host)
-	if err != nil {
-		return nil, err
-	}
-	t := rpc.NewTransport(c, nil, keybase1.WrapError)
-	cli := rpc.NewClient(t, keybase1.ErrorUnwrapper{})
-	ac := gregor1.AuthClient{Cli: cli}
-	if _, err := ac.AuthenticateSessionToken(context.TODO(), a.authToken); err != nil {
-		a.log.Warning("host %q auth error: %s", host, err)
-		return nil, err
-	}
-
-	a.log.Debug("%s: success connecting to gregord on host %q", a.selfHost, host)
-
-	return cli, nil
-}
-
-type hostErr struct {
-	host string
-	err  error
-}
-
-type pubErr struct {
-	errors []hostErr
-}
-
-func (p *pubErr) Error() string {
-	s := make([]string, len(p.errors))
-	for i, e := range p.errors {
-		s[i] = fmt.Sprintf("host %q: error %s", e.host, e.err)
-	}
-	return fmt.Sprintf("(errors: %d) %s", len(p.errors), strings.Join(s, ", "))
-}
-
-func (p *pubErr) Add(host string, e error) {
-	p.errors = append(p.errors, hostErr{host: host, err: e})
-}
-
-func (p *pubErr) Empty() bool {
-	return len(p.errors) == 0
 }
