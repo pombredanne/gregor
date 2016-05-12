@@ -89,7 +89,7 @@ type Server struct {
 
 	// used to determine which other servers are alive
 	statusGroup Aliver
-	addr        net.Addr
+	addr        chan net.Addr
 	authToken   gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
@@ -114,22 +114,20 @@ type Server struct {
 func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int,
 	storageQueueSize int) *Server {
 	s := &Server{
-		clock:             clockwork.NewRealClock(),
-		users:             make(map[string]*perUIDServer),
-		lastConns:         make(map[string]connectionID),
-		newConnectionCh:   make(chan *connection),
-		statsCh:           make(chan chan *Stats, 1),
-		broadcastCh:       make(chan messageArgs),
-		publishCh:         make(chan messageArgs, 1000),
-		closeCh:           make(chan struct{}),
-		confirmCh:         make(chan confirmUIDShutdownArgs),
-		storageDispatchCh: make(chan storageReq, storageQueueSize),
-		log:               log,
-		broadcastTimeout:  broadcastTimeout,
-	}
-
-	for i := 0; i < storageHandlers; i++ {
-		go s.storageDispatchHandler()
+		clock:            clockwork.NewRealClock(),
+		users:            make(map[string]*perUIDServer),
+		lastConns:        make(map[string]connectionID),
+		newConnectionCh:  make(chan *connection),
+		statsCh:          make(chan chan *Stats, 1),
+		syncCh:           make(chan syncArgs),
+		consumeCh:        make(chan messageArgs),
+		broadcastCh:      make(chan messageArgs),
+		publishCh:        make(chan messageArgs, 1000),
+		closeCh:          make(chan struct{}),
+		confirmCh:        make(chan confirmUIDShutdownArgs),
+		log:              log,
+		broadcastTimeout: broadcastTimeout,
+		addr:             make(chan net.Addr, 1),
 	}
 
 	s.publishSpawn()
@@ -332,17 +330,16 @@ func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
 
 func (s *Server) publishSpawn() {
 	for i := 0; i < 10; i++ {
-		go s.publishReceive()
+		go s.publishProcess()
 	}
 }
 
-func (s *Server) publishReceive() {
+func (s *Server) publishProcess() {
 	for {
 		select {
 		case marg := <-s.publishCh:
 			if err := s.publish(marg); err != nil {
 				s.log.Warning("publish error: %s", err)
-				// XXX retry?
 			}
 		case <-s.closeCh:
 			return
@@ -350,12 +347,15 @@ func (s *Server) publishReceive() {
 	}
 }
 
+func (s *Server) createAliveGroup() {
+	s.log.Debug("creating new aliveGroup")
+	a := <-s.addr
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.clock, s.closeCh, s.log)
+}
+
 func (s *Server) publish(marg messageArgs) error {
 	s.log.Debug("publish: %+v", marg)
-	s.groupOnce.Do(func() {
-		s.log.Debug("creating new aliveGroup")
-		s.group = newAliveGroup(s.statusGroup, s.addr.String(), s.authToken, s.clock, s.closeCh, s.log)
-	})
+	s.groupOnce.Do(s.createAliveGroup)
 
 	if err := s.group.Publish(marg.c, marg.m); err != nil {
 		return err
@@ -473,7 +473,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
-	s.addr = l.Addr()
+	s.addr <- l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {

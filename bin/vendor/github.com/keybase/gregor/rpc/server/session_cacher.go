@@ -116,6 +116,17 @@ func (sc *SessionCacher) clearExpiryQueue() {
 	}
 }
 
+func (sc *SessionCacher) reconnectAuthdHandler(handler authdHandler) {
+	// We receive a message on the connectCh channel whenever we have successfully
+	// reconnected to authd after a dropped connection. In order to update the
+	// auth interface on SessionCacher, we do it synchronously on the main
+	// thread. This is to prevent a race condition where we are reading/writing
+	// the variable at the same time.
+	for cli := range handler.connectCh {
+		sc.reqCh <- setAuthReq{cli: gregor1.AuthClient{Cli: cli}}
+	}
+}
+
 // requestHandler runs in a single goroutine, handling all access requests and
 // periodic expiry of sessions.
 func (sc *SessionCacher) requestHandler() {
@@ -149,6 +160,15 @@ func (sc *SessionCacher) Close() {
 func (sc *SessionCacher) Size() int {
 	respCh := make(chan int)
 	sc.reqCh <- sizeReq{respCh}
+	return <-respCh
+}
+
+// Access the auth interface in a sychnronous way withe the main loop. It gets
+// shared between the reconnect and main thread, so we need to be careful when
+// we touch it.
+func (sc *SessionCacher) auth() gregor1.AuthInterface {
+	respCh := make(chan gregor1.AuthInterface)
+	sc.reqCh <- authReq{respCh}
 	return <-respCh
 }
 

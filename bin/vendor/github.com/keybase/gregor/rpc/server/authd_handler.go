@@ -29,6 +29,8 @@ func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli 
 	if err := srv.Register(gregor1.AuthProtocol(a)); err != nil {
 		return err
 	}
+	// Let the main thread know about our new connection
+	a.connectCh <- conn.GetClient()
 	return nil
 }
 
