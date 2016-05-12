@@ -25,7 +25,7 @@ func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) authdH
 }
 
 func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.GenericClient, srv *rpc.Server) error {
-	a.log.Debug("authd handler: connected and registering protocols")
+	a.log.Debug("authd handler: registering protocols")
 	if err := srv.Register(gregor1.AuthProtocol(a)); err != nil {
 		return err
 	}
