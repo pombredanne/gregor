@@ -17,6 +17,7 @@ const (
 
 type UID interface {
 	Bytes() []byte
+	String() string
 }
 
 type MsgID interface {
@@ -26,6 +27,7 @@ type MsgID interface {
 
 type DeviceID interface {
 	Bytes() []byte
+	String() string
 }
 
 type System interface {

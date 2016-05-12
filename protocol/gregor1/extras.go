@@ -12,7 +12,9 @@ import (
 )
 
 func (u UID) Bytes() []byte            { return []byte(u) }
+func (u UID) String() string           { return hex.EncodeToString(u) }
 func (d DeviceID) Bytes() []byte       { return []byte(d) }
+func (d DeviceID) String() string      { return hex.EncodeToString(d) }
 func (m MsgID) Bytes() []byte          { return []byte(m) }
 func (m MsgID) String() string         { return hex.EncodeToString(m) }
 func (s System) String() string        { return string(s) }
