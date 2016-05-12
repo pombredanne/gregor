@@ -38,9 +38,8 @@ type syncArgs struct {
 }
 
 type messageArgs struct {
-	c     context.Context
-	m     gregor1.Message
-	retCh chan<- error
+	c context.Context
+	m gregor1.Message
 }
 
 type confirmUIDShutdownArgs struct {
@@ -74,8 +73,6 @@ type Server struct {
 
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
-	syncCh            chan syncArgs
-	consumeCh         chan messageArgs
 	broadcastCh       chan messageArgs
 	closeCh           chan struct{}
 	confirmCh         chan confirmUIDShutdownArgs
@@ -109,8 +106,6 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		lastConns:         make(map[string]connectionID),
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
-		syncCh:            make(chan syncArgs),
-		consumeCh:         make(chan messageArgs),
 		broadcastCh:       make(chan messageArgs),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
@@ -251,7 +246,7 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
-	s.broadcastCh <- messageArgs{c, tm, nil}
+	s.broadcastCh <- messageArgs{c, tm}
 	return nil
 }
 
@@ -274,7 +269,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	// If this is going to block, we just drop the broadcast. It means that
 	// the user has a device that is not responding fast enough
 	select {
-	case srv.sendBroadcastCh <- messageArgs{c, m, nil}:
+	case srv.sendBroadcastCh <- messageArgs{c, m}:
 	default:
 		s.log.Error("user %s super slow receiving broadcasts, rejecting!",
 			gregor.UIDFromMessage(m))
@@ -288,7 +283,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 // the main Serve loop
 func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
 	retCh := make(chan syncRet)
-	s.syncCh <- syncArgs{c, arg, retCh}
+	s.storageSync(s.storage, s.log, arg, retCh)
 	ret := <-retCh
 	return ret.res, ret.err
 }
@@ -297,12 +292,11 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 // different thread than Serve
 func (s *Server) startConsume(c context.Context, m gregor1.Message) error {
 	retCh := make(chan error)
-	args := messageArgs{c, m, retCh}
-	s.consumeCh <- args
+	s.storageConsumeMessage(m, retCh)
 	if err := <-retCh; err != nil {
 		return err
 	}
-	s.broadcastCh <- args
+	s.broadcastCh <- messageArgs{c, m}
 	return nil
 }
 
@@ -312,10 +306,6 @@ func (s *Server) Serve() error {
 		select {
 		case c := <-s.newConnectionCh:
 			s.logError("addUIDConnection", s.addUIDConnection(c))
-		case a := <-s.consumeCh:
-			s.storageConsumeMessage(a.m, a.retCh)
-		case a := <-s.syncCh:
-			s.storageSync(s.storage, s.log, a.a, a.retCh)
 		case a := <-s.broadcastCh:
 			s.sendBroadcast(a.c, a.m)
 		case c := <-s.statsCh:
