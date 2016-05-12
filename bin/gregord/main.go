@@ -11,7 +11,6 @@ import (
 	"github.com/keybase/gregor/bin"
 	"github.com/keybase/gregor/protocol/gregor1"
 	server "github.com/keybase/gregor/rpc/server"
-	"github.com/keybase/gregor/rpc/transport"
 	"github.com/keybase/gregor/srvup"
 	"github.com/keybase/gregor/storage"
 )
@@ -38,12 +37,6 @@ func main() {
 		sc := server.NewSessionCacherFromURI(opts.SessionServer, clockwork.NewRealClock(),
 			10*time.Minute, log, rpcopts)
 		defer sc.Close()
-		trans := transport.NewConnTransport(log, rpcopts, opts.SessionServer)
-		handler := NewAuthdHandler(log)
-
-		log.Debug("Connecting to session server %s", opts.SessionServer.String())
-		rpc.NewConnectionWithTransport(&handler, trans, keybase1.ErrorUnwrapper{},
-			true, keybase1.WrapError, log, nil)
 
 		log.Debug("Setting authenticator")
 		srv.SetAuthenticator(sc)
