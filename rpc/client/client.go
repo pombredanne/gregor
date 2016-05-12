@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/keybase/gregor"
@@ -18,12 +19,17 @@ type LocalStorageEngine interface {
 }
 
 type Client struct {
-	user     gregor.UID
-	device   gregor.DeviceID
-	sm       gregor.StateMachine
-	storage  LocalStorageEngine
-	incoming gregor1.IncomingInterface
-	log      rpc.LogOutput
+	user    gregor.UID
+	device  gregor.DeviceID
+	sm      gregor.StateMachine
+	storage LocalStorageEngine
+	log     rpc.LogOutput
+
+	// We'll be resetting the incoming RPC interface whenever we reconnect, so for that reason.
+	// This reset will be in a GoRoutine, so let's just protect it with a mutex for the sake
+	// of simplicity
+	incomingMu sync.RWMutex
+	incoming   gregor1.IncomingInterface
 }
 
 func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine, storage LocalStorageEngine, incoming gregor1.IncomingInterface, log rpc.LogOutput) *Client {
@@ -35,6 +41,18 @@ func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine, 
 		incoming: incoming,
 		log:      log,
 	}
+}
+
+func (c *Client) SetIncomingInterface(i gregor1.IncomingInterface) {
+	c.incomingMu.Lock()
+	defer c.incomingMu.Unlock()
+	c.incoming = i
+}
+
+func (c *Client) incomingInterface() gregor1.IncomingInterface {
+	c.incomingMu.RLock()
+	defer c.incomingMu.RUnlock()
+	return c.incoming
 }
 
 func (c *Client) Save() error {
@@ -88,7 +106,7 @@ func (c *Client) syncFromTime(t *time.Time) error {
 	if t != nil {
 		arg.Ctime = gregor1.ToTime(*t)
 	}
-	res, err := c.incoming.Sync(ctx, arg)
+	res, err := c.incomingInterface().Sync(ctx, arg)
 	if err != nil {
 		return err
 	}
