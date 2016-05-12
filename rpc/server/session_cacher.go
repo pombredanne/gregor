@@ -56,8 +56,11 @@ func NewSessionCacherFromURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Du
 	log.Debug("Connecting to session server %s", ss.String())
 	rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
+	// Wait for a connection before moving on
 	sc.parent = gregor1.AuthClient{Cli: <-handler.connectCh}
 
+	// Spawn off a thread to handle reconnecting and updating the auth interface
+	// on SessionCacher.
 	go sc.reconnectAuthdHandler(handler)
 
 	return sc
@@ -119,6 +122,11 @@ func (sc *SessionCacher) clearExpiryQueue() {
 }
 
 func (sc *SessionCacher) reconnectAuthdHandler(handler authdHandler) {
+	// We receive a message on the connectCh channel whenever we have successfully
+	// reconnected to authd after a dropped connection. In order to update the
+	// auth interface on SessionCacher, we do it synchronously on the main
+	// thread. This is to prevent a race condition where we are reading/writing
+	// the variable at the same time.
 	for cli := range handler.connectCh {
 		sc.reqCh <- setAuthReq{cli: gregor1.AuthClient{Cli: cli}}
 	}
@@ -160,6 +168,9 @@ func (sc *SessionCacher) Size() int {
 	return <-respCh
 }
 
+// Access the auth interface in a sychnronous way withe the main loop. It gets
+// shared between the reconnect and main thread, so we need to be careful when
+// we touch it.
 func (sc *SessionCacher) auth() gregor1.AuthInterface {
 	respCh := make(chan gregor1.AuthInterface)
 	sc.reqCh <- authReq{respCh}
