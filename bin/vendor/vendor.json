@@ -117,9 +117,11 @@
 			"revisionTime": "2016-05-12T22:05:41Z"
 		},
 		{
+			"checksumSHA1": "evsNwy3y7BgG2M7jb9dLVwq2wGs=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/test",
 			"path": "github.com/keybase/gregor/test",
-			"revision": "743038f678abeaf867019bae99c1461fd75f9341",
-			"revisionTime": "2016-04-27T13:04:34-07:00"
+			"revision": "1c28377c9495d14066e78351a742628876f8913e",
+			"revisionTime": "2016-05-12T11:40:01-05:00"
 		},
 		{
 			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",

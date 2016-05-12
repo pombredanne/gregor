@@ -80,7 +80,6 @@ type Server struct {
 
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
-	syncCh            chan syncArgs
 	broadcastCh       chan messageArgs
 	publishCh         chan messageArgs
 	closeCh           chan struct{}
@@ -90,7 +89,7 @@ type Server struct {
 
 	// used to determine which other servers are alive
 	statusGroup Aliver
-	addr        net.Addr
+	addr        chan net.Addr
 	authToken   gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
@@ -112,15 +111,13 @@ type Server struct {
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int,
-	storageQueueSize int) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int, storageQueueSize int) *Server {
 	s := &Server{
 		clock:             clockwork.NewRealClock(),
 		users:             make(map[string]*perUIDServer),
 		lastConns:         make(map[string]connectionID),
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
-		syncCh:            make(chan syncArgs),
 		broadcastCh:       make(chan messageArgs),
 		publishCh:         make(chan messageArgs, 1000),
 		closeCh:           make(chan struct{}),
@@ -128,6 +125,7 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		storageDispatchCh: make(chan storageReq, storageQueueSize),
 		log:               log,
 		broadcastTimeout:  broadcastTimeout,
+		addr:              make(chan net.Addr, 1),
 	}
 
 	for i := 0; i < storageHandlers; i++ {
@@ -334,17 +332,16 @@ func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
 
 func (s *Server) publishSpawn() {
 	for i := 0; i < 10; i++ {
-		go s.publishReceive()
+		go s.publishProcess()
 	}
 }
 
-func (s *Server) publishReceive() {
+func (s *Server) publishProcess() {
 	for {
 		select {
 		case marg := <-s.publishCh:
 			if err := s.publish(marg); err != nil {
 				s.log.Warning("publish error: %s", err)
-				// XXX retry?
 			}
 		case <-s.closeCh:
 			return
@@ -352,12 +349,15 @@ func (s *Server) publishReceive() {
 	}
 }
 
+func (s *Server) createAliveGroup() {
+	s.log.Debug("creating new aliveGroup")
+	a := <-s.addr
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.clock, s.closeCh, s.log)
+}
+
 func (s *Server) publish(marg messageArgs) error {
 	s.log.Debug("publish: %+v", marg)
-	s.groupOnce.Do(func() {
-		s.log.Debug("creating new aliveGroup")
-		s.group = newAliveGroup(s.statusGroup, s.addr.String(), s.authToken, s.clock, s.closeCh, s.log)
-	})
+	s.groupOnce.Do(s.createAliveGroup)
 
 	if err := s.group.Publish(marg.c, marg.m); err != nil {
 		return err
@@ -475,7 +475,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
-	s.addr = l.Addr()
+	s.addr <- l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {
