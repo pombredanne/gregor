@@ -176,7 +176,7 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 		return err
 	}
 
-	return c.parent.startConsume(ctx, m)
+	return c.parent.runConsumeMessageMainSequence(ctx, m)
 }
 
 func (c *connection) Ping(ctx context.Context) (string, error) {

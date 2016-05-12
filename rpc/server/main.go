@@ -279,24 +279,25 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 // client of gregord for a sync call. It is on a different thread than
 // the main Serve loop
 func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
-	retCh := make(chan syncRet)
-	s.storageSync(s.storage, s.log, arg, retCh)
-	ret := <-retCh
-	return ret.res, ret.err
+	res := s.storageSync(s.storage, s.log, arg)
+	return res.res, res.err
 }
 
-// startConsume is the main entry point to the gregor flow described in the
+// runConsumeMessageMainSequence is the main entry point to the gregor flow described in the
 // architecture documents. It receives a new message, writes it to the StateMachine,
 // and broadcasts it to the other clients. Like startSync, this function is called
 // from connection, and is on a different thread than Serve
-func (s *Server) startConsume(c context.Context, m gregor1.Message) error {
-	retCh := make(chan error)
-	s.storageConsumeMessage(m, retCh)
-	if err := <-retCh; err != nil {
+func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Message) error {
+	if err := s.storageConsumeMessage(m); err != nil {
 		return err
 	}
-	s.broadcastCh <- messageArgs{c, m}
+	s.broadcastConsumeMessage(c, m)
+
 	return nil
+}
+
+func (s *Server) broadcastConsumeMessage(c context.Context, m gregor1.Message) {
+	s.broadcastCh <- messageArgs{c, m}
 }
 
 // Serve starts the serve loop for Server.
@@ -330,25 +331,28 @@ type syncReq struct {
 }
 
 // storageConsumeMessage schedules a Consume request on the dispatch handler
-func (s *Server) storageConsumeMessage(m gregor.Message, retCh chan<- error) {
+func (s *Server) storageConsumeMessage(m gregor.Message) error {
+	retCh := make(chan error)
 	req := consumeMessageReq{m: m, respCh: retCh}
 	err := s.storageDispatch(req)
 	if err != nil {
-		retCh <- err
+		return err
 	}
+	return <-retCh
 }
 
 // storageSync schedules a Sync request on the dispatch handler
-func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg gregor1.SyncArg,
-	retCh chan<- syncRet) {
+func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg gregor1.SyncArg) syncRet {
+	retCh := make(chan syncRet)
 	req := syncReq{sm: sm, log: log, arg: arg, respCh: retCh}
 	err := s.storageDispatch(req)
 	if err != nil {
-		retCh <- syncRet{
+		return syncRet{
 			res: gregor1.SyncResult{Msgs: []gregor1.InBandMessage{}, Hash: []byte{}},
 			err: err,
 		}
 	}
+	return <-retCh
 }
 
 // storageDispatch dispatches a new StorageMachine request. The storageDispatchCh channel
