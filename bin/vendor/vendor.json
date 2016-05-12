@@ -50,10 +50,11 @@
 			"revisionTime": "2016-04-04T17:08:33-07:00"
 		},
 		{
-			"checksumSHA1": "GsL/Xszx3T2Bwa8VaeIas7T5eIc=",
+			"checksumSHA1": "he7vv+BLnD9UygqdJ7KpEjNaunw=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/go-framed-msgpack-rpc",
 			"path": "github.com/keybase/go-framed-msgpack-rpc",
-			"revision": "72cdc158d2cb6bf5b0221e6247a54a1c3cfefea4",
-			"revisionTime": "2016-05-11T00:49:11Z"
+			"revision": "46f76e560e2cfd5883cfd397df9007220d2aec29",
+			"revisionTime": "2016-05-12T13:08:44-05:00"
 		},
 		{
 			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
@@ -87,15 +88,15 @@
 			"checksumSHA1": "Q4pK+kqEWiQ0s5MzyjV60snUeeQ=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc",
 			"path": "github.com/keybase/gregor/rpc",
-			"revision": "11dadbf06788bf192ad6cb12f3a988eea1894462",
-			"revisionTime": "2016-05-11T11:36:51-05:00"
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
 			"checksumSHA1": "bnvFrpmU25FxpK59mfRO1dmkgOs=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/client",
 			"path": "github.com/keybase/gregor/rpc/client",
-			"revision": "11dadbf06788bf192ad6cb12f3a988eea1894462",
-			"revisionTime": "2016-05-11T11:36:51-05:00"
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
 			"checksumSHA1": "rmP0j973iRWC+7JFpvdP1RHTvEg=",
@@ -112,9 +113,10 @@
 		},
 		{
 			"checksumSHA1": "Hw5QponZfTQS//GJxzQ2ctB1dEM=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/srvup",
 			"path": "github.com/keybase/gregor/srvup",
-			"revision": "11dadbf06788bf192ad6cb12f3a988eea1894462",
-			"revisionTime": "2016-05-11T11:36:51-05:00"
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
 			"checksumSHA1": "I9rLXQw+eQEKoC5DOoyLizBRstI=",
