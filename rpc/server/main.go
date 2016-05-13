@@ -107,25 +107,30 @@ type Server struct {
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
 	broadcastTimeout time.Duration
+
+	// The number of publishProcess goroutines to spawn.
+	numPublishers int
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int, storageQueueSize int) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int) *Server {
 	s := &Server{
-		clock:             clockwork.NewRealClock(),
-		users:             make(map[string]*perUIDServer),
-		lastConns:         make(map[string]connectionID),
-		newConnectionCh:   make(chan *connection),
-		statsCh:           make(chan chan *Stats, 1),
-		broadcastCh:       make(chan messageArgs),
-		publishCh:         make(chan messageArgs, 1000),
-		closeCh:           make(chan struct{}),
-		confirmCh:         make(chan confirmUIDShutdownArgs),
-		storageDispatchCh: make(chan storageReq, storageQueueSize),
-		log:               log,
-		broadcastTimeout:  broadcastTimeout,
-		addr:              make(chan net.Addr, 1),
+		clock:            clockwork.NewRealClock(),
+		users:            make(map[string]*perUIDServer),
+		lastConns:        make(map[string]connectionID),
+		newConnectionCh:  make(chan *connection),
+		statsCh:          make(chan chan *Stats, 1),
+		syncCh:           make(chan syncArgs),
+		consumeCh:        make(chan messageArgs),
+		broadcastCh:      make(chan messageArgs),
+		publishCh:        make(chan messageArgs, publishChSize),
+		closeCh:          make(chan struct{}),
+		confirmCh:        make(chan confirmUIDShutdownArgs),
+		log:              log,
+		broadcastTimeout: broadcastTimeout,
+		addr:             make(chan net.Addr, 1),
+		numPublishers:    numPublishers,
 	}
 
 	for i := 0; i < storageHandlers; i++ {
@@ -332,20 +337,15 @@ func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
 }
 
 func (s *Server) publishSpawn() {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < s.numPublishers; i++ {
 		go s.publishProcess()
 	}
 }
 
 func (s *Server) publishProcess() {
-	for {
-		select {
-		case marg := <-s.publishCh:
-			if err := s.publish(marg); err != nil {
-				s.log.Warning("publish error: %s", err)
-			}
-		case <-s.closeCh:
-			return
+	for marg := range s.publishCh {
+		if err := s.publish(marg); err != nil {
+			s.log.Warning("publish error: %s", err)
 		}
 	}
 }
@@ -493,6 +493,7 @@ func (s *Server) ListenLoop(l net.Listener) error {
 // Shutdown tells the server to stop its Serve loop and storage dispatch
 // handlers
 func (s *Server) Shutdown() {
+	close(s.publishCh)
 	close(s.closeCh)
 	close(s.storageDispatchCh)
 }
