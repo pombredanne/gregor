@@ -15,20 +15,26 @@ import (
 )
 
 type Options struct {
-	SessionServer    *rpc.FMPURI
-	BindAddress      string
-	MysqlDSN         string
-	Debug            bool
-	TLSConfig        *tls.Config
-	MockAuth         bool
-	RPCDebug         string
-	BroadcastTimeout time.Duration
-	StorageHandlers  int
-	StorageQueueSize int
+	SessionServer     *rpc.FMPURI
+	BindAddress       string
+	IncomingAddress   string
+	MysqlDSN          string
+	Debug             bool
+	TLSConfig         *tls.Config
+	MockAuth          bool
+	RPCDebug          string
+	BroadcastTimeout  time.Duration
+	HeartbeatInterval time.Duration
+	AliveThreshold    time.Duration
+	StorageHandlers   int
+	StorageQueueSize  int
+	PublishBufferSize int
+	NumPublishers     int
+	PublishTimeout    time.Duration
 }
 
 const usageStr = `Usage:
-gregord -session-server=<uri> -bind-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
+gregord -session-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
     [-rpc-debug=<debug str>]
 
@@ -44,9 +50,10 @@ Configuring TLS
 
 Environment Variables
 
-  All of the above flags have environment variable equivalents:
+  Some flags have environment variable equivalents:
 
     -bind-address or BIND_ADDRESS
+    -incoming-address or INCOMING_ADDRESS
     -session-server or SESSION_SERVER
     -mysql-dsn or MYSQL_DSN
     -debug or DEBUG
@@ -81,6 +88,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
+	fs.StringVar(&options.IncomingAddress, "incoming-address", os.Getenv("INCOMING_ADDRESS"), "hostname:port for external connections (will use bind-address if empty)")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
@@ -94,6 +102,12 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		"Timeout on client broadcasts")
 	fs.IntVar(&options.StorageHandlers, "storage-handlers", 40, "Number of threads handling storage requests")
 	fs.IntVar(&options.StorageQueueSize, "storage-queue-size", 10000, "Length of the queue for requests to StorageMachine")
+
+	fs.DurationVar(&options.HeartbeatInterval, "heartbeat-interval", 1*time.Second, "How often to send alive heartbeats")
+	fs.DurationVar(&options.AliveThreshold, "alive-threshold", 2*time.Second, "Server alive threshold")
+	fs.IntVar(&options.PublishBufferSize, "publish-buffer-size", 10000, "Size of the publish message buffer")
+	fs.IntVar(&options.NumPublishers, "num-publishers", 10, "Number of publisher goroutines")
+	fs.DurationVar(&options.PublishTimeout, "publish-timeout", 200*time.Millisecond, "Timeout on publish calls")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

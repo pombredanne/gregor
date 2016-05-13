@@ -50,10 +50,11 @@
 			"revisionTime": "2016-04-04T17:08:33-07:00"
 		},
 		{
-			"checksumSHA1": "GsL/Xszx3T2Bwa8VaeIas7T5eIc=",
+			"checksumSHA1": "he7vv+BLnD9UygqdJ7KpEjNaunw=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/go-framed-msgpack-rpc",
 			"path": "github.com/keybase/go-framed-msgpack-rpc",
-			"revision": "72cdc158d2cb6bf5b0221e6247a54a1c3cfefea4",
-			"revisionTime": "2016-05-11T00:49:11Z"
+			"revision": "46f76e560e2cfd5883cfd397df9007220d2aec29",
+			"revisionTime": "2016-05-12T13:08:44-05:00"
 		},
 		{
 			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
@@ -77,35 +78,45 @@
 			"revisionTime": "2016-04-25T15:40:58-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor/bin/gregord",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
-		},
-		{
-			"path": "github.com/keybase/gregor/bin/naggerd",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
-		},
-		{
+			"checksumSHA1": "vBApJ3HQlw0UtZGFKMeiBdjLxws=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/protocol/gregor1",
 			"path": "github.com/keybase/gregor/protocol/gregor1",
-			"revision": "b0a5e44fe1aba537fc85215ad9e1fd569375c5c8",
-			"revisionTime": "2016-05-05T22:01:37-04:00"
+			"revision": "85a74c3ddfd868eb107de17b47f00c609bb7912d",
+			"revisionTime": "2016-05-13T12:29:27-05:00"
 		},
 		{
+			"checksumSHA1": "Q4pK+kqEWiQ0s5MzyjV60snUeeQ=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc",
 			"path": "github.com/keybase/gregor/rpc",
-			"revision": "31f28b42b3367b66de78329664af0f7fca3f0bf6",
-			"revisionTime": "2016-05-05T22:29:01-04:00"
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
+			"checksumSHA1": "bnvFrpmU25FxpK59mfRO1dmkgOs=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/client",
 			"path": "github.com/keybase/gregor/rpc/client",
-			"revision": "31f28b42b3367b66de78329664af0f7fca3f0bf6",
-			"revisionTime": "2016-05-05T22:29:01-04:00"
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
-			"checksumSHA1": "tieVlDMFqjQJWGfxcQpvu25x6u0=",
+			"checksumSHA1": "tFP297ic9KCncs9JOoirwKuW6D8=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/server",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "9c61701788fdf1f217a410f804c7c28f41fbec93",
-			"revisionTime": "2016-05-12T22:05:41Z"
+			"revision": "85a74c3ddfd868eb107de17b47f00c609bb7912d",
+			"revisionTime": "2016-05-13T12:29:27-05:00"
+		},
+		{
+			"checksumSHA1": "h8oaZmdPZVoy9WfN53aMytHHSUs=",
+			"path": "github.com/keybase/gregor/rpc/transport",
+			"revision": "4a8fdb9037528f015daf181dd2c16628ea290153",
+			"revisionTime": "2016-05-12T12:05:54-05:00"
+		},
+		{
+			"checksumSHA1": "Hw5QponZfTQS//GJxzQ2ctB1dEM=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/srvup",
+			"path": "github.com/keybase/gregor/srvup",
+			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
+			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
 			"checksumSHA1": "I9rLXQw+eQEKoC5DOoyLizBRstI=",
@@ -114,9 +125,11 @@
 			"revisionTime": "2016-05-12T22:05:41Z"
 		},
 		{
+			"checksumSHA1": "evsNwy3y7BgG2M7jb9dLVwq2wGs=",
+			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/test",
 			"path": "github.com/keybase/gregor/test",
-			"revision": "743038f678abeaf867019bae99c1461fd75f9341",
-			"revisionTime": "2016-04-27T13:04:34-07:00"
+			"revision": "1c28377c9495d14066e78351a742628876f8913e",
+			"revisionTime": "2016-05-12T11:40:01-05:00"
 		},
 		{
 			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",

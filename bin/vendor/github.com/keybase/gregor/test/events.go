@@ -12,6 +12,7 @@ type Events struct {
 	PerUIDCreated   chan gregor1.UID
 	PerUIDDestroyed chan gregor1.UID
 	BcastSent       chan gregor1.Message
+	PubSent         chan gregor1.Message
 }
 
 func NewEvents() *Events {
@@ -21,6 +22,7 @@ func NewEvents() *Events {
 		PerUIDCreated:   make(chan gregor1.UID, 100),
 		PerUIDDestroyed: make(chan gregor1.UID, 100),
 		BcastSent:       make(chan gregor1.Message, 100),
+		PubSent:         make(chan gregor1.Message, 100),
 	}
 }
 
@@ -42,4 +44,8 @@ func (e *Events) UIDServerDestroyed(uid gregor1.UID) {
 
 func (e *Events) BroadcastSent(m gregor1.Message) {
 	e.BcastSent <- m
+}
+
+func (e *Events) PublishSent(m gregor1.Message) {
+	e.PubSent <- m
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -55,6 +56,12 @@ type Stats struct {
 
 type storageReq interface{}
 
+// Aliver is an interface to an object that can tell Server which
+// other servers are alive.
+type Aliver interface {
+	Alive() ([]string, error)
+}
+
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
@@ -74,10 +81,18 @@ type Server struct {
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
 	broadcastCh       chan messageArgs
+	publishCh         chan messageArgs
 	closeCh           chan struct{}
 	confirmCh         chan confirmUIDShutdownArgs
 	storageDispatchCh chan storageReq
 	nextConnectionID  connectionID
+
+	// used to determine which other servers are alive
+	statusGroup Aliver
+	addr        chan net.Addr
+	authToken   gregor1.SessionToken
+	groupOnce   sync.Once
+	group       *aliveGroup
 
 	// events allows checking various server event occurrences
 	// (useful for testing, ok if left a default nil value)
@@ -92,12 +107,26 @@ type Server struct {
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
 	broadcastTimeout time.Duration
+
+	// The number of publishProcess goroutines to spawn.
+	numPublishers int
+
+	// Timeout for publish RPC calls
+	publishTimeout time.Duration
+}
+
+type ServerOpts struct {
+	BroadcastTimeout time.Duration
+	PublishChSize    int
+	NumPublishers    int
+	PublishTimeout   time.Duration
+	StorageHandlers  int
+	StorageQueueSize int
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandlers int,
-	storageQueueSize int) *Server {
+func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 	s := &Server{
 		clock:             clockwork.NewRealClock(),
 		users:             make(map[string]*perUIDServer),
@@ -105,16 +134,22 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, storageHandler
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
 		broadcastCh:       make(chan messageArgs),
+		publishCh:         make(chan messageArgs, opts.PublishChSize),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
-		storageDispatchCh: make(chan storageReq, storageQueueSize),
+		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
 		log:               log,
-		broadcastTimeout:  broadcastTimeout,
+		broadcastTimeout:  opts.BroadcastTimeout,
+		addr:              make(chan net.Addr, 1),
+		numPublishers:     opts.NumPublishers,
+		publishTimeout:    opts.PublishTimeout,
 	}
 
-	for i := 0; i < storageHandlers; i++ {
+	for i := 0; i < opts.StorageHandlers; i++ {
 		go s.storageDispatchHandler()
 	}
+
+	s.publishSpawn()
 
 	return s
 }
@@ -129,6 +164,10 @@ func (s *Server) SetEventHandler(e EventHandler) {
 
 func (s *Server) SetStorageStateMachine(sm gregor.StateMachine) {
 	s.storage = sm
+}
+
+func (s *Server) SetStatusGroup(g Aliver) {
+	s.statusGroup = g
 }
 
 func (s *Server) uidKey(u gregor.UID) (string, error) {
@@ -293,11 +332,63 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	}
 	s.broadcastConsumeMessage(c, m)
 
+	return s.publishConsumeMessage(c, m)
+}
+
+// consumePublish handles published messages from other gregord
+// servers.  It doesn't store to db or publish.
+func (s *Server) consumePublish(c context.Context, m gregor1.Message) error {
+	s.broadcastCh <- messageArgs{c: c, m: m}
+	return nil
+}
+
+func (s *Server) publishSpawn() {
+	for i := 0; i < s.numPublishers; i++ {
+		go s.publishProcess()
+	}
+}
+
+func (s *Server) publishProcess() {
+	for marg := range s.publishCh {
+		if err := s.publish(marg); err != nil {
+			s.log.Warning("publish error: %s", err)
+		}
+	}
+}
+
+func (s *Server) createAliveGroup() {
+	s.log.Debug("creating new aliveGroup")
+	a := <-s.addr
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.publishTimeout, s.clock, s.closeCh, s.log)
+}
+
+func (s *Server) publish(marg messageArgs) error {
+	s.log.Debug("publish: %+v", marg)
+	s.groupOnce.Do(s.createAliveGroup)
+
+	if err := s.group.Publish(marg.c, marg.m); err != nil {
+		return err
+	}
+
+	if s.events != nil {
+		s.events.PublishSent(marg.m)
+	}
+
 	return nil
 }
 
 func (s *Server) broadcastConsumeMessage(c context.Context, m gregor1.Message) {
 	s.broadcastCh <- messageArgs{c, m}
+}
+
+func (s *Server) publishConsumeMessage(c context.Context, m gregor1.Message) error {
+	select {
+	case s.publishCh <- messageArgs{c: c, m: m}:
+	default:
+		s.log.Warning("publishCh full: %d", len(s.publishCh))
+		return ErrPublishChannelFull
+	}
+	return nil
 }
 
 // Serve starts the serve loop for Server.
@@ -401,6 +492,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
+	s.addr <- l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {
@@ -417,6 +509,7 @@ func (s *Server) ListenLoop(l net.Listener) error {
 // Shutdown tells the server to stop its Serve loop and storage dispatch
 // handlers
 func (s *Server) Shutdown() {
+	close(s.publishCh)
 	close(s.closeCh)
 	close(s.storageDispatchCh)
 }
