@@ -54,13 +54,27 @@ func main() {
 		db.Close()
 	}()
 
+	statusGroup := setupPubSub(opts, log)
+	defer statusGroup.Shutdown()
+
+	srv.SetStatusGroup(statusGroup)
+
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	srv.SetStorageStateMachine(sm)
+	go srv.Serve()
+
+	log.Debug("Calling mainServer.listenAndServe()")
+	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
+	os.Exit(4)
+}
+
+func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
 	mstore, err := srvup.NewStorageMysql(opts.MysqlDSN, log)
 	if err != nil {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
 	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
-	defer statusGroup.Shutdown()
 
 	alive, err := statusGroup.Alive()
 	if err != nil {
@@ -81,13 +95,6 @@ func main() {
 		log.Debug("self is first gregord server alive, proceeding directly to server initialization")
 	}
 
-	srv.SetStatusGroup(statusGroup)
+	return statusGroup
 
-	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
-	srv.SetStorageStateMachine(sm)
-	go srv.Serve()
-
-	log.Debug("Calling mainServer.listenAndServe()")
-	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
-	os.Exit(4)
 }
