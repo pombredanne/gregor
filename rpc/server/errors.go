@@ -1,9 +1,15 @@
 package rpc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+// ErrPublishChannelFull signals that the message was unable to be
+// published to other gregord instances because this server's
+// publish channel was full.
+var ErrPublishChannelFull = errors.New("Server publish channel is full")
 
 // IsSocketClosedError returns true if e looks like an error due
 // to the socket being closed.

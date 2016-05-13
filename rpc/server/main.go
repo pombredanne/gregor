@@ -319,6 +319,7 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	case s.publishCh <- messageArgs{c: c, m: m}:
 	default:
 		s.log.Warning("publishCh full: %d", len(s.publishCh))
+		return ErrPublishChannelFull
 	}
 	return nil
 }
