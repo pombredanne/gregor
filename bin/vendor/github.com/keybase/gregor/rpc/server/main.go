@@ -414,7 +414,9 @@ func (s *Server) ListenLoop(l net.Listener) error {
 	}
 }
 
-// Shutdown tells the server to stop its Serve loop.
+// Shutdown tells the server to stop its Serve loop and storage dispatch
+// handlers
 func (s *Server) Shutdown() {
 	close(s.closeCh)
+	close(s.storageDispatchCh)
 }
