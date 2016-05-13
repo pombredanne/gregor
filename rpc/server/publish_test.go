@@ -43,7 +43,7 @@ func TestPublish(t *testing.T) {
 
 	// s1 consumes a message
 	m1 := newOOBMessage(goodUID, "sys", nil)
-	if err := s1.consume(context.TODO(), m1); err != nil {
+	if err := s1.runConsumeMessageMainSequence(context.TODO(), m1); err != nil {
 		t.Fatal(err)
 	}
 

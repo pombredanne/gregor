@@ -117,24 +117,23 @@ type Server struct {
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int, publishTimeout time.Duration) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandlers, storageQueueSize int, publishTimeout time.Duration) *Server {
 	s := &Server{
-		clock:            clockwork.NewRealClock(),
-		users:            make(map[string]*perUIDServer),
-		lastConns:        make(map[string]connectionID),
-		newConnectionCh:  make(chan *connection),
-		statsCh:          make(chan chan *Stats, 1),
-		syncCh:           make(chan syncArgs),
-		consumeCh:        make(chan messageArgs),
-		broadcastCh:      make(chan messageArgs),
-		publishCh:        make(chan messageArgs, publishChSize),
-		closeCh:          make(chan struct{}),
-		confirmCh:        make(chan confirmUIDShutdownArgs),
-		log:              log,
-		broadcastTimeout: broadcastTimeout,
-		addr:             make(chan net.Addr, 1),
-		numPublishers:    numPublishers,
-		publishTimeout:   publishTimeout,
+		clock:             clockwork.NewRealClock(),
+		users:             make(map[string]*perUIDServer),
+		lastConns:         make(map[string]connectionID),
+		newConnectionCh:   make(chan *connection),
+		statsCh:           make(chan chan *Stats, 1),
+		broadcastCh:       make(chan messageArgs),
+		publishCh:         make(chan messageArgs, publishChSize),
+		closeCh:           make(chan struct{}),
+		confirmCh:         make(chan confirmUIDShutdownArgs),
+		storageDispatchCh: make(chan storageReq, storageQueueSize),
+		log:               log,
+		broadcastTimeout:  broadcastTimeout,
+		addr:              make(chan net.Addr, 1),
+		numPublishers:     numPublishers,
+		publishTimeout:    publishTimeout,
 	}
 
 	for i := 0; i < storageHandlers; i++ {

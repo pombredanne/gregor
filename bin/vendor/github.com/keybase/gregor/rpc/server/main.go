@@ -117,7 +117,7 @@ type Server struct {
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers int, publishTimeout time.Duration) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int, publishTimeout time.Duration) *Server {
 	s := &Server{
 		clock:            clockwork.NewRealClock(),
 		users:            make(map[string]*perUIDServer),
@@ -135,6 +135,10 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize,
 		addr:             make(chan net.Addr, 1),
 		numPublishers:    numPublishers,
 		publishTimeout:   publishTimeout,
+	}
+
+	for i := 0; i < storageHandlers; i++ {
+		go s.storageDispatchHandler()
 	}
 
 	s.publishSpawn()
