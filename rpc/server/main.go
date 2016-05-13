@@ -332,13 +332,7 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	}
 	s.broadcastConsumeMessage(c, m)
 
-	select {
-	case s.publishCh <- messageArgs{c: c, m: m}:
-	default:
-		s.log.Warning("publishCh full: %d", len(s.publishCh))
-		return ErrPublishChannelFull
-	}
-	return nil
+	return s.publishConsumeMessage(c, m)
 }
 
 // consumePub handles published messages from other gregord
@@ -385,6 +379,16 @@ func (s *Server) publish(marg messageArgs) error {
 
 func (s *Server) broadcastConsumeMessage(c context.Context, m gregor1.Message) {
 	s.broadcastCh <- messageArgs{c, m}
+}
+
+func (s *Server) publishConsumeMessage(c context.Context, m gregor1.Message) error {
+	select {
+	case s.publishCh <- messageArgs{c: c, m: m}:
+	default:
+		s.log.Warning("publishCh full: %d", len(s.publishCh))
+		return ErrPublishChannelFull
+	}
+	return nil
 }
 
 // Serve starts the serve loop for Server.
