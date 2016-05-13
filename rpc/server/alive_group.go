@@ -19,10 +19,11 @@ type aliveGroup struct {
 	clock     clockwork.Clock
 	done      chan struct{}
 	log       rpc.LogOutput
+	timeout   time.Duration
 	sync.RWMutex
 }
 
-func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToken, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
+func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToken, timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
 	a := &aliveGroup{
 		group:     make(map[string]*sibConn),
 		status:    status,
@@ -31,6 +32,7 @@ func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToke
 		clock:     clock,
 		done:      done,
 		log:       log,
+		timeout:   timeout,
 	}
 	a.update()
 	go a.check()
@@ -40,15 +42,23 @@ func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToke
 func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 	a.RLock()
 	defer a.RUnlock()
+
 	perr := &pubErr{}
+
+	var wg sync.WaitGroup
 	for host, conn := range a.group {
-		if err := conn.CallConsumePubMessage(ctx, msg); err != nil {
-			a.log.Warning("host %q consumePubMessage error: %s", host, err)
-			perr.Add(host, err)
-		} else {
-			a.log.Debug("host %q consumePubMessage success", host)
-		}
+		wg.Add(1)
+		go func() {
+			if err := conn.CallConsumePubMessage(ctx, msg); err != nil {
+				a.log.Warning("host %q consumePubMessage error: %s", host, err)
+				perr.Add(host, err)
+			} else {
+				a.log.Debug("host %q consumePubMessage success", host)
+			}
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	if perr.Empty() {
 		return nil
@@ -123,7 +133,7 @@ func (a *aliveGroup) update() error {
 		if conn, ok := a.group[host]; ok {
 			newgroup[host] = conn
 		} else {
-			newconn, err := NewSibConn(host, a.authToken, a.log)
+			newconn, err := NewSibConn(host, a.authToken, a.timeout, a.log)
 			if err != nil {
 				a.log.Warning("error connecting to %q: %s", host, err)
 			} else {

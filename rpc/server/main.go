@@ -110,11 +110,14 @@ type Server struct {
 
 	// The number of publishProcess goroutines to spawn.
 	numPublishers int
+
+	// Timeout for publish RPC calls
+	publishTimeout time.Duration
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int) *Server {
+func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int, publishTimeout time.Duration) *Server {
 	s := &Server{
 		clock:            clockwork.NewRealClock(),
 		users:            make(map[string]*perUIDServer),
@@ -131,6 +134,7 @@ func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize,
 		broadcastTimeout: broadcastTimeout,
 		addr:             make(chan net.Addr, 1),
 		numPublishers:    numPublishers,
+		publishTimeout:   publishTimeout,
 	}
 
 	for i := 0; i < storageHandlers; i++ {
@@ -353,7 +357,7 @@ func (s *Server) publishProcess() {
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
 	a := <-s.addr
-	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.clock, s.closeCh, s.log)
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.publishTimeout, s.clock, s.closeCh, s.log)
 }
 
 func (s *Server) publish(marg messageArgs) error {
