@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 )
 
 // ErrPublishChannelFull signals that the message was unable to be
@@ -28,11 +29,14 @@ type hostErr struct {
 // message to multiple hosts.
 type pubErr struct {
 	errors []hostErr
+	sync.Mutex
 }
 
 // Error returns a list of all the errors that happened while
 // publishing a message to multiple hosts.
 func (p *pubErr) Error() string {
+	p.Lock()
+	defer p.Unlock()
 	s := make([]string, len(p.errors))
 	for i, e := range p.errors {
 		s[i] = fmt.Sprintf("host %q: error %s", e.host, e.err)
@@ -42,10 +46,14 @@ func (p *pubErr) Error() string {
 
 // Add inserts an error for a host.
 func (p *pubErr) Add(host string, e error) {
+	p.Lock()
+	defer p.Unlock()
 	p.errors = append(p.errors, hostErr{host: host, err: e})
 }
 
 // Empty returns true if no errors were added.
 func (p *pubErr) Empty() bool {
+	p.Lock()
+	defer p.Unlock()
 	return len(p.errors) == 0
 }
