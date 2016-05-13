@@ -23,7 +23,7 @@ type ConsumeMessageArg struct {
 	M Message `codec:"m" json:"m"`
 }
 
-type ConsumePubMessageArg struct {
+type ConsumePublishMessageArg struct {
 	M Message `codec:"m" json:"m"`
 }
 
@@ -33,7 +33,7 @@ type PingArg struct {
 type IncomingInterface interface {
 	Sync(context.Context, SyncArg) (SyncResult, error)
 	ConsumeMessage(context.Context, Message) error
-	ConsumePubMessage(context.Context, Message) error
+	ConsumePublishMessage(context.Context, Message) error
 	Ping(context.Context) (string, error)
 }
 
@@ -73,18 +73,18 @@ func IncomingProtocol(i IncomingInterface) rpc.Protocol {
 				},
 				MethodType: rpc.MethodCall,
 			},
-			"consumePubMessage": {
+			"consumePublishMessage": {
 				MakeArg: func() interface{} {
-					ret := make([]ConsumePubMessageArg, 1)
+					ret := make([]ConsumePublishMessageArg, 1)
 					return &ret
 				},
 				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
-					typedArgs, ok := args.(*[]ConsumePubMessageArg)
+					typedArgs, ok := args.(*[]ConsumePublishMessageArg)
 					if !ok {
-						err = rpc.NewTypeError((*[]ConsumePubMessageArg)(nil), args)
+						err = rpc.NewTypeError((*[]ConsumePublishMessageArg)(nil), args)
 						return
 					}
-					err = i.ConsumePubMessage(ctx, (*typedArgs)[0].M)
+					err = i.ConsumePublishMessage(ctx, (*typedArgs)[0].M)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -119,9 +119,9 @@ func (c IncomingClient) ConsumeMessage(ctx context.Context, m Message) (err erro
 	return
 }
 
-func (c IncomingClient) ConsumePubMessage(ctx context.Context, m Message) (err error) {
-	__arg := ConsumePubMessageArg{M: m}
-	err = c.Cli.Call(ctx, "gregor.1.incoming.consumePubMessage", []interface{}{__arg}, nil)
+func (c IncomingClient) ConsumePublishMessage(ctx context.Context, m Message) (err error) {
+	__arg := ConsumePublishMessageArg{M: m}
+	err = c.Cli.Call(ctx, "gregor.1.incoming.consumePublishMessage", []interface{}{__arg}, nil)
 	return
 }
 

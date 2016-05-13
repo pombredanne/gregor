@@ -42,11 +42,11 @@ func NewSibConn(host string, authToken gregor1.SessionToken, timeout time.Durati
 	return s, nil
 }
 
-func (s *sibConn) CallConsumePubMessage(ctx context.Context, msg gregor1.Message) error {
+func (s *sibConn) CallConsumePublishMessage(ctx context.Context, msg gregor1.Message) error {
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 	ic := gregor1.IncomingClient{Cli: s.conn.GetClient()}
-	return ic.ConsumePubMessage(ctx, msg)
+	return ic.ConsumePublishMessage(ctx, msg)
 }
 
 func (s *sibConn) Shutdown() {

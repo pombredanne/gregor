@@ -49,7 +49,7 @@ func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 	for host, conn := range a.group {
 		wg.Add(1)
 		go func() {
-			if err := conn.CallConsumePubMessage(ctx, msg); err != nil {
+			if err := conn.CallConsumePublishMessage(ctx, msg); err != nil {
 				a.log.Warning("host %q consumePubMessage error: %s", host, err)
 				perr.Add(host, err)
 			} else {

@@ -335,9 +335,9 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 	return s.publishConsumeMessage(c, m)
 }
 
-// consumePub handles published messages from other gregord
+// consumePublish handles published messages from other gregord
 // servers.  It doesn't store to db or publish.
-func (s *Server) consumePub(c context.Context, m gregor1.Message) error {
+func (s *Server) consumePublish(c context.Context, m gregor1.Message) error {
 	s.broadcastCh <- messageArgs{c: c, m: m}
 	return nil
 }
