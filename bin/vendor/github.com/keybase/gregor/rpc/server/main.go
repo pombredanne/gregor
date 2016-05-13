@@ -115,29 +115,37 @@ type Server struct {
 	publishTimeout time.Duration
 }
 
+type ServerOpts struct {
+	BroadcastTimeout time.Duration
+	PublishChSize    int
+	NumPublishers    int
+	PublishTimeout   time.Duration
+	StorageHandlers  int
+	StorageQueueSize int
+}
+
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, broadcastTimeout time.Duration, publishChSize, numPublishers, storageHandler, storageQueueSize int, publishTimeout time.Duration) *Server {
+func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 	s := &Server{
-		clock:            clockwork.NewRealClock(),
-		users:            make(map[string]*perUIDServer),
-		lastConns:        make(map[string]connectionID),
-		newConnectionCh:  make(chan *connection),
-		statsCh:          make(chan chan *Stats, 1),
-		syncCh:           make(chan syncArgs),
-		consumeCh:        make(chan messageArgs),
-		broadcastCh:      make(chan messageArgs),
-		publishCh:        make(chan messageArgs, publishChSize),
-		closeCh:          make(chan struct{}),
-		confirmCh:        make(chan confirmUIDShutdownArgs),
-		log:              log,
-		broadcastTimeout: broadcastTimeout,
-		addr:             make(chan net.Addr, 1),
-		numPublishers:    numPublishers,
-		publishTimeout:   publishTimeout,
+		clock:             clockwork.NewRealClock(),
+		users:             make(map[string]*perUIDServer),
+		lastConns:         make(map[string]connectionID),
+		newConnectionCh:   make(chan *connection),
+		statsCh:           make(chan chan *Stats, 1),
+		broadcastCh:       make(chan messageArgs),
+		publishCh:         make(chan messageArgs, opts.PublishChSize),
+		closeCh:           make(chan struct{}),
+		confirmCh:         make(chan confirmUIDShutdownArgs),
+		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
+		log:               log,
+		broadcastTimeout:  opts.BroadcastTimeout,
+		addr:              make(chan net.Addr, 1),
+		numPublishers:     opts.NumPublishers,
+		publishTimeout:    opts.PublishTimeout,
 	}
 
-	for i := 0; i < storageHandlers; i++ {
+	for i := 0; i < opts.StorageHandlers; i++ {
 		go s.storageDispatchHandler()
 	}
 
