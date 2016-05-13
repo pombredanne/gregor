@@ -81,8 +81,15 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
 		log.Error("%#v", err)
 		os.Exit(3)
 	}
+
 	// start sending heartbeats
-	statusGroup.HeartbeatLoop(opts.BindAddress)
+	externalAddr := opts.BindAddress
+	if len(opts.IncomingAddress) > 0 {
+		// only use opts.IncomingAddress if it is set
+		externalAddr = opts.IncomingAddress
+	}
+	log.Debug("starting heartbeat loop for address %s", externalAddr)
+	statusGroup.HeartbeatLoop(externalAddr)
 
 	if len(alive) > 0 {
 		// there are other gregors up

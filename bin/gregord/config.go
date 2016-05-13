@@ -17,6 +17,7 @@ import (
 type Options struct {
 	SessionServer     *rpc.FMPURI
 	BindAddress       string
+	IncomingAddress   string
 	MysqlDSN          string
 	Debug             bool
 	TLSConfig         *tls.Config
@@ -32,7 +33,7 @@ type Options struct {
 }
 
 const usageStr = `Usage:
-gregord -session-server=<uri> -bind-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
+gregord -session-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
     [-rpc-debug=<debug str>]
 
@@ -48,9 +49,10 @@ Configuring TLS
 
 Environment Variables
 
-  All of the above flags have environment variable equivalents:
+  Some flags have environment variable equivalents:
 
     -bind-address or BIND_ADDRESS
+    -incoming-address or INCOMING_ADDRESS
     -session-server or SESSION_SERVER
     -mysql-dsn or MYSQL_DSN
     -debug or DEBUG
@@ -85,6 +87,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
+	fs.StringVar(&options.IncomingAddress, "incoming-address", os.Getenv("INCOMING_ADDRESS"), "hostname:port for external connections (will use bind-address if empty)")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
