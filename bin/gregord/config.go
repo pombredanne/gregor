@@ -27,6 +27,8 @@ type Options struct {
 	AliveThreshold    time.Duration
 	StorageHandlers   int
 	StorageQueueSize  int
+	PublishBufferSize int
+	NumPublishers     int
 }
 
 const usageStr = `Usage:
@@ -99,6 +101,8 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	fs.DurationVar(&options.HeartbeatInterval, "heartbeat-interval", 1*time.Second, "How often to send alive heartbeats")
 	fs.DurationVar(&options.AliveThreshold, "alive-threshold", 2*time.Second, "Server alive threshold")
+	fs.IntVar(&options.PublishBufferSize, "publish-buffer-size", 10000, "Size of the publish message buffer")
+	fs.IntVar(&options.NumPublishers, "num-publishers", 10, "Number of publisher goroutines")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

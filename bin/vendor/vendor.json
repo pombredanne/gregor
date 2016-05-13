@@ -99,11 +99,11 @@
 			"revisionTime": "2016-05-12T15:55:02-05:00"
 		},
 		{
-			"checksumSHA1": "PjzMoWC2lg8JJf9J/auO1CLVmp4=",
+			"checksumSHA1": "3zs8U2EaUEF1nT/wevIyqn0FFIY=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/server",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "f18ff524da3e24bf81caedf6ec0ea16622db85af",
-			"revisionTime": "2016-05-13T10:08:04-05:00"
+			"revision": "a7c50f7a67966fff9c2f49f839304d62418c1a40",
+			"revisionTime": "2016-05-13T10:29:36-05:00"
 		},
 		{
 			"checksumSHA1": "h8oaZmdPZVoy9WfN53aMytHHSUs=",

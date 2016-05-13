@@ -28,8 +28,7 @@ func main() {
 	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
-	srv := server.NewServer(log, opts.BroadcastTimeout, opts.StorageHandlers,
-		opts.StorageQueueSize)
+	srv := server.NewServer(log, opts.BroadcastTimeout, opts.PublishBufferSize, opts.NumPublishers, opts.StorageHandlers, opts.StorageQueueSize)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
