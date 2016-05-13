@@ -53,8 +53,8 @@
 			"checksumSHA1": "he7vv+BLnD9UygqdJ7KpEjNaunw=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/go-framed-msgpack-rpc",
 			"path": "github.com/keybase/go-framed-msgpack-rpc",
-			"revision": "46f76e560e2cfd5883cfd397df9007220d2aec29",
-			"revisionTime": "2016-05-12T13:08:44-05:00"
+			"revision": "7eb800e74590a338a24f8a897647f2a0cd94445f",
+			"revisionTime": "2016-05-13T13:29:44-07:00"
 		},
 		{
 			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
@@ -102,8 +102,8 @@
 			"checksumSHA1": "tFP297ic9KCncs9JOoirwKuW6D8=",
 			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/server",
 			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "85a74c3ddfd868eb107de17b47f00c609bb7912d",
-			"revisionTime": "2016-05-13T12:29:27-05:00"
+			"revision": "a7b6f34c5d3b8a030ba8234e5b391beff6df4ac9",
+			"revisionTime": "2016-05-13T13:42:21-07:00"
 		},
 		{
 			"checksumSHA1": "h8oaZmdPZVoy9WfN53aMytHHSUs=",

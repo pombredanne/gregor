@@ -45,19 +45,16 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 	return sc
 }
 
-func NewSessionCacherFromURI(ss *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
-	log rpc.LogOutput, rpcopts rpc.LogOptions) *SessionCacher {
-
+func NewSessionCacherFromURI(uri *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
+	log rpc.LogOutput, opts rpc.LogOptions) *SessionCacher {
 	sc := NewSessionCacher(nil, cl, timeout)
-
-	transport := NewConnTransport(log, rpcopts, ss)
+	transport := rpc.NewConnectionTransport(uri, rpc.NewSimpleLogFactory(log, opts), keybase1.WrapError)
 	handler := NewAuthdHandler(sc, log)
 
-	log.Debug("Connecting to session server %s", ss.String())
-	conn := rpc.NewConnectionWithTransport(&handler, transport, keybase1.ErrorUnwrapper{},
+	log.Debug("Connecting to session server %s", uri.String())
+	conn := rpc.NewConnectionWithTransport(handler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
 	sc.parent = gregor1.AuthClient{Cli: conn.GetClient()}
-
 	return sc
 }
 

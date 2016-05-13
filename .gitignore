@@ -3,5 +3,5 @@ protocol/go-build-stamp
 protocol/node_modules/
 bin/dbinit/dbinit
 bin/gregord/gregord
-bin/naggerd/naggerd
+bin/rsenderd/rsenderd
 bin/gregorcli/gregorcli

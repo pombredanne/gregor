@@ -55,6 +55,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
+	fs.DurationVar(&options.RemindDuration, "remind-duration", 5*time.Minute, "interval between sending reminders")
 	fs.Var(remindServer, "remind-server", "host:port of the remind server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 
@@ -70,13 +71,28 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		return nil, err
 	}
 
-	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
+	switch v := mysqlDSN.Get().(type) {
+	case error:
+		return nil, v
+	case string:
+		if v == "" {
+			return nil, bin.BadUsage("Error parsing mysql DSN")
+		}
+		options.MysqlDSN = v
+	default:
 		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
-	if options.RemindServer, ok = remindServer.Get().(*rpc.FMPURI); !ok || options.RemindServer == nil {
-		return nil, bin.BadUsage("Error parsing session server URI")
+	switch v := remindServer.Get().(type) {
+	case error:
+		return nil, v
+	case *rpc.FMPURI:
+		if v == nil {
+			return nil, bin.BadUsage("Error parsing mysql DSN")
+		}
+		options.RemindServer = v
+	default:
+		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
 	return &options, nil

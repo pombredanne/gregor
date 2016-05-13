@@ -23,15 +23,15 @@ func testGoodUsage(t *testing.T, args []string) {
 
 func TestUsage(t *testing.T) {
 	ebu := bin.ErrBadUsage("")
-	testBadUsage(t, []string{"naggerd", "-remind-server", "XXXXX://localhost:30000",
+	testBadUsage(t, []string{"rsenderd", "-remind-server", "XXXXX://localhost:30000",
 		"-mysql-dsn", "gregor:@/gregor_test"}, ebu, "invalid framed msgpack rpc scheme")
-	testBadUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-aws-region", "foo",
+	testBadUsage(t, []string{"rsenderd", "-remind-server", "fmprpc://localhost:30000", "-aws-region", "foo",
 		"-mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
-	testBadUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000",
+	testBadUsage(t, []string{"rsenderd", "-remind-server", "fmprpc://localhost:30000",
 		"-s3-config-bucket", "foo", "-mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 
-	testGoodUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test"})
-	testGoodUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test", "-debug"})
-	testGoodUsage(t, []string{"naggerd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test",
+	testGoodUsage(t, []string{"rsenderd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test"})
+	testGoodUsage(t, []string{"rsenderd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test", "-debug"})
+	testGoodUsage(t, []string{"rsenderd", "-remind-server", "fmprpc://localhost:30000", "-mysql-dsn", "gregor:@/gregor_test",
 		"-aws-region", "region", "-s3-config-bucket", "bucket"})
 }

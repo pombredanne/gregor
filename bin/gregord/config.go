@@ -136,12 +136,27 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		return nil, err
 	}
 
-	var ok bool
-	if options.MysqlDSN, ok = mysqlDSN.Get().(string); !ok || options.MysqlDSN == "" {
+	switch v := mysqlDSN.Get().(type) {
+	case error:
+		return nil, v
+	case string:
+		if v == "" {
+			return nil, bin.BadUsage("Error parsing mysql DSN")
+		}
+		options.MysqlDSN = v
+	default:
 		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
-	if options.SessionServer, ok = sessionServer.Get().(*rpc.FMPURI); !ok || options.SessionServer == nil {
+	switch v := sessionServer.Get().(type) {
+	case error:
+		return nil, v
+	case *rpc.FMPURI:
+		if v == nil {
+			return nil, bin.BadUsage("Error parsing session server URI")
+		}
+		options.SessionServer = v
+	default:
 		return nil, bin.BadUsage("Error parsing session server URI")
 	}
 

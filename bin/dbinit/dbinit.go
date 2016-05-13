@@ -23,8 +23,16 @@ func init() {
 
 func main() {
 	flag.Parse()
-	dsn, ok := mysqlDSN.Get().(string)
-	if !ok || dsn == "" {
+	var dsn string
+	switch v := mysqlDSN.Get().(type) {
+	case error:
+		log.Fatal(v)
+	case string:
+		if v == "" {
+			log.Fatal("Error parsing mysql DSN")
+		}
+		dsn = v
+	default:
 		log.Fatal("Error parsing mysql DSN")
 	}
 

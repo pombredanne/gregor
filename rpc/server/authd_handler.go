@@ -17,8 +17,8 @@ type authdHandler struct {
 var _ rpc.ConnectionHandler = (*authdHandler)(nil)
 var _ gregor1.AuthInterface = (*authdHandler)(nil)
 
-func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) authdHandler {
-	return authdHandler{
+func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) *authdHandler {
+	return &authdHandler{
 		authserver: authserver,
 		log:        log,
 	}
