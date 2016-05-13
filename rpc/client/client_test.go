@@ -98,7 +98,7 @@ func (m mockLocalIncoming) Sync(_ context.Context, arg gregor1.SyncArg) (gregor1
 func (m mockLocalIncoming) ConsumeMessage(_ context.Context, _ gregor1.Message) error {
 	return errors.New("unimplemented")
 }
-func (m mockLocalIncoming) ConsumePubMessage(_ context.Context, _ gregor1.Message) error {
+func (m mockLocalIncoming) ConsumePublishMessage(_ context.Context, _ gregor1.Message) error {
 	return errors.New("unimplemented")
 }
 func (m mockLocalIncoming) Ping(_ context.Context) (string, error) {
