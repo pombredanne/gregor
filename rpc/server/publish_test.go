@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"bytes"
 	"testing"
 	"time"
 
@@ -69,6 +70,18 @@ func TestPublish(t *testing.T) {
 
 	// check that the client connected to s2 received a broadcast
 	if len(cli.broadcasts) != 1 {
-		t.Errorf("client broadcasts received: %d, expected 1", len(cli.broadcasts))
+		t.Fatalf("client broadcasts received: %d, expected 1", len(cli.broadcasts))
+	}
+
+	// compare the message contents
+	m2 := cli.broadcasts[0]
+	if !bytes.Equal(m2.Oobm_.Uid_, m1.Oobm_.Uid_) {
+		t.Errorf("m2 uid: %x, expected %x", m2.Oobm_.Uid_, m1.Oobm_.Uid_)
+	}
+	if m2.Oobm_.System_ != m1.Oobm_.System_ {
+		t.Errorf("m2 system: %s, expected %s", m2.Oobm_.System_, m1.Oobm_.System_)
+	}
+	if !bytes.Equal(m2.Oobm_.Body_, m1.Oobm_.Body_) {
+		t.Errorf("m2 body: %s, expected %s", m2.Oobm_.Body_, m2.Oobm_.Body_)
 	}
 }
