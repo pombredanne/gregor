@@ -16,12 +16,13 @@ import (
 type sibConn struct {
 	uri       *rpc.FMPURI
 	authToken gregor1.SessionToken
+	timeout   time.Duration
 	log       rpc.LogOutput
 	conn      *rpc.Connection
 	logPrefix string
 }
 
-func NewSibConn(host string, authToken gregor1.SessionToken, log rpc.LogOutput) (*sibConn, error) {
+func NewSibConn(host string, authToken gregor1.SessionToken, timeout time.Duration, log rpc.LogOutput) (*sibConn, error) {
 	uri, err := rpc.ParseFMPURI("fmprpc://" + host)
 	if err != nil {
 		return nil, err
@@ -29,6 +30,7 @@ func NewSibConn(host string, authToken gregor1.SessionToken, log rpc.LogOutput) 
 	s := &sibConn{
 		uri:       uri,
 		authToken: authToken,
+		timeout:   timeout,
 		log:       log,
 		logPrefix: fmt.Sprintf("[sibConn %s]", uri),
 	}
@@ -41,6 +43,8 @@ func NewSibConn(host string, authToken gregor1.SessionToken, log rpc.LogOutput) 
 }
 
 func (s *sibConn) CallConsumePubMessage(ctx context.Context, msg gregor1.Message) error {
+	ctx, cancel := context.WithTimeout(ctx, s.timeout)
+	defer cancel()
 	ic := gregor1.IncomingClient{Cli: s.conn.GetClient()}
 	return ic.ConsumePubMessage(ctx, msg)
 }

@@ -30,6 +30,7 @@ type Options struct {
 	StorageQueueSize  int
 	PublishBufferSize int
 	NumPublishers     int
+	PublishTimeout    time.Duration
 }
 
 const usageStr = `Usage:
@@ -106,6 +107,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.DurationVar(&options.AliveThreshold, "alive-threshold", 2*time.Second, "Server alive threshold")
 	fs.IntVar(&options.PublishBufferSize, "publish-buffer-size", 10000, "Size of the publish message buffer")
 	fs.IntVar(&options.NumPublishers, "num-publishers", 10, "Number of publisher goroutines")
+	fs.DurationVar(&options.PublishTimeout, "publish-timeout", 200*time.Millisecond, "Timeout on publish calls")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())
