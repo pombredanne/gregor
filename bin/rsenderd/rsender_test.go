@@ -16,7 +16,7 @@ import (
 func TestRSender(t *testing.T) {
 	remind := new(mockRemind)
 	r := newMockRSender(t, remind)
-	defer storage.ReleaseTestDB()
+	defer test.ReleaseTestDB()
 	fc, ok := r.sm.Clock().(clockwork.FakeClock)
 	if !ok {
 		t.Fatal("state machine doesn't have a FakeClock")
@@ -59,7 +59,7 @@ func TestRSender(t *testing.T) {
 
 func newMockRSender(t *testing.T, remind gregor1.RemindInterface) *rSender {
 	var of gregor1.ObjFactory
-	db := storage.AcquireTestDB(t)
+	db := test.AcquireTestDB(t)
 	sm, _ := storage.NewTestMySQLEngine(db, of)
 	return &rSender{db: db, sm: sm, remind: remind, log: bin.NewLogger("rsenderd")}
 }

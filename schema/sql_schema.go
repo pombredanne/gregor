@@ -1,4 +1,8 @@
-package storage
+package schema
+
+import (
+	"database/sql"
+)
 
 var schema = []string{
 
@@ -60,4 +64,29 @@ var schema = []string{
 
 func Schema(engine string) []string {
 	return schema
+}
+
+// CreateDB connects to a DB and initializes it with Gregor Schema.
+func CreateDB(engine string, name string) (*sql.DB, error) {
+	db, err := sql.Open(engine, name)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, stmt := range Schema(engine) {
+		if _, err := tx.Exec(stmt); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
