@@ -11,8 +11,9 @@ import (
 )
 
 var (
+	dsnVar   = "MYSQL_DSN"
 	s3conf   bin.S3Config
-	mysqlDSN = &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
+	mysqlDSN = &bin.DSNGetter{S: os.Getenv(dsnVar), S3conf: &s3conf}
 )
 
 func init() {
@@ -22,6 +23,9 @@ func init() {
 }
 
 func main() {
+	if len(os.Getenv(dsnVar)) == 0 {
+		log.Fatalf("Error, environment variable %s is not defined.", dsnVar)
+	}
 	flag.Parse()
 	var dsn string
 	switch v := mysqlDSN.Get().(type) {
