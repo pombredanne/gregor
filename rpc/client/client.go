@@ -3,8 +3,6 @@ package storage
 import (
 	"bytes"
 	"errors"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/keybase/gregor"
@@ -30,27 +28,15 @@ type Client struct {
 }
 
 func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine,
-	storage LocalStorageEngine, log rpc.LogOutput) *Client {
-
-	// Grab a time interval for flushing state machine to local storage
-	td := time.Duration(time.Minute)
-	etd := os.Getenv("GREGOR_CLI_SAVE_INTERVAL_SECONDS")
-	if etd != "" {
-		res, err := strconv.Atoi(etd)
-		if err == nil {
-			td = time.Duration(res) * time.Second
-		}
-	}
-
+	storage LocalStorageEngine, saveInterval time.Duration, log rpc.LogOutput) *Client {
 	c := &Client{
 		user:      user,
 		device:    device,
 		sm:        sm,
 		storage:   storage,
 		log:       log,
-		saveTimer: time.Tick(td), // How often we save to local storage
+		saveTimer: time.Tick(saveInterval), // How often we save to local storage
 	}
-
 	return c
 }
 
@@ -112,9 +98,6 @@ func (c *Client) syncFromTime(cli gregor1.IncomingInterface, t *time.Time) error
 		return err
 	}
 
-	// Replay all the messages on the outgoing interface
-	// Note: this will have the effect of getting these messages in our
-	// local state machine as well as triggering their effects
 	for _, ibm := range res.Msgs {
 		m := gregor1.Message{Ibm_: &ibm}
 		c.sm.ConsumeMessage(m)

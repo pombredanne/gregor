@@ -121,7 +121,7 @@ func TestLevelDBClient(t *testing.T) {
 	}
 
 	cli := mockLocalIncoming{sm.server}
-	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, rpc.SimpleLogOutput{})
+	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, time.Minute, rpc.SimpleLogOutput{})
 
 	if err := c.Save(); err != nil {
 		t.Fatal(err)

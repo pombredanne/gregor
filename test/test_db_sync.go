@@ -3,12 +3,12 @@ package test
 import (
 	"database/sql"
 	"log"
-	"net/url"
 	"os"
 	"sync"
 	"testing"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/keybase/gregor"
 )
 
 var (
@@ -18,18 +18,14 @@ var (
 
 // AcquireTestDB returns a MySQL DB and acquires a lock be released with ReleaseTestDB.
 func AcquireTestDB(t *testing.T) *sql.DB {
+	var dsn string
 	s := os.Getenv("MYSQL_DSN")
-	dsn := ""
 	if s != "" {
-		udsn, err := url.Parse(s)
+		var err error
+		dsn, err = gregor.URLAddParseTime(s)
 		if err != nil {
 			t.Skip("Error parsing MYSQL_DSN")
 		}
-		query := udsn.Query()
-		query.Set("parseTime", "true")
-		udsn.RawQuery = query.Encode()
-
-		dsn = udsn.String()
 	}
 
 	if dsn == "" {

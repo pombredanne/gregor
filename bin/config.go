@@ -6,13 +6,13 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/url"
 	"strings"
 	"time"
 
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor"
 )
 
 type ErrBadUsage string
@@ -161,17 +161,10 @@ func (v *DSNGetter) Set(s string) error {
 		}
 		s = strings.TrimSpace(string(b))
 	}
-	dsn, err := url.Parse(s)
-	if err != nil {
-		return err
-	}
 
-	query := dsn.Query()
-	query.Set("parseTime", "true")
-	dsn.RawQuery = query.Encode()
-
-	v.val = dsn.String()
-	return nil
+	var err error
+	v.val, err = gregor.URLAddParseTime(s)
+	return err
 }
 
 func (v *DSNGetter) String() string {
