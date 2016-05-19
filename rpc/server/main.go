@@ -90,7 +90,7 @@ type Server struct {
 	// used to determine which other servers are alive
 	statusGroup Aliver
 	addr        chan net.Addr
-	authToken   gregor1.SessionToken
+	superCh     chan gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
 
@@ -141,6 +141,7 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		log:               log,
 		broadcastTimeout:  opts.BroadcastTimeout,
 		addr:              make(chan net.Addr, 1),
+		superCh:           make(chan gregor1.SessionToken, 1),
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
 	}
@@ -156,6 +157,10 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 
 func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 	s.auth = a
+}
+
+func (s *Server) SetSuperTokenCh(ch chan gregor1.SessionToken) {
+	s.superCh = ch
 }
 
 func (s *Server) SetEventHandler(e EventHandler) {
@@ -358,8 +363,24 @@ func (s *Server) publishProcess() {
 
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
-	a := <-s.addr
-	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.publishTimeout, s.clock, s.closeCh, s.log)
+	timeout := 2 * time.Second
+	var a net.Addr
+	select {
+	case a = <-s.addr:
+	case <-time.After(timeout):
+		s.log.Debug("waited %s for address", timeout)
+		panic("timeout waiting for address")
+	}
+
+	var t gregor1.SessionToken
+	select {
+	case t = <-s.superCh:
+	case <-time.After(timeout):
+		s.log.Debug("waited %s for super user session token", timeout)
+		panic("timeout waiting for super user session token")
+	}
+
+	s.group = newAliveGroup(s.statusGroup, a.String(), t, s.publishTimeout, s.clock, s.closeCh, s.log)
 }
 
 func (s *Server) publish(marg messageArgs) error {

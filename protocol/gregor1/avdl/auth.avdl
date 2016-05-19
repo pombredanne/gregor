@@ -1,12 +1,12 @@
 @namespace("gregor.1")
 
+// authentication protocol.  
+// clients of gregord call this, and gregord calls it on authd.
 protocol auth {
-	@typedef("string") record SessionID {}
-	@typedef("string") record SessionToken {}
 	record AuthResult {
 		UID uid;
 		SessionID sid;
 	}
 	AuthResult authenticateSessionToken(SessionToken session);
-	void revokeSessionIDs(array<SessionID> sessionIDs);
 }
+

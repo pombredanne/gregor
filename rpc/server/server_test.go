@@ -42,6 +42,10 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 	return
 }
 
+func (m mockAuth) CreateGregorSuperUserSessionToken(_ context.Context) (gregor1.SessionToken, error) {
+	return superToken, nil
+}
+
 func newStorageStateMachine() gregor.StateMachine {
 	var of gregor1.ObjFactory
 	return storage.NewMemEngine(of, clockwork.NewRealClock())

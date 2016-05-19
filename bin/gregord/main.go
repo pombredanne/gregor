@@ -53,6 +53,7 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 
 		log.Debug("Setting authenticator")
 		srv.SetAuthenticator(sc)
+		srv.SetSuperTokenCh(sc.SuperTokenCh)
 	}
 
 	log.Debug("Connect to MySQL DB at %s", opts.MysqlDSN)

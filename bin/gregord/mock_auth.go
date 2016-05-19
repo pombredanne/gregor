@@ -2,7 +2,9 @@ package main
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
+
 	"github.com/keybase/gregor/protocol/gregor1"
 	"golang.org/x/net/context"
 )
@@ -43,6 +45,10 @@ func (m *mockAuth) newUser() (tok gregor1.SessionToken, auth gregor1.AuthResult,
 
 func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.SessionID) error {
 	return nil
+}
+
+func (m mockAuth) CreateGregorSuperUserSessionToken(ctx context.Context) (gregor1.SessionToken, error) {
+	return "", errors.New("mockAuth super token not implemented")
 }
 
 var _ gregor1.AuthInterface = &mockAuth{}

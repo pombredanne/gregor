@@ -152,16 +152,6 @@ func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.S
 	return res, err
 }
 
-func (c *connection) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
-	for _, sid := range sessionIDs {
-		c.log.Info("Revoke: %+v", sid)
-		if c.authInfo.clear(sid) {
-			break
-		}
-	}
-	return c.parent.auth.RevokeSessionIDs(ctx, sessionIDs)
-}
-
 func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
 	if err := c.checkUIDAuth(ctx, arg.Uid); err != nil {
 		return gregor1.SyncResult{}, err
@@ -238,5 +228,4 @@ func (c *connection) close() {
 }
 
 var _ gregor1.AuthInterface = (*connection)(nil)
-
-// var _ gregor1.IncomingInterface = (*connection)(nil)
+var _ gregor1.IncomingInterface = (*connection)(nil)

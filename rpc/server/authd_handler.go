@@ -10,25 +10,38 @@ import (
 
 // authdHandler implements rpc.ConnectionHandler
 type authdHandler struct {
-	authserver gregor1.AuthInterface
+	authserver gregor1.AuthUpdateInterface
 	log        rpc.LogOutput
+	superCh    chan gregor1.SessionToken
 }
 
 var _ rpc.ConnectionHandler = (*authdHandler)(nil)
-var _ gregor1.AuthInterface = (*authdHandler)(nil)
+var _ gregor1.AuthUpdateInterface = (*authdHandler)(nil)
 
-func NewAuthdHandler(authserver gregor1.AuthInterface, log rpc.LogOutput) *authdHandler {
+func NewAuthdHandler(authserver gregor1.AuthUpdateInterface, log rpc.LogOutput, superCh chan gregor1.SessionToken) *authdHandler {
 	return &authdHandler{
 		authserver: authserver,
 		log:        log,
+		superCh:    superCh,
 	}
 }
 
 func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.GenericClient, srv *rpc.Server) error {
 	a.log.Debug("authd handler: registering protocols")
-	if err := srv.Register(gregor1.AuthProtocol(a)); err != nil {
+	if err := srv.Register(gregor1.AuthUpdateProtocol(a)); err != nil {
 		return err
 	}
+
+	// get a super user token
+	ac := gregor1.AuthInternalClient{Cli: cli}
+	tok, err := ac.CreateGregorSuperUserSessionToken(ctx)
+	if err != nil {
+		a.log.Debug("authd handler: error creating super user session token: %s", err)
+		return err
+	}
+	a.log.Debug("authd handler: created super user session token")
+	a.superCh <- tok
+
 	return nil
 }
 
@@ -65,9 +78,4 @@ func (a *authdHandler) HandlerName() string {
 func (a *authdHandler) RevokeSessionIDs(ctx context.Context, sessionIDs []gregor1.SessionID) error {
 	a.log.Debug("authd handler: revoke session IDs")
 	return a.authserver.RevokeSessionIDs(ctx, sessionIDs)
-}
-
-func (a *authdHandler) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
-	a.log.Error("authd handler: authd is authenticing on gregord?")
-	return a.authserver.AuthenticateSessionToken(ctx, tok)
 }

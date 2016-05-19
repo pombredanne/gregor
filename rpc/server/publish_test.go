@@ -18,7 +18,7 @@ func TestPublish(t *testing.T) {
 	incoming1 := newStorageStateMachine()
 	s1, l1, e1 := startTestServer(incoming1)
 	defer s1.Shutdown()
-	s1.authToken = superToken
+	s1.superCh <- superToken
 	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
 	defer sg1.Shutdown()
 	sg1.HeartbeatLoop(l1.Addr().String())
@@ -27,7 +27,7 @@ func TestPublish(t *testing.T) {
 	incoming2 := newStorageStateMachine()
 	s2, l2, e2 := startTestServer(incoming2)
 	defer s2.Shutdown()
-	s2.authToken = superToken
+	s2.superCh <- superToken
 	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
 	defer sg2.Shutdown()
 	sg2.HeartbeatLoop(l2.Addr().String())
