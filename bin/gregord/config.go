@@ -15,7 +15,7 @@ import (
 )
 
 type Options struct {
-	SessionServer     *rpc.FMPURI
+	AuthServer        *rpc.FMPURI
 	BindAddress       string
 	IncomingAddress   string
 	MysqlDSN          string
@@ -34,7 +34,7 @@ type Options struct {
 }
 
 const usageStr = `Usage:
-gregord -session-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
+gregord -auth-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
     [-rpc-debug=<debug str>]
 
@@ -54,7 +54,7 @@ Environment Variables
 
     -bind-address or BIND_ADDRESS
     -incoming-address or INCOMING_ADDRESS
-    -session-server or SESSION_SERVER
+    -auth-server or AUTH_SERVER
     -mysql-dsn or MYSQL_DSN
     -debug or DEBUG
     -tls-key or TLS_KEY
@@ -84,7 +84,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	var options Options
 	var s3conf bin.S3Config
 	var tlsKey, tlsCert string
-	sessionServer := &bin.FMPURIGetter{S: os.Getenv("SESSION_SERVER")}
+	authServer := &bin.FMPURIGetter{S: os.Getenv("AUTH_SERVER")}
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
@@ -95,7 +95,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.BoolVar(&options.MockAuth, "mock-auth", false, "turn on mock authentication")
 	fs.StringVar(&tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")
 	fs.StringVar(&tlsCert, "tls-cert", os.Getenv("TLS_CERT"), "file or S3 bucket or raw TLS Cert")
-	fs.Var(sessionServer, "session-server", "host:port of the session server")
+	fs.Var(authServer, "auth-server", "host:port of the auth server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 	fs.StringVar(&options.RPCDebug, "rpc-debug", os.Getenv("GREGOR_RPC_DEBUG"), "RPC debug options")
 	fs.DurationVar(&options.BroadcastTimeout, "broadcast-timeout", 10000*time.Millisecond,
@@ -148,16 +148,16 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		return nil, bin.BadUsage("Error parsing mysql DSN")
 	}
 
-	switch v := sessionServer.Get().(type) {
+	switch v := authServer.Get().(type) {
 	case error:
 		return nil, v
 	case *rpc.FMPURI:
 		if v == nil {
-			return nil, bin.BadUsage("Error parsing session server URI")
+			return nil, bin.BadUsage("Error parsing auth server URI")
 		}
-		options.SessionServer = v
+		options.AuthServer = v
 	default:
-		return nil, bin.BadUsage("Error parsing session server URI")
+		return nil, bin.BadUsage("Error parsing auth server URI")
 	}
 
 	return &options, nil

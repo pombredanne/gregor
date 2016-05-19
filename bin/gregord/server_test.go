@@ -178,7 +178,7 @@ func TestRunTLS(t *testing.T) {
 	opts, err := ParseOptions([]string{
 		"gregor",
 		"--bind-address", bindAddress,
-		"--session-server", "fmprpc+tls://localhost:30000",
+		"--auth-server", "fmprpc+tls://localhost:30000",
 		"--tls-key", ("file://" + key),
 		"--tls-cert", ("file://" + crt),
 		"--mysql-dsn", "gregor:@/gregor_test",
@@ -224,7 +224,7 @@ func TestRunTCP(t *testing.T) {
 	opts, err := ParseOptions([]string{
 		"gregor",
 		"--bind-address", bindAddress,
-		"--session-server", "fmprpc://localhost:30000",
+		"--auth-server", "fmprpc://localhost:30000",
 		"--mysql-dsn", "gregor:@/gregor_test",
 	})
 	require.Nil(t, err, "no error")
