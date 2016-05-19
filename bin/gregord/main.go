@@ -18,11 +18,17 @@ import (
 // Main entry point or gregord
 func main() {
 	log := bin.NewLogger("gregord")
-
-	opts, err := ParseOptions(os.Args)
+	rc, err := mainInner(log)
 	if err != nil {
 		log.Error("%s", err)
-		os.Exit(1)
+	}
+	os.Exit(rc)
+}
+
+func mainInner(log *bin.StandardLogger) (int, error) {
+	opts, err := ParseOptions(os.Args)
+	if err != nil {
+		return 1, err
 	}
 
 	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
@@ -53,15 +59,18 @@ func main() {
 	db, err := sql.Open("mysql", opts.MysqlDSN)
 
 	if err != nil {
-		log.Error("%s", err)
-		os.Exit(3)
+		return 3, err
 	}
 	defer func() {
 		log.Info("DB close on clean shutdown")
 		db.Close()
 	}()
 
-	statusGroup := setupPubSub(opts, log)
+	statusGroup, err := setupPubSub(opts, log)
+	if err != nil {
+		return 3, err
+	}
+
 	defer statusGroup.Shutdown()
 
 	srv.SetStatusGroup(statusGroup)
@@ -71,23 +80,24 @@ func main() {
 	go srv.Serve()
 
 	log.Debug("Calling mainServer.listenAndServe()")
-	log.Error("%s", newMainServer(opts, srv).listenAndServe())
-	os.Exit(4)
+	err = newMainServer(opts, srv).listenAndServe()
+	if err != nil {
+		return 4, err
+	}
+	return 0, nil
 }
 
-func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
+func setupPubSub(opts *Options, log *bin.StandardLogger) (*srvup.Status, error) {
 	mstore, err := srvup.NewStorageMysql(opts.MysqlDSN, log)
 	if err != nil {
-		log.Error("%s", err)
-		os.Exit(3)
+		return nil, err
 	}
 	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
 
 	alive, err := statusGroup.Alive()
 	if err != nil {
 		// bad enough to quit:
-		log.Error("%s", err)
-		os.Exit(3)
+		return nil, err
 	}
 
 	// start sending heartbeats
@@ -109,6 +119,5 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
 		log.Debug("self is first gregord server alive, proceeding directly to server initialization")
 	}
 
-	return statusGroup
-
+	return statusGroup, nil
 }
