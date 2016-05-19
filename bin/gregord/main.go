@@ -21,7 +21,7 @@ func main() {
 
 	opts, err := ParseOptions(os.Args)
 	if err != nil {
-		log.Error("%#v", err)
+		log.Error("%s", err)
 		os.Exit(1)
 	}
 
@@ -53,7 +53,7 @@ func main() {
 	db, err := sql.Open("mysql", opts.MysqlDSN)
 
 	if err != nil {
-		log.Error("%#v", err)
+		log.Error("%s", err)
 		os.Exit(3)
 	}
 	defer func() {
@@ -71,14 +71,14 @@ func main() {
 	go srv.Serve()
 
 	log.Debug("Calling mainServer.listenAndServe()")
-	log.Error("%#v", newMainServer(opts, srv).listenAndServe())
+	log.Error("%s", newMainServer(opts, srv).listenAndServe())
 	os.Exit(4)
 }
 
 func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
 	mstore, err := srvup.NewStorageMysql(opts.MysqlDSN, log)
 	if err != nil {
-		log.Error("%#v", err)
+		log.Error("%s", err)
 		os.Exit(3)
 	}
 	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
@@ -86,7 +86,7 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) *srvup.Status {
 	alive, err := statusGroup.Alive()
 	if err != nil {
 		// bad enough to quit:
-		log.Error("%#v", err)
+		log.Error("%s", err)
 		os.Exit(3)
 	}
 
