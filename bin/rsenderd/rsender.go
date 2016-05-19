@@ -21,11 +21,11 @@ type rSender struct {
 	log    rpc.LogOutput
 }
 
-func newRSender(db *sql.DB, remindServer *rpc.FMPURI, log rpc.LogOutput) *rSender {
+func newRSender(db *sql.DB, remindServer *rpc.FMPURI, log rpc.LogOutput, mysqlDSN string) *rSender {
 	transport := rpc.NewConnectionTransport(remindServer, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError)
 	conn := rpc.NewConnectionWithTransport(nil, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
-	return &rSender{db, storage.NewMySQLEngine(db, of), gregor1.RemindClient{conn.GetClient()}, log}
+	return &rSender{db, storage.NewMySQLEngine(db, of, mysqlDSN), gregor1.RemindClient{conn.GetClient()}, log}
 }
 
 func (r *rSender) sendReminders() error {

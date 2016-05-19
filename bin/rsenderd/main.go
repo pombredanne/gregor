@@ -25,7 +25,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	r := newRSender(db, opts.RemindServer, log)
+	r := newRSender(db, opts.RemindServer, log, opts.MysqlDSN)
 	for _ = range time.Tick(opts.RemindDuration) {
 		if err := r.sendReminders(); err != nil {
 			log.Error("%#v", err)

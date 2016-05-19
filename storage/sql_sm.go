@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"net/url"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/keybase/gregor"
@@ -22,24 +23,33 @@ type SQLEngine struct {
 	objFactory gregor.ObjFactory
 	clock      clockwork.Clock
 	stw        sqlTimeWriter
+	tablePrefix string
 }
 
-func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock) *SQLEngine {
-	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl}
+func getTablePrefix(dsn string) string {
+	parts, err := url.Parse(dsn)
+	if err != nil {
+		return ""
+	}
+	return parts.Query().Get("tablePrefix")
 }
 
-func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
+func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock, tp string) *SQLEngine {
+	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl, tablePrefix : tp}
+}
+
+func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory, dsn string) *SQLEngine {
+	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock(), getTablePrefix(dsn))
 }
 
 func NewTestMySQLEngine(d *sql.DB, of gregor.ObjFactory) (*SQLEngine, clockwork.FakeClock) {
 	clock := clockwork.NewFakeClock()
-	eng := NewSQLEngine(d, of, mysqlTimeWriter{}, clock)
+	eng := NewSQLEngine(d, of, mysqlTimeWriter{}, clock, "")
 	return eng, clock
 }
 
 func NewTestSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewFakeClock())
+	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewFakeClock(), "")
 }
 
 type builder interface {

@@ -66,7 +66,7 @@ func main() {
 
 	srv.SetStatusGroup(statusGroup)
 
-	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
+	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{}, opts.MysqlDSN)
 	srv.SetStorageStateMachine(sm)
 	go srv.Serve()
 

@@ -14,7 +14,7 @@ import (
 func testEngine(t *testing.T, db *sql.DB, w sqlTimeWriter) {
 	cl := clockwork.NewFakeClock()
 	var of gregor1.ObjFactory
-	eng := NewSQLEngine(db, of, w, cl)
+	eng := NewSQLEngine(db, of, w, cl, "")
 	test.TestStateMachineAllDevices(t, eng)
 	test.TestStateMachinePerDevice(t, eng)
 }
