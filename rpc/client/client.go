@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"errors"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/keybase/gregor"
@@ -29,14 +31,26 @@ type Client struct {
 
 func NewClient(user gregor.UID, device gregor.DeviceID, sm gregor.StateMachine,
 	storage LocalStorageEngine, log rpc.LogOutput) *Client {
+
+	// Grab a time interval for flushing state machine to local storage
+	td := time.Duration(time.Minute)
+	etd := os.Getenv("GREGOR_CLI_SAVE_INTERVAL_SECONDS")
+	if etd != "" {
+		res, err := strconv.Atoi(etd)
+		if err == nil {
+			td = time.Duration(res) * time.Second
+		}
+	}
+
 	c := &Client{
 		user:      user,
 		device:    device,
 		sm:        sm,
 		storage:   storage,
 		log:       log,
-		saveTimer: time.Tick(1 * time.Minute), // How often we save to local storage
+		saveTimer: time.Tick(td), // How often we save to local storage
 	}
+
 	return c
 }
 
