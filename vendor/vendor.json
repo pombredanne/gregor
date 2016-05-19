@@ -3,13 +3,11 @@
 	"ignore": "test",
 	"package": [
 		{
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/cenkalti/backoff",
 			"path": "github.com/cenkalti/backoff",
 			"revision": "32cd0c5b3aef12c76ed64aaf678f6c79736be7dc",
 			"revisionTime": "2015-08-27T15:34:15+03:00"
 		},
 		{
-			"origin": "github.com/stretchr/testify/vendor/github.com/davecgh/go-spew/spew",
 			"path": "github.com/davecgh/go-spew/spew",
 			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1",
 			"revisionTime": "2016-04-18T23:58:27+01:00"
@@ -51,13 +49,11 @@
 		},
 		{
 			"checksumSHA1": "he7vv+BLnD9UygqdJ7KpEjNaunw=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/go-framed-msgpack-rpc",
 			"path": "github.com/keybase/go-framed-msgpack-rpc",
 			"revision": "7eb800e74590a338a24f8a897647f2a0cd94445f",
 			"revisionTime": "2016-05-13T13:29:44-07:00"
 		},
 		{
-			"origin": "github.com/keybase/client/go/vendor/github.com/keybase/go-jsonw",
 			"path": "github.com/keybase/go-jsonw",
 			"revision": "7bf51294cf911c68a70bdfc02137a9154462723a",
 			"revisionTime": "2016-04-21T10:04:43-07:00"
@@ -68,71 +64,6 @@
 			"revisionTime": "2016-03-23T15:35:38-07:00"
 		},
 		{
-			"path": "github.com/keybase/gregor",
-			"revision": "28c38ba709098c260d03fd9be84a41c3fab6d1e6",
-			"revisionTime": "2016-05-02T13:03:58-04:00"
-		},
-		{
-			"path": "github.com/keybase/gregor/bin",
-			"revision": "990de2914ab02103ce4a577fa944daf053b9fbed",
-			"revisionTime": "2016-04-25T15:40:58-07:00"
-		},
-		{
-			"checksumSHA1": "vBApJ3HQlw0UtZGFKMeiBdjLxws=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/protocol/gregor1",
-			"path": "github.com/keybase/gregor/protocol/gregor1",
-			"revision": "85a74c3ddfd868eb107de17b47f00c609bb7912d",
-			"revisionTime": "2016-05-13T12:29:27-05:00"
-		},
-		{
-			"checksumSHA1": "Q4pK+kqEWiQ0s5MzyjV60snUeeQ=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc",
-			"path": "github.com/keybase/gregor/rpc",
-			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
-			"revisionTime": "2016-05-12T15:55:02-05:00"
-		},
-		{
-			"checksumSHA1": "bnvFrpmU25FxpK59mfRO1dmkgOs=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/client",
-			"path": "github.com/keybase/gregor/rpc/client",
-			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
-			"revisionTime": "2016-05-12T15:55:02-05:00"
-		},
-		{
-			"checksumSHA1": "tFP297ic9KCncs9JOoirwKuW6D8=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/rpc/server",
-			"path": "github.com/keybase/gregor/rpc/server",
-			"revision": "a7b6f34c5d3b8a030ba8234e5b391beff6df4ac9",
-			"revisionTime": "2016-05-13T13:42:21-07:00"
-		},
-		{
-			"checksumSHA1": "h8oaZmdPZVoy9WfN53aMytHHSUs=",
-			"path": "github.com/keybase/gregor/rpc/transport",
-			"revision": "4a8fdb9037528f015daf181dd2c16628ea290153",
-			"revisionTime": "2016-05-12T12:05:54-05:00"
-		},
-		{
-			"checksumSHA1": "Hw5QponZfTQS//GJxzQ2ctB1dEM=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/srvup",
-			"path": "github.com/keybase/gregor/srvup",
-			"revision": "86d2e01953a94a907eb84baf84d26c9c6181d220",
-			"revisionTime": "2016-05-12T15:55:02-05:00"
-		},
-		{
-			"checksumSHA1": "I9rLXQw+eQEKoC5DOoyLizBRstI=",
-			"path": "github.com/keybase/gregor/storage",
-			"revision": "9c61701788fdf1f217a410f804c7c28f41fbec93",
-			"revisionTime": "2016-05-12T22:05:41Z"
-		},
-		{
-			"checksumSHA1": "evsNwy3y7BgG2M7jb9dLVwq2wGs=",
-			"origin": "github.com/keybase/gregor/bin/vendor/github.com/keybase/gregor/test",
-			"path": "github.com/keybase/gregor/test",
-			"revision": "1c28377c9495d14066e78351a742628876f8913e",
-			"revisionTime": "2016-05-12T11:40:01-05:00"
-		},
-		{
-			"origin": "github.com/stretchr/testify/vendor/github.com/pmezard/go-difflib/difflib",
 			"path": "github.com/pmezard/go-difflib/difflib",
 			"revision": "c5d7a69bf8a2c9c374798160849c071093e41dd1",
 			"revisionTime": "2016-04-18T23:58:27+01:00"
@@ -221,13 +152,7 @@
 			"path": "golang.org/x/net/context",
 			"revision": "815d315ead425c4365077d904a2331ee9e179820",
 			"revisionTime": "2016-04-20T16:37:57+10:00"
-		},
-		{
-			"checksumSHA1": "pancewZW3HwGvpDwfH5Imrbadc4=",
-			"path": "golang.org/x/net/context",
-			"revision": "815d315ead425c4365077d904a2331ee9e179820",
-			"revisionTime": "2016-04-20T16:37:57+10:00"
 		}
 	],
-	"rootPath": "github.com/keybase/gregor/bin"
+	"rootPath": "github.com/keybase/gregor"
 }
