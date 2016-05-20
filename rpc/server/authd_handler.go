@@ -50,6 +50,11 @@ func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli 
 	a.log.Debug("authd handler: created super user session token")
 	a.superCh <- tok
 
+	// Stop any existing update loops.
+	close(a.doneCh)
+	a.doneCh = make(chan struct{})
+
+	// Start a new update loop.
 	go a.updateSuperToken(conn)
 
 	return nil
