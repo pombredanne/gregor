@@ -90,7 +90,7 @@ type Server struct {
 	// used to determine which other servers are alive
 	statusGroup Aliver
 	addr        chan net.Addr
-	authToken   gregor1.SessionToken
+	superCh     chan gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
 
@@ -141,6 +141,7 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		log:               log,
 		broadcastTimeout:  opts.BroadcastTimeout,
 		addr:              make(chan net.Addr, 1),
+		superCh:           make(chan gregor1.SessionToken, 1),
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
 	}
@@ -156,6 +157,13 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 
 func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 	s.auth = a
+}
+
+func (s *Server) SetSuperTokenCh(ch chan gregor1.SessionToken) {
+	s.superCh = ch
+	if s.group != nil {
+		s.log.Warning("SetSuperTokenCh called after aliveGroup created")
+	}
 }
 
 func (s *Server) SetEventHandler(e EventHandler) {
@@ -358,8 +366,10 @@ func (s *Server) publishProcess() {
 
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
+
 	a := <-s.addr
-	s.group = newAliveGroup(s.statusGroup, a.String(), s.authToken, s.publishTimeout, s.clock, s.closeCh, s.log)
+
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log)
 }
 
 func (s *Server) publish(marg messageArgs) error {

@@ -81,6 +81,8 @@ type MsgID []byte
 type DeviceID []byte
 type Body []byte
 type Time int64
+type SessionID string
+type SessionToken string
 type CommonInterface interface {
 }
 

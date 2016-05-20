@@ -15,23 +15,24 @@ import (
 )
 
 type Options struct {
-	AuthServer        *rpc.FMPURI
-	BindAddress       string
-	IncomingAddress   string
-	MysqlDSN          string
-	Debug             bool
-	TLSConfig         *tls.Config
-	MockAuth          bool
-	RPCDebug          string
-	BroadcastTimeout  time.Duration
-	HeartbeatInterval time.Duration
-	AliveThreshold    time.Duration
-	StorageHandlers   int
-	StorageQueueSize  int
-	PublishBufferSize int
-	NumPublishers     int
-	PublishTimeout    time.Duration
-	ChildMode         bool
+	AuthServer                *rpc.FMPURI
+	BindAddress               string
+	IncomingAddress           string
+	MysqlDSN                  string
+	Debug                     bool
+	TLSConfig                 *tls.Config
+	MockAuth                  bool
+	RPCDebug                  string
+	BroadcastTimeout          time.Duration
+	HeartbeatInterval         time.Duration
+	AliveThreshold            time.Duration
+	StorageHandlers           int
+	StorageQueueSize          int
+	PublishBufferSize         int
+	NumPublishers             int
+	PublishTimeout            time.Duration
+	SuperTokenRefreshInterval time.Duration
+	ChildMode                 bool
 }
 
 const usageStr = `Usage:
@@ -111,6 +112,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.IntVar(&options.PublishBufferSize, "publish-buffer-size", 10000, "Size of the publish message buffer")
 	fs.IntVar(&options.NumPublishers, "num-publishers", 10, "Number of publisher goroutines")
 	fs.DurationVar(&options.PublishTimeout, "publish-timeout", 200*time.Millisecond, "Timeout on publish calls")
+	fs.DurationVar(&options.SuperTokenRefreshInterval, "super-token-refresh-interval", 1*time.Hour, "Time interval in between creating new authd super tokens")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())
