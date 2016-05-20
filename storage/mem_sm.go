@@ -106,6 +106,11 @@ func (u *user) addItems(items []gregor.Item) {
 
 // logMessage logs a message for this user and potentially associates an item
 func (u *user) logMessage(t time.Time, m gregor.InBandMessage, i *item) {
+	for _, l := range u.log {
+		if bytes.Equal(l.m.Metadata().MsgID().Bytes(), m.Metadata().MsgID().Bytes()) {
+			return
+		}
+	}
 	u.log = append(u.log, loggedMsg{m, t, i})
 }
 
