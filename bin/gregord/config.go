@@ -31,12 +31,13 @@ type Options struct {
 	PublishBufferSize int
 	NumPublishers     int
 	PublishTimeout    time.Duration
+	ChildMode         bool
 }
 
 const usageStr = `Usage:
 gregord -auth-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
-    [-rpc-debug=<debug str>]
+    [-rpc-debug=<debug str>] [-child-mode]
 
 Configuring TLS
 
@@ -62,6 +63,7 @@ Environment Variables
     -aws-region or AWS_REGION
     -s3-config-bucket or S3_CONFIG_BUCKET
     -rpc-debug or GREGOR_RPC_DEBUG
+    --child-mode or CHILD_MODE
 `
 
 func ParseOptions(argv []string) (*Options, error) {
@@ -93,6 +95,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
 	fs.BoolVar(&options.MockAuth, "mock-auth", false, "turn on mock authentication")
+	fs.BoolVar(&options.ChildMode, "child-mode", false, "exit on EOF on stdin")
 	fs.StringVar(&tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")
 	fs.StringVar(&tlsCert, "tls-cert", os.Getenv("TLS_CERT"), "file or S3 bucket or raw TLS Cert")
 	fs.Var(authServer, "auth-server", "host:port of the auth server")
