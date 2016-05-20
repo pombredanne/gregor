@@ -93,11 +93,13 @@ func (c *Client) syncFromTime(cli gregor1.IncomingInterface, t *time.Time) error
 	}
 
 	// Grab the events from gregord
+	c.log.Debug("syncFromTime from: %s", gregor1.FromTime(arg.Ctime))
 	res, err := cli.Sync(ctx, arg)
 	if err != nil {
 		return err
 	}
 
+	c.log.Debug("syncFromTime consuming %d messages", len(res.Msgs))
 	for _, ibm := range res.Msgs {
 		m := gregor1.Message{Ibm_: &ibm}
 		c.sm.ConsumeMessage(m)
