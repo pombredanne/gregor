@@ -363,21 +363,17 @@ func (s *Server) publishProcess() {
 
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
-	timeout := 2 * time.Second
-	var a net.Addr
-	select {
-	case a = <-s.addr:
-	case <-time.After(timeout):
-		s.log.Debug("waited %s for address", timeout)
-		panic("timeout waiting for address")
-	}
+	a := <-s.addr
 
 	var t gregor1.SessionToken
-	select {
-	case t = <-s.superCh:
-	case <-time.After(timeout):
-		s.log.Debug("waited %s for super user session token", timeout)
-		panic("timeout waiting for super user session token")
+Loop:
+	for {
+		select {
+		case t = <-s.superCh:
+			break Loop
+		case <-time.After(1 * time.Second):
+			s.log.Debug("createAliveGroup: slow receive of super user session token")
+		}
 	}
 
 	s.group = newAliveGroup(s.statusGroup, a.String(), t, s.publishTimeout, s.clock, s.closeCh, s.log)
