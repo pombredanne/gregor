@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -246,11 +248,14 @@ func newOOBMessage(uid gregor1.UID, system gregor1.System, body gregor1.Body) gr
 }
 
 func newUpdateMessage(uid gregor1.UID) gregor1.Message {
+	id := rand.Int63()
+	msgid := strconv.FormatInt(id, 16)
 	return gregor1.Message{
 		Ibm_: &gregor1.InBandMessage{
 			StateUpdate_: &gregor1.StateUpdateMessage{
 				Md_: gregor1.Metadata{
-					Uid_: uid,
+					Uid_:   uid,
+					MsgID_: []byte(msgid),
 				},
 			},
 		},
@@ -364,25 +369,18 @@ func TestBlockedUser(t *testing.T) {
 
 	// Spawn a bunch of these on the slow client to try and overwhelm and
 	// saturate the broadcast channel in the perUIDServer
-	done := make(chan struct{})
-	go func() {
-		for i := 0; i < 20; i++ {
-			if err := slowCli.cli.IncomingClient().ConsumeMessage(context.TODO(),
-				newUpdateMessage(evilUID)); err != nil {
-				t.Fatal(err)
-			}
-		}
-		done <- struct{}{}
-	}()
-	<-done
-
-	// In a broken state, this user could get blocked
-	go func() {
-		if err := cli.IncomingClient().ConsumeMessage(context.TODO(),
-			newUpdateMessage(goodUID)); err != nil {
+	for i := 0; i < 20; i++ {
+		if err := slowCli.cli.IncomingClient().ConsumeMessage(context.TODO(),
+			newUpdateMessage(evilUID)); err != nil {
 			t.Fatal(err)
 		}
-	}()
+	}
+
+	// In a broken state, this user could get blocked
+	if err := cli.IncomingClient().ConsumeMessage(context.TODO(),
+		newUpdateMessage(goodUID)); err != nil {
+		t.Fatal(err)
+	}
 
 	// Give the whole thing 2 seconds to work or we consider it a failure
 	success := 0
