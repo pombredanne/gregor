@@ -64,7 +64,7 @@ func (s *perUIDServer) logError(prefix string, err error) {
 	if err == nil {
 		return
 	}
-	s.log.Info("[uid %x] %s error: %s", s.uid, prefix, err)
+	s.log.Info("[uid %s] %s error: %s", s.uid, prefix, err)
 }
 
 func (s *perUIDServer) serve() {
@@ -113,7 +113,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 	var errCh = make(chan connectionArgs)
 	var wg sync.WaitGroup
 	for id, conn := range s.conns {
-		s.log.Info("uid %x broadcast to %d", s.uid, id)
+		s.log.Info("uid %s broadcast to %d", s.uid, id)
 		if err := conn.checkMessageAuth(a.c, a.m); err != nil {
 			s.log.Info("[connection %d]: %s", id, err)
 			s.removeConnection(conn, id)
@@ -166,7 +166,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 func (s *perUIDServer) tryShutdown() {
 	// make sure no connections have been added
 	if len(s.conns) != 0 {
-		s.log.Info("tried shutdown, but %d conns for %x", len(s.conns), s.uid)
+		s.log.Info("tried shutdown, but %d conns for %s", len(s.conns), s.uid)
 		return
 	}
 
@@ -179,12 +179,12 @@ func (s *perUIDServer) tryShutdown() {
 }
 
 func (s *perUIDServer) checkClosed() {
-	s.log.Info("uid server %x: received connection closed message, checking all connections", s.uid)
+	s.log.Info("uid server %s: received connection closed message, checking all connections", s.uid)
 	for id, conn := range s.conns {
 		if conn.xprt.IsConnected() {
 			continue
 		}
-		s.log.Info("uid server %x: connection %d closed", s.uid, id)
+		s.log.Info("uid server %s: connection %d closed", s.uid, id)
 		s.removeConnection(conn, id)
 	}
 }
@@ -200,7 +200,7 @@ func (s *perUIDServer) isConnDown(err error) bool {
 }
 
 func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
-	s.log.Info("uid server %x: removing connection %d", s.uid, id)
+	s.log.Info("uid server %s: removing connection %d", s.uid, id)
 	conn.close()
 	delete(s.conns, id)
 	if s.events != nil {
