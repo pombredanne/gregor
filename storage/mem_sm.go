@@ -364,19 +364,22 @@ func (m *MemEngine) IsEphemeral() bool {
 func (m *MemEngine) InitState(s gregor.State) error {
 	m.Lock()
 	defer m.Unlock()
-	userItems := make(map[*user][]gregor.Item)
+
 	items, err := s.Items()
 	if err != nil {
 		return err
 	}
 
+	now := m.clock.Now()
 	for _, it := range items {
 		user := m.getUser(it.Metadata().UID())
-		userItems[user] = append(userItems[user], it)
-	}
+		ibm, err := m.objFactory.MakeInBandMessageFromItem(it)
+		if err != nil {
+			return err
+		}
 
-	for u, items := range userItems {
-		u.addItems(items)
+		item := user.addItem(now, it)
+		user.logMessage(now, ibm, item)
 	}
 
 	return nil
