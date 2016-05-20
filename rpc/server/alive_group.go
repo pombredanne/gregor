@@ -12,27 +12,41 @@ import (
 )
 
 type aliveGroup struct {
-	group     map[string]*sibConn
-	status    Aliver
-	authToken gregor1.SessionToken
-	selfHost  string
-	clock     clockwork.Clock
-	done      chan struct{}
-	log       rpc.LogOutput
-	timeout   time.Duration
+	group       map[string]*sibConn
+	status      Aliver
+	authToken   gregor1.SessionToken
+	authTokenCh chan gregor1.SessionToken
+	selfHost    string
+	clock       clockwork.Clock
+	done        chan struct{}
+	log         rpc.LogOutput
+	timeout     time.Duration
 	sync.RWMutex
 }
 
-func newAliveGroup(status Aliver, selfHost string, authToken gregor1.SessionToken, timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
+func waitToken(authTokenCh chan gregor1.SessionToken, log rpc.LogOutput) gregor1.SessionToken {
+	for {
+		select {
+		case t := <-authTokenCh:
+			return t
+		case <-time.After(1 * time.Second):
+			log.Debug("newAliveGroup: slow receive of super user session token")
+		}
+	}
+}
+
+func newAliveGroup(status Aliver, selfHost string, authTokenCh chan gregor1.SessionToken, timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
+	authToken := waitToken(authTokenCh, log)
 	a := &aliveGroup{
-		group:     make(map[string]*sibConn),
-		status:    status,
-		selfHost:  selfHost,
-		authToken: authToken,
-		clock:     clock,
-		done:      done,
-		log:       log,
-		timeout:   timeout,
+		group:       make(map[string]*sibConn),
+		status:      status,
+		selfHost:    selfHost,
+		authToken:   authToken,
+		authTokenCh: authTokenCh,
+		clock:       clock,
+		done:        done,
+		log:         log,
+		timeout:     timeout,
 	}
 	a.update()
 	go a.check()
@@ -71,6 +85,9 @@ func (a *aliveGroup) check() {
 		select {
 		case <-a.done:
 			return
+		case t := <-a.authTokenCh:
+			a.log.Debug("aliveGroup received new super auth token")
+			a.authToken = t
 		case <-a.clock.After(1 * time.Second):
 		}
 

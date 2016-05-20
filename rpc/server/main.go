@@ -161,6 +161,9 @@ func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
 
 func (s *Server) SetSuperTokenCh(ch chan gregor1.SessionToken) {
 	s.superCh = ch
+	if s.group != nil {
+		s.log.Warning("SetSuperTokenCh called after aliveGroup created")
+	}
 }
 
 func (s *Server) SetEventHandler(e EventHandler) {
@@ -363,20 +366,10 @@ func (s *Server) publishProcess() {
 
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
+
 	a := <-s.addr
 
-	var t gregor1.SessionToken
-Loop:
-	for {
-		select {
-		case t = <-s.superCh:
-			break Loop
-		case <-time.After(1 * time.Second):
-			s.log.Debug("createAliveGroup: slow receive of super user session token")
-		}
-	}
-
-	s.group = newAliveGroup(s.statusGroup, a.String(), t, s.publishTimeout, s.clock, s.closeCh, s.log)
+	s.group = newAliveGroup(s.statusGroup, a.String(), s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log)
 }
 
 func (s *Server) publish(marg messageArgs) error {

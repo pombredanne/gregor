@@ -48,7 +48,7 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
 		sc := server.NewSessionCacherFromURI(opts.AuthServer, clockwork.NewRealClock(),
-			10*time.Minute, log, rpcopts)
+			10*time.Minute, log, rpcopts, opts.SuperTokenRefreshInterval)
 		defer sc.Close()
 
 		log.Debug("Setting authenticator")

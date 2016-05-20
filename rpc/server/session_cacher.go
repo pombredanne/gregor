@@ -30,6 +30,7 @@ type SessionCacher struct {
 	reqCh        chan request
 	expiryQueue  []expirySt
 	SuperTokenCh chan gregor1.SessionToken
+	authdHandler *authdHandler
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
@@ -48,13 +49,13 @@ func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.
 }
 
 func NewSessionCacherFromURI(uri *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
-	log rpc.LogOutput, opts rpc.LogOptions) *SessionCacher {
+	log rpc.LogOutput, opts rpc.LogOptions, refreshInterval time.Duration) *SessionCacher {
 	sc := NewSessionCacher(nil, cl, timeout)
 	transport := rpc.NewConnectionTransport(uri, rpc.NewSimpleLogFactory(log, opts), keybase1.WrapError)
-	handler := NewAuthdHandler(sc, log, sc.SuperTokenCh)
+	sc.authdHandler = NewAuthdHandler(sc, log, sc.SuperTokenCh, refreshInterval)
 
 	log.Debug("Connecting to session server %s", uri.String())
-	conn := rpc.NewConnectionWithTransport(handler, transport, keybase1.ErrorUnwrapper{},
+	conn := rpc.NewConnectionWithTransport(sc.authdHandler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
 	sc.parent = gregor1.AuthClient{Cli: conn.GetClient()}
 	return sc
@@ -136,6 +137,9 @@ func (sc *SessionCacher) requestHandler() {
 // Close allows the SessionCacher to be garbage collected.
 func (sc *SessionCacher) Close() {
 	close(sc.reqCh)
+	if sc.authdHandler != nil {
+		sc.authdHandler.Close()
+	}
 }
 
 // Size returns the number of sessions currently in the cache.
