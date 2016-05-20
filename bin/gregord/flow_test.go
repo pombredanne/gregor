@@ -32,8 +32,8 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 			t.Logf("cleared artifical sleep")
 		}()
 	}
-	db := storage.AcquireTestDB(t)
-	defer storage.ReleaseTestDB()
+	db := test.AcquireTestDB(t)
+	defer test.ReleaseTestDB()
 	auth := newMockAuth()
 
 	srvAddr, events, clock, cleanup := startTestGregord(t, db, auth)

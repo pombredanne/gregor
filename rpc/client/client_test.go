@@ -120,7 +120,8 @@ func TestLevelDBClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, mockLocalIncoming{sm.server}, rpc.SimpleLogOutput{})
+	cli := mockLocalIncoming{sm.server}
+	c := NewClient(user, device, sm, &LevelDBStorageEngine{db}, time.Minute, rpc.SimpleLogOutput{})
 
 	if err := c.Save(); err != nil {
 		t.Fatal(err)
@@ -136,18 +137,18 @@ func TestLevelDBClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.syncFromTime(c.sm.LatestCTime(c.user, c.device)); err != nil {
+	if err := c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device)); err != nil {
 		t.Fatal(err)
 	}
 
 	test.AddStateMachinePerDevice(sm.client, user, nil)
 
-	err = c.syncFromTime(c.sm.LatestCTime(c.user, c.device))
+	err = c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device))
 	if _, ok := err.(errHashMismatch); !ok {
 		t.Fatal(err)
 	}
 
-	if err := c.Sync(); err != nil {
+	if err := c.Sync(cli); err != nil {
 		t.Fatal(err)
 	}
 }

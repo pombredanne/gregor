@@ -10,7 +10,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/keybase/gregor/bin"
-	"github.com/keybase/gregor/storage"
+	"github.com/keybase/gregor/schema"
 )
 
 var (
@@ -66,7 +66,7 @@ func main() {
 		}
 	}
 
-	if _, err := storage.CreateDB("mysql", dsn); err != nil {
+	if _, err := schema.CreateDB("mysql", dsn); err != nil {
 		log.Fatal(err)
 	}
 }
