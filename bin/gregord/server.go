@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
 	"os"
 	"os/signal"
@@ -18,7 +19,30 @@ type mainServer struct {
 }
 
 func newMainServer(o *Options, m gregor.MainLoopServer) *mainServer {
-	return &mainServer{opts: o, mls: m, addr: make(chan net.Addr, 1)}
+	ret := &mainServer{opts: o, mls: m, addr: make(chan net.Addr, 1)}
+	if o.ChildMode {
+		ret.stopOnClosedStdin()
+	}
+	return ret
+}
+
+// waitForEOFThenClose waits for eof on the given reader, and then closes
+// the given channel
+func waitForEOFThenClose(r io.Reader, ch chan struct{}) {
+	var buf [1024]byte
+
+	for {
+		n, err := r.Read(buf[:])
+		if n == 0 || err != nil {
+			close(ch)
+			break
+		}
+	}
+}
+
+func (m *mainServer) stopOnClosedStdin() {
+	m.stopCh = make(chan struct{})
+	go waitForEOFThenClose(os.Stdin, m.stopCh)
 }
 
 func (m *mainServer) listen() (net.Listener, error) {
