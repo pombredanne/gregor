@@ -132,7 +132,7 @@ func (c *Client) Sync(cli gregor1.IncomingInterface) error {
 }
 
 func (c *Client) ConsumeMessage(m gregor1.Message) error {
-	if err := c.sm.ConsumeMessage(m); err != nil {
+	if _, err := c.sm.ConsumeMessage(m); err != nil {
 		return err
 	}
 
