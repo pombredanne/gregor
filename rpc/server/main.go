@@ -435,8 +435,7 @@ func (s *Server) storageConsumeMessage(m gregor.Message) consumeMessageRet {
 	err := s.storageDispatch(req)
 	if err != nil {
 		return consumeMessageRet{
-			err:   err,
-			ctime: time.Now(),
+			err: err,
 		}
 	}
 	return <-retCh
