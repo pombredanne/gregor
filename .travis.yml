@@ -26,6 +26,8 @@ services:
   - docker
 before_install:
   - mysql -e "create database IF NOT EXISTS test;" -uroot
+install:
+  - true
 before_script:
   - (cd protocol && npm i && git diff --quiet --exit-code)
   - (cd bin/dbinit && go build && ./dbinit -y)
