@@ -54,7 +54,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
-	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
+	fs.BoolVar(&options.Debug, "debug", os.Getenv("DEBUG") != "", "turn on debugging")
 	fs.DurationVar(&options.RemindDuration, "remind-duration", 5*time.Minute, "interval between sending reminders")
 	fs.Var(remindServer, "remind-server", "host:port of the remind server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")

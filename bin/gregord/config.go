@@ -94,7 +94,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.StringVar(&options.IncomingAddress, "incoming-address", os.Getenv("INCOMING_ADDRESS"), "hostname:port for external connections (will use bind-address if empty)")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
-	fs.BoolVar(&options.Debug, "debug", false, "turn on debugging")
+	fs.BoolVar(&options.Debug, "debug", os.Getenv("DEBUG") != "", "turn on debugging")
 	fs.BoolVar(&options.MockAuth, "mock-auth", false, "turn on mock authentication")
 	fs.BoolVar(&options.ChildMode, "child-mode", false, "exit on EOF on stdin")
 	fs.StringVar(&tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")
