@@ -247,28 +247,28 @@ func (s *SQLEngine) consumeInBandMessageMetadata(tx *sql.Tx, md gregor.Metadata,
 	return s.objFactory.MakeMetadata(md.UID(), md.MsgID(), md.DeviceID(), ctime, md.InBandMsgType())
 }
 
-func (s *SQLEngine) ConsumeMessage(m gregor.Message) error {
+func (s *SQLEngine) ConsumeMessage(m gregor.Message) (time.Time, error) {
 	switch {
 	case m.ToInBandMessage() != nil:
 		return s.consumeInBandMessage(m.ToInBandMessage())
 	default:
-		return nil
+		return time.Time{}, nil
 	}
 }
 
-func (s *SQLEngine) consumeInBandMessage(m gregor.InBandMessage) error {
+func (s *SQLEngine) consumeInBandMessage(m gregor.InBandMessage) (time.Time, error) {
 	switch {
 	case m.ToStateUpdateMessage() != nil:
 		return s.consumeStateUpdateMessage(m.ToStateUpdateMessage())
 	default:
-		return nil
+		return time.Time{}, nil
 	}
 }
 
-func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err error) {
+func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (ctime time.Time, err error) {
 	tx, err := s.driver.Begin()
 	if err != nil {
-		return err
+		return time.Time{}, err
 	}
 	defer func() {
 		if err != nil {
@@ -280,23 +280,25 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (err 
 
 	md := m.Metadata()
 	if md, err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
-		return err
+		return time.Time{}, err
 	}
+
+	ctime = md.CTime()
 	if m.Creation() != nil {
 		if err = s.consumeCreation(tx, m.Creation()); err != nil {
-			return err
+			return ctime, err
 		}
 	}
 	if m.Dismissal() != nil {
 		if err = s.consumeMsgIDsToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().MsgIDsToDismiss(), md.CTime()); err != nil {
-			return err
+			return ctime, err
 		}
 		if err = s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss(), md.CTime()); err != nil {
-			return err
+			return ctime, err
 		}
 	}
 
-	return nil
+	return ctime, nil
 }
 
 func (s *SQLEngine) rowToItem(u gregor.UID, rows *sql.Rows) (gregor.Item, error) {

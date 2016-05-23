@@ -40,14 +40,15 @@ func (sm *clientServerSM) Clear() error {
 	return sm.client.Clear()
 }
 
-func (sm *clientServerSM) ConsumeMessage(m gregor.Message) error {
+func (sm *clientServerSM) ConsumeMessage(m gregor.Message) (time.Time, error) {
 	if sm.client != nil {
-		if err := sm.client.ConsumeMessage(m); err != nil {
-			return err
+		if ctime, err := sm.client.ConsumeMessage(m); err != nil {
+			return ctime, err
 		}
 	}
 
-	return sm.server.ConsumeMessage(m)
+	ctime, err := sm.server.ConsumeMessage(m)
+	return ctime, err
 }
 
 func (sm *clientServerSM) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {

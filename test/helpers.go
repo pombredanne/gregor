@@ -134,7 +134,7 @@ func newDismissalByCategory(of gregor.ObjFactory, u gregor.UID, m gregor.MsgID, 
 }
 
 func consumeMessage(t *testing.T, which string, sm gregor.StateMachine, m gregor.Message) {
-	err := sm.ConsumeMessage(m)
+	_, err := sm.ConsumeMessage(m)
 	if err != nil {
 		t.Fatalf("In inserting msg %s: %v", which, err)
 	}

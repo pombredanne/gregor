@@ -335,9 +335,11 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 // and broadcasts it to the other clients. Like startSync, this function is called
 // from connection, and is on a different thread than Serve
 func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Message) error {
-	if err := s.storageConsumeMessage(m); err != nil {
-		return err
+	res := s.storageConsumeMessage(m)
+	if res.err != nil {
+		return res.err
 	}
+	m.SetCTime(res.ctime)
 	s.broadcastConsumeMessage(c, m)
 
 	return s.publishConsumeMessage(c, m)
@@ -419,9 +421,14 @@ func (s *Server) Serve() error {
 	}
 }
 
+type consumeMessageRet struct {
+	err   error
+	ctime time.Time
+}
+
 type consumeMessageReq struct {
 	m      gregor.Message
-	respCh chan<- error
+	respCh chan<- consumeMessageRet
 }
 
 type syncReq struct {
@@ -432,12 +439,14 @@ type syncReq struct {
 }
 
 // storageConsumeMessage schedules a Consume request on the dispatch handler
-func (s *Server) storageConsumeMessage(m gregor.Message) error {
-	retCh := make(chan error)
+func (s *Server) storageConsumeMessage(m gregor.Message) consumeMessageRet {
+	retCh := make(chan consumeMessageRet)
 	req := consumeMessageReq{m: m, respCh: retCh}
 	err := s.storageDispatch(req)
 	if err != nil {
-		return err
+		return consumeMessageRet{
+			err: err,
+		}
 	}
 	return <-retCh
 }
@@ -477,7 +486,8 @@ func (s *Server) storageDispatchHandler() {
 	for req := range s.storageDispatchCh {
 		switch req := req.(type) {
 		case consumeMessageReq:
-			req.respCh <- s.storage.ConsumeMessage(req.m)
+			ctime, err := s.storage.ConsumeMessage(req.m)
+			req.respCh <- consumeMessageRet{ctime: ctime, err: err}
 		case syncReq:
 			res, err := grpc.Sync(req.sm, req.log, req.arg)
 			req.respCh <- syncRet{res: res, err: err}

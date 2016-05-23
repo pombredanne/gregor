@@ -93,11 +93,13 @@ func (c *Client) syncFromTime(cli gregor1.IncomingInterface, t *time.Time) error
 	}
 
 	// Grab the events from gregord
+	c.log.Debug("syncFromTime from: %s", gregor1.FromTime(arg.Ctime))
 	res, err := cli.Sync(ctx, arg)
 	if err != nil {
 		return err
 	}
 
+	c.log.Debug("syncFromTime consuming %d messages", len(res.Msgs))
 	for _, ibm := range res.Msgs {
 		m := gregor1.Message{Ibm_: &ibm}
 		c.sm.ConsumeMessage(m)
@@ -131,8 +133,8 @@ func (c *Client) Sync(cli gregor1.IncomingInterface) error {
 	return nil
 }
 
-func (c *Client) ConsumeMessage(m gregor1.Message) error {
-	if err := c.sm.ConsumeMessage(m); err != nil {
+func (c *Client) StateMachineConsumeMessage(m gregor1.Message) error {
+	if _, err := c.sm.ConsumeMessage(m); err != nil {
 		return err
 	}
 
@@ -147,10 +149,10 @@ func (c *Client) ConsumeMessage(m gregor1.Message) error {
 	return nil
 }
 
-func (c *Client) LatestCTime() *time.Time {
+func (c *Client) StateMachineLatestCTime() *time.Time {
 	return c.sm.LatestCTime(c.user, c.device)
 }
 
-func (c *Client) InBandMessagesSince(t time.Time) ([]gregor.InBandMessage, error) {
+func (c *Client) StateMachineInBandMessagesSince(t time.Time) ([]gregor.InBandMessage, error) {
 	return c.sm.InBandMessagesSince(c.user, c.device, t)
 }

@@ -231,6 +231,12 @@ func (m Message) ToOutOfBandMessage() gregor.OutOfBandMessage {
 	return *m.Oobm_
 }
 
+func (m *Message) SetCTime(ctime time.Time) {
+	if m.Ibm_ != nil && m.Ibm_.StateUpdate_ != nil {
+		m.Ibm_.StateUpdate_.Md_.Ctime_ = ToTime(ctime)
+	}
+}
+
 func (r Reminder) Item() gregor.Item     { return r.Item_ }
 func (r Reminder) RemindTime() time.Time { return FromTime(r.RemindTime_) }
 
