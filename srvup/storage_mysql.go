@@ -69,9 +69,9 @@ func (s *StorageMysql) UpdateServerStatus(group, hostname string) error {
 	var err error
 	if s.update == nil {
 		if s.clock != nil {
-			s.update, err = s.db.Prepare("INSERT INTO gregor_server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
 		} else {
-			s.update, err = s.db.Prepare("INSERT INTO gregor_server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, hostname, hbtime, ctime) VALUES (?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
 		}
 		if err != nil {
 			return err
@@ -92,9 +92,9 @@ func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]st
 	var err error
 	if s.alive == nil {
 		if s.clock != nil {
-			s.alive, err = s.db.Prepare("SELECT hostname FROM gregor_server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
+			s.alive, err = s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
 		} else {
-			s.alive, err = s.db.Prepare("SELECT hostname FROM gregor_server_status WHERE groupname=? AND hbtime >= DATE_SUB(NOW(), INTERVAL ? SECOND)")
+			s.alive, err = s.db.Prepare("SELECT hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(NOW(), INTERVAL ? SECOND)")
 		}
 		if err != nil {
 			return nil, err
@@ -143,7 +143,7 @@ func (s *StorageMysql) cleanLoop() {
 
 func (s *StorageMysql) clean() error {
 	if s.cleanup == nil {
-		stmt, err := s.db.Prepare("DELETE FROM gregor_server_status WHERE hbtime < DATE_SUB(NOW(), INTERVAL 1 HOUR)")
+		stmt, err := s.db.Prepare("DELETE FROM server_status WHERE hbtime < DATE_SUB(NOW(), INTERVAL 1 HOUR)")
 		if err != nil {
 			return fmt.Errorf("prepare error: %s", err)
 		}
@@ -179,10 +179,10 @@ func (s *StorageMysql) resetSchema() error {
 }
 
 var schema = []string{
-	`CREATE TABLE IF NOT EXISTS gregor_server_status (
+	`CREATE TABLE IF NOT EXISTS server_status (
 		groupname VARCHAR(32) NOT NULL,
 		hostname VARCHAR(128) NOT NULL,
-		hbtime DATETIME NOT NULL,
+		hbtime DATETIME(6) NOT NULL,
 		ctime DATETIME NOT NULL,
 		PRIMARY KEY (groupname, hostname),
 		INDEX (groupname, hbtime)
@@ -190,5 +190,5 @@ var schema = []string{
 }
 
 var reset = []string{
-	`DROP TABLE IF EXISTS gregor_server_status`,
+	`DROP TABLE IF EXISTS server_status`,
 }
