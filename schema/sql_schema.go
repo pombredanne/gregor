@@ -60,6 +60,15 @@ var schema = []string{
 		FOREIGN KEY(uid, msgid) REFERENCES gregor_messages (uid, msgid) ON DELETE CASCADE,
 		PRIMARY KEY(uid, msgid, category, dtime)
 	)`,
+
+	`CREATE TABLE IF NOT EXISTS server_status (
+		groupname VARCHAR(32) NOT NULL,
+		hostname VARCHAR(128) NOT NULL,
+		hbtime DATETIME(6) NOT NULL,
+		ctime DATETIME NOT NULL,
+		PRIMARY KEY (groupname, hostname),
+		INDEX (groupname, hbtime)
+	) ENGINE=InnoDB DEFAULT CHARSET=utf8`,
 }
 
 func Schema(engine string) []string {
