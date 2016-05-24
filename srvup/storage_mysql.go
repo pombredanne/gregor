@@ -182,7 +182,7 @@ var schema = []string{
 	`CREATE TABLE IF NOT EXISTS server_status (
 		groupname VARCHAR(32) NOT NULL,
 		hostname VARCHAR(128) NOT NULL,
-		hbtime DATETIME(6) NOT NULL,
+		hbtime DATETIME NOT NULL,
 		ctime DATETIME NOT NULL,
 		PRIMARY KEY (groupname, hostname),
 		INDEX (groupname, hbtime)
