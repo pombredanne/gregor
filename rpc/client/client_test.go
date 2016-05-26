@@ -138,18 +138,20 @@ func TestLevelDBClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device)); err != nil {
+	_, err = c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device))
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	test.AddStateMachinePerDevice(sm.client, user, nil)
 
-	err = c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device))
+	_, err = c.syncFromTime(cli, c.sm.LatestCTime(c.user, c.device))
 	if _, ok := err.(errHashMismatch); !ok {
 		t.Fatal(err)
 	}
 
-	if err := c.Sync(cli); err != nil {
+	_, err = c.Sync(cli)
+	if err != nil {
 		t.Fatal(err)
 	}
 }
