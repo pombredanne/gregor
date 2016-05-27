@@ -20,9 +20,12 @@ type sibConn struct {
 	log       rpc.LogOutput
 	conn      *rpc.Connection
 	logPrefix string
+	hostname  string
 }
 
-func NewSibConn(host string, authToken gregor1.SessionToken, timeout time.Duration, log rpc.LogOutput) (*sibConn, error) {
+func NewSibConn(host string, authToken gregor1.SessionToken, timeout time.Duration,
+	log rpc.LogOutput) (*sibConn, error) {
+
 	uri, err := rpc.ParseFMPURI("fmprpc://" + host)
 	if err != nil {
 		return nil, err
@@ -33,6 +36,7 @@ func NewSibConn(host string, authToken gregor1.SessionToken, timeout time.Durati
 		timeout:   timeout,
 		log:       log,
 		logPrefix: fmt.Sprintf("[sibConn %s]", uri),
+		hostname:  host,
 	}
 
 	if err := s.connect(); err != nil {

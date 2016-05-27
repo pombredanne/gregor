@@ -128,7 +128,7 @@ func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) er
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 
-	c.log.Info("Authenticate: %+v", tok)
+	c.log.Debug("Authenticate: %+v", tok)
 	if tok == "" {
 		var UnauthenticatedSessionError = keybase1.Status{
 			Name: "BAD_SESSION",
@@ -161,7 +161,16 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 }
 
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
-	c.log.Info("ConsumeMessage: %+v", m)
+
+	// Debugging
+	ibm := m.ToInBandMessage()
+	if ibm != nil {
+		c.log.Debug("ConsumeMessage: in-band message: msgID: %s Ctime: %s",
+			m.ToInBandMessage().Metadata().MsgID(), m.ToInBandMessage().Metadata().CTime())
+	} else {
+		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
+	}
+
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		return err
 	}
@@ -170,7 +179,16 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 }
 
 func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Message) error {
-	c.log.Info("ConsumePubMessage: %+v", m)
+
+	// Debugging
+	ibm := m.ToInBandMessage()
+	if ibm != nil {
+		c.log.Debug("ConsumeMessage: in-band message: msgID: %s Ctime: %s",
+			m.ToInBandMessage().Metadata().MsgID(), m.ToInBandMessage().Metadata().CTime())
+	} else {
+		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
+	}
+
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		c.close()
 		return err

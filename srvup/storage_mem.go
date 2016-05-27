@@ -17,7 +17,12 @@ type StorageMem struct {
 	sync.Mutex
 }
 
-type groupMap map[string]time.Time
+type nodeRow struct {
+	heartbeat time.Time
+	hostname  string
+}
+
+type groupMap map[NodeId]nodeRow
 
 func NewStorageMem(c clockwork.Clock) *StorageMem {
 	return &StorageMem{
@@ -26,7 +31,7 @@ func NewStorageMem(c clockwork.Clock) *StorageMem {
 	}
 }
 
-func (m *StorageMem) UpdateServerStatus(group, hostname string) error {
+func (m *StorageMem) UpdateServerStatus(group string, node NodeDesc) error {
 	m.Lock()
 	defer m.Unlock()
 	g, ok := m.groups[group]
@@ -34,23 +39,23 @@ func (m *StorageMem) UpdateServerStatus(group, hostname string) error {
 		g = make(groupMap)
 		m.groups[group] = g
 	}
-	g[hostname] = m.clock.Now()
+	g[node.Id] = nodeRow{heartbeat: m.clock.Now(), hostname: node.Hostname}
 	return nil
 }
 
-func (m *StorageMem) AliveServers(group string, threshold time.Duration) ([]string, error) {
+func (m *StorageMem) AliveServers(group string, threshold time.Duration) ([]NodeDesc, error) {
 	m.Lock()
 	defer m.Unlock()
 	g, ok := m.groups[group]
 	if !ok {
 		return nil, nil
 	}
-	var alive []string
-	for host, ptime := range g {
-		if m.clock.Now().Sub(ptime) >= threshold {
+	var alive []NodeDesc
+	for id, row := range g {
+		if m.clock.Now().Sub(row.heartbeat) >= threshold {
 			continue
 		}
-		alive = append(alive, host)
+		alive = append(alive, NodeDesc{Id: id, Hostname: row.hostname})
 	}
 	return alive, nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
+	"github.com/keybase/gregor/srvup"
 	"golang.org/x/net/context"
 )
 
@@ -59,7 +60,8 @@ type storageReq interface{}
 // Aliver is an interface to an object that can tell Server which
 // other servers are alive.
 type Aliver interface {
-	Alive() ([]string, error)
+	Alive() ([]srvup.NodeDesc, error)
+	MyID() srvup.NodeId
 }
 
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
@@ -80,8 +82,8 @@ type Server struct {
 
 	newConnectionCh   chan *connection
 	statsCh           chan chan *Stats
-	broadcastCh       chan messageArgs
-	publishCh         chan messageArgs
+	broadcastCh       chan gregor1.Message
+	publishCh         chan gregor1.Message
 	closeCh           chan struct{}
 	confirmCh         chan confirmUIDShutdownArgs
 	storageDispatchCh chan storageReq
@@ -89,7 +91,6 @@ type Server struct {
 
 	// used to determine which other servers are alive
 	statusGroup Aliver
-	addr        chan net.Addr
 	superCh     chan gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
@@ -133,14 +134,13 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		lastConns:         make(map[string]connectionID),
 		newConnectionCh:   make(chan *connection),
 		statsCh:           make(chan chan *Stats, 1),
-		broadcastCh:       make(chan messageArgs),
-		publishCh:         make(chan messageArgs, opts.PublishChSize),
+		broadcastCh:       make(chan gregor1.Message),
+		publishCh:         make(chan gregor1.Message, opts.PublishChSize),
 		closeCh:           make(chan struct{}),
 		confirmCh:         make(chan confirmUIDShutdownArgs),
 		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
 		log:               log,
 		broadcastTimeout:  opts.BroadcastTimeout,
-		addr:              make(chan net.Addr, 1),
 		superCh:           make(chan gregor1.SessionToken, 1),
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
@@ -290,11 +290,11 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 	if !ok {
 		return ErrBadCast
 	}
-	s.broadcastCh <- messageArgs{c, tm}
+	s.broadcastCh <- tm
 	return nil
 }
 
-func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
+func (s *Server) sendBroadcast(m gregor1.Message) error {
 	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
 	if err != nil {
 		return err
@@ -313,7 +313,7 @@ func (s *Server) sendBroadcast(c context.Context, m gregor1.Message) error {
 	// If this is going to block, we just drop the broadcast. It means that
 	// the user has a device that is not responding fast enough
 	select {
-	case srv.sendBroadcastCh <- messageArgs{c, m}:
+	case srv.sendBroadcastCh <- m:
 	default:
 		s.log.Error("user %s super slow receiving broadcasts, rejecting!",
 			gregor.UIDFromMessage(m))
@@ -340,15 +340,15 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 		return res.err
 	}
 	m.SetCTime(res.ctime)
-	s.broadcastConsumeMessage(c, m)
+	s.broadcastConsumeMessage(m)
 
-	return s.publishConsumeMessage(c, m)
+	return s.publishConsumeMessage(m)
 }
 
 // consumePublish handles published messages from other gregord
 // servers.  It doesn't store to db or publish.
 func (s *Server) consumePublish(c context.Context, m gregor1.Message) error {
-	s.broadcastCh <- messageArgs{c: c, m: m}
+	s.broadcastCh <- m
 	return nil
 }
 
@@ -369,33 +369,46 @@ func (s *Server) publishProcess() {
 func (s *Server) createAliveGroup() {
 	s.log.Debug("creating new aliveGroup")
 
-	a := <-s.addr
+	// Get our ID, but statusGroup might be nil if we are in a test
+	id := srvup.NodeId("")
+	if s.statusGroup != nil {
+		id = s.statusGroup.MyID()
+	}
 
-	s.group = newAliveGroup(s.statusGroup, a.String(), s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log)
+	s.group = newAliveGroup(s.statusGroup, id, s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log)
 }
 
-func (s *Server) publish(marg messageArgs) error {
-	s.log.Debug("publish: %+v", marg)
+func (s *Server) publish(m gregor1.Message) error {
+
+	// Debugging
+	ibm := m.ToInBandMessage()
+	if ibm != nil {
+		s.log.Debug("publish: in-band message: msgID: %s Ctime: %s",
+			m.ToInBandMessage().Metadata().MsgID(), m.ToInBandMessage().Metadata().CTime())
+	} else {
+		s.log.Debug("publish: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
+	}
+
 	s.groupOnce.Do(s.createAliveGroup)
 
-	if err := s.group.Publish(marg.c, marg.m); err != nil {
+	if err := s.group.Publish(context.Background(), m); err != nil {
 		return err
 	}
 
 	if s.events != nil {
-		s.events.PublishSent(marg.m)
+		s.events.PublishSent(m)
 	}
 
 	return nil
 }
 
-func (s *Server) broadcastConsumeMessage(c context.Context, m gregor1.Message) {
-	s.broadcastCh <- messageArgs{c, m}
+func (s *Server) broadcastConsumeMessage(m gregor1.Message) {
+	s.broadcastCh <- m
 }
 
-func (s *Server) publishConsumeMessage(c context.Context, m gregor1.Message) error {
+func (s *Server) publishConsumeMessage(m gregor1.Message) error {
 	select {
-	case s.publishCh <- messageArgs{c: c, m: m}:
+	case s.publishCh <- m:
 	default:
 		s.log.Warning("publishCh full: %d", len(s.publishCh))
 		return ErrPublishChannelFull
@@ -409,8 +422,8 @@ func (s *Server) Serve() error {
 		select {
 		case c := <-s.newConnectionCh:
 			s.logError("addUIDConnection", s.addUIDConnection(c))
-		case a := <-s.broadcastCh:
-			s.sendBroadcast(a.c, a.m)
+		case m := <-s.broadcastCh:
+			s.sendBroadcast(m)
 		case c := <-s.statsCh:
 			s.reportStats(c)
 		case a := <-s.confirmCh:
@@ -512,7 +525,6 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 
 // ListenLoop listens for new connections on net.Listener.
 func (s *Server) ListenLoop(l net.Listener) error {
-	s.addr <- l.Addr()
 	for {
 		c, err := l.Accept()
 		if err != nil {

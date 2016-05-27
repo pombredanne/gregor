@@ -23,7 +23,7 @@ type perUIDServer struct {
 
 	parentConfirmCh  chan confirmUIDShutdownArgs
 	newConnectionCh  chan *connectionArgs
-	sendBroadcastCh  chan messageArgs
+	sendBroadcastCh  chan gregor1.Message
 	tryShutdownCh    chan bool
 	closeListenCh    chan error
 	parentShutdownCh chan struct{}
@@ -40,9 +40,9 @@ func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArg
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
 		newConnectionCh:  make(chan *connectionArgs, 1),
-		sendBroadcastCh:  make(chan messageArgs, 1000), // make this a huge queue for slow devices
-		tryShutdownCh:    make(chan bool, 1),           // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error, 100),        // each connection uses the same closeListenCh, so buffer it more than 1
+		sendBroadcastCh:  make(chan gregor1.Message, 1000), // make this a huge queue for slow devices
+		tryShutdownCh:    make(chan bool, 1),               // buffered so it can receive inside serve()
+		closeListenCh:    make(chan error, 100),            // each connection uses the same closeListenCh, so buffer it more than 1
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
 		selfShutdownCh:   make(chan struct{}),
@@ -77,8 +77,8 @@ func (s *perUIDServer) serve() {
 		select {
 		case a := <-s.newConnectionCh:
 			s.logError("addConn", s.addConn(a))
-		case a := <-s.sendBroadcastCh:
-			s.broadcast(a)
+		case m := <-s.sendBroadcastCh:
+			s.broadcast(m)
 		case <-s.closeListenCh:
 			s.checkClosed()
 			s.tryShutdown()
@@ -109,12 +109,12 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 	return nil
 }
 
-func (s *perUIDServer) broadcast(a messageArgs) {
+func (s *perUIDServer) broadcast(m gregor1.Message) {
 	var errCh = make(chan connectionArgs)
 	var wg sync.WaitGroup
 	for id, conn := range s.conns {
 		s.log.Info("uid %s broadcast to %d", s.uid, id)
-		if err := conn.checkMessageAuth(a.c, a.m); err != nil {
+		if err := conn.checkMessageAuth(context.Background(), m); err != nil {
 			s.log.Info("[connection %d]: %s", id, err)
 			s.removeConnection(conn, id)
 			continue
@@ -128,9 +128,9 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 		wg.Add(1)
 		go func(conn *connection, id connectionID) {
 			defer wg.Done()
-			ctx, cancel := context.WithTimeout(a.c, s.broadcastTimeout)
+			ctx, cancel := context.WithTimeout(context.Background(), s.broadcastTimeout)
 			defer cancel()
-			if err := oc.BroadcastMessage(ctx, a.m); err != nil {
+			if err := oc.BroadcastMessage(ctx, m); err != nil {
 				s.log.Info("[connection %d]: %s", id, err)
 
 				// Push these onto a channel to clean up afterward
@@ -153,7 +153,7 @@ func (s *perUIDServer) broadcast(a messageArgs) {
 	}
 
 	if s.events != nil {
-		s.events.BroadcastSent(a.m)
+		s.events.BroadcastSent(m)
 	}
 
 	if len(s.conns) == 0 {

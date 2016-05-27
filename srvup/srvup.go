@@ -4,22 +4,39 @@
 package srvup
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 )
 
+// NodeId is a random id of a node
+type NodeId string
+
+// NodeDesc identifies a node in the group
+type NodeDesc struct {
+	Hostname string
+	Id       NodeId
+}
+
+func (n NodeDesc) String() string {
+	return fmt.Sprintf("[ %s, %s ]", n.Id, n.Hostname)
+}
+
 // Storage is an interface for storing and querying server status.
 type Storage interface {
-	UpdateServerStatus(group, hostname string) error
-	AliveServers(group string, threshold time.Duration) ([]string, error)
+	UpdateServerStatus(group string, node NodeDesc) error
+	AliveServers(group string, threshold time.Duration) ([]NodeDesc, error)
 }
 
 // Status maintains a server's alive status and queries for the
 // alive status of all the servers.
 type Status struct {
 	group              string
+	myID               NodeId
 	heartbeatInterval  time.Duration
 	aliveThreshold     time.Duration
 	storage            Storage
@@ -27,7 +44,7 @@ type Status struct {
 	done               chan struct{}
 	clock              clockwork.Clock
 	aliveCacheMu       sync.RWMutex
-	aliveCache         []string
+	aliveCache         []NodeDesc
 	aliveCacheAt       time.Time
 	aliveCacheDuration time.Duration
 	wg                 sync.WaitGroup
@@ -35,8 +52,15 @@ type Status struct {
 
 // New creates a new Status for a server.
 func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storage) *Status {
+
+	// Generate a random ID for ourselves
+	rawid := make([]byte, 8)
+	rand.Read(rawid)
+	id := base64.StdEncoding.EncodeToString(rawid)
+
 	return &Status{
 		group:              group,
+		myID:               NodeId(id),
 		heartbeatInterval:  heartbeatInterval,
 		aliveThreshold:     aliveThreshold,
 		storage:            s,
@@ -49,16 +73,15 @@ func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storag
 
 // Alive returns a list of hostnames for servers that have pinged
 // within s.aliveThreshold.
-func (s *Status) Alive() ([]string, error) {
+func (s *Status) Alive() ([]NodeDesc, error) {
 	s.aliveCacheMu.RLock()
 	if s.aliveCacheValid() {
 		defer s.aliveCacheMu.RUnlock()
 		return s.aliveCache, nil
 	}
-
-	// cache is stale
 	s.aliveCacheMu.RUnlock()
 
+	// cache is stale
 	s.aliveCacheMu.Lock()
 	defer s.aliveCacheMu.Unlock()
 
@@ -82,6 +105,11 @@ func (s *Status) Alive() ([]string, error) {
 	return s.aliveCache, nil
 }
 
+// MyID returns the unique ID of the owner of the statsu group
+func (s *Status) MyID() NodeId {
+	return s.myID
+}
+
 // HeartbeatLoop runs a loop in a separate goroutine that sends a
 // heartbeat every s.pingInterval.
 func (s *Status) HeartbeatLoop(hostname string) {
@@ -91,7 +119,7 @@ func (s *Status) HeartbeatLoop(hostname string) {
 		for {
 			start := s.clock.Now()
 			if err := s.heartbeat(hostname); err != nil {
-				s.log.Warning("heartbat error: %s", err)
+				s.log.Warning("heartbeat error: %s", err)
 			}
 			sleepDur := s.heartbeatInterval - s.since(start)
 			if sleepDur < 0 {
@@ -109,7 +137,8 @@ func (s *Status) HeartbeatLoop(hostname string) {
 }
 
 func (s *Status) heartbeat(hostname string) error {
-	return s.storage.UpdateServerStatus(s.group, hostname)
+	return s.storage.UpdateServerStatus(s.group,
+		NodeDesc{Hostname: hostname, Id: NodeId(s.MyID())})
 }
 
 // Shutdown stops the HeartbeatLoop and waits for it to finish.
