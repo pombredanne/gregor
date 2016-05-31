@@ -261,6 +261,10 @@ func newUpdateMessage(uid gregor1.UID) gregor1.Message {
 					Uid_:   uid,
 					MsgID_: []byte(msgid),
 				},
+				Creation_: &gregor1.Item{
+					Category_: "test",
+					Body_:     []byte(""),
+				},
 			},
 		},
 	}

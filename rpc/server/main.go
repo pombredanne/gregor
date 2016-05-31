@@ -335,6 +335,7 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 // and broadcasts it to the other clients. Like startSync, this function is called
 // from connection, and is on a different thread than Serve
 func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Message) error {
+
 	res := s.storageConsumeMessage(m)
 	if res.err != nil {
 		return res.err

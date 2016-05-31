@@ -160,7 +160,45 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 	return c.parent.startSync(ctx, arg)
 }
 
+func validateConsumeMessage(m gregor1.Message) error {
+	err := errors.New("invalid consume call, missing required fields")
+	ibm := m.ToInBandMessage()
+	obm := m.ToOutOfBandMessage()
+	if ibm != nil {
+		upd := ibm.ToStateUpdateMessage()
+		if upd != nil {
+			if upd.Metadata() == nil || upd.Metadata().MsgID() == nil || upd.Metadata().UID() == nil {
+				return err
+			}
+			if upd.Creation() != nil {
+				if upd.Creation().Category() == nil || upd.Creation().Body() == nil {
+					return err
+				}
+			} else if upd.Dismissal() != nil {
+				if upd.Dismissal().MsgIDsToDismiss() == nil || upd.Dismissal().RangesToDismiss() == nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+	} else if obm != nil {
+		if obm.UID() == nil || obm.System() == nil || obm.Body() == nil {
+			return err
+		}
+	} else {
+		return err
+	}
+
+	return nil
+}
+
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
+
+	// Check the validity of the message first
+	if err := validateConsumeMessage(m); err != nil {
+		return err
+	}
 
 	// Debugging
 	ibm := m.ToInBandMessage()
@@ -171,15 +209,22 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
+	// Check authorization
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		return err
 	}
 
+	// Start up the main processing procedure
 	return c.parent.runConsumeMessageMainSequence(ctx, m)
 }
 
 func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Message) error {
 
+	// Check the validity of the message first
+	if err := validateConsumeMessage(m); err != nil {
+		return err
+	}
+
 	// Debugging
 	ibm := m.ToInBandMessage()
 	if ibm != nil {
@@ -189,6 +234,7 @@ func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Messag
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
+	// Check authorization
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		c.close()
 		return err
