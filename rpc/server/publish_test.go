@@ -15,12 +15,13 @@ import (
 func TestPublish(t *testing.T) {
 	c := clockwork.NewFakeClock()
 	m := srvup.NewStorageMem(c)
+	log := rpc.SimpleLogOutput{}
 
 	incoming1 := newStorageStateMachine()
 	s1, l1, e1 := startTestServer(incoming1)
 	defer s1.Shutdown()
 	s1.superCh <- superToken
-	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
 	sg1.HeartbeatLoop(l1.Addr().String())
 	s1.SetStatusGroup(sg1)
@@ -29,7 +30,7 @@ func TestPublish(t *testing.T) {
 	s2, l2, e2 := startTestServer(incoming2)
 	defer s2.Shutdown()
 	s2.superCh <- superToken
-	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
 	sg2.HeartbeatLoop(l2.Addr().String())
 	s2.SetStatusGroup(sg2)
@@ -90,12 +91,13 @@ func TestPublish(t *testing.T) {
 func TestNodeIds(t *testing.T) {
 	c := clockwork.NewFakeClock()
 	m := srvup.NewStorageMem(c)
+	log := rpc.SimpleLogOutput{}
 
 	incoming1 := newStorageStateMachine()
 	s1, l1, _ := startTestServer(incoming1)
 	defer s1.Shutdown()
 	s1.superCh <- superToken
-	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
 	sg1.HeartbeatLoop(l1.Addr().String())
 	s1.SetStatusGroup(sg1)
@@ -104,7 +106,7 @@ func TestNodeIds(t *testing.T) {
 	s2, l2, _ := startTestServer(incoming2)
 	defer s2.Shutdown()
 	s2.superCh <- superToken
-	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
 	sg2.HeartbeatLoop(l2.Addr().String())
 	s2.SetStatusGroup(sg2)

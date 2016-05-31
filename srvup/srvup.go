@@ -5,12 +5,13 @@ package srvup
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 // NodeId is a random id of a node
@@ -18,12 +19,12 @@ type NodeId string
 
 // NodeDesc identifies a node in the group
 type NodeDesc struct {
-	Hostname string
-	Id       NodeId
+	Address string
+	Id      NodeId
 }
 
 func (n NodeDesc) String() string {
-	return fmt.Sprintf("[ %s, %s ]", n.Id, n.Hostname)
+	return fmt.Sprintf("[ %s, %s ]", n.Id, n.Address)
 }
 
 // Storage is an interface for storing and querying server status.
@@ -51,12 +52,14 @@ type Status struct {
 }
 
 // New creates a new Status for a server.
-func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storage) *Status {
+func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storage,
+	log rpc.LogOutput) *Status {
 
 	// Generate a random ID for ourselves
 	rawid := make([]byte, 8)
 	rand.Read(rawid)
-	id := base64.StdEncoding.EncodeToString(rawid)
+	id := hex.EncodeToString(rawid)
+	log.Info("srvup group created: group: %s myID: %s", group, id)
 
 	return &Status{
 		group:              group,
@@ -67,11 +70,11 @@ func New(group string, heartbeatInterval, aliveThreshold time.Duration, s Storag
 		done:               make(chan struct{}),
 		clock:              clockwork.NewRealClock(),
 		aliveCacheDuration: 1 * time.Second,
-		log:                defaultLogger{},
+		log:                log,
 	}
 }
 
-// Alive returns a list of hostnames for servers that have pinged
+// Alive returns a list of addresss for servers that have pinged
 // within s.aliveThreshold.
 func (s *Status) Alive() ([]NodeDesc, error) {
 	s.aliveCacheMu.RLock()
@@ -112,10 +115,10 @@ func (s *Status) MyID() NodeId {
 
 // HeartbeatLoop runs a loop in a separate goroutine that sends a
 // heartbeat every s.pingInterval.
-func (s *Status) HeartbeatLoop(hostname string) {
+func (s *Status) HeartbeatLoop(address string) {
 
 	// Put one out right away to make testing this easier
-	if err := s.heartbeat(hostname); err != nil {
+	if err := s.heartbeat(address); err != nil {
 		s.log.Warning("heartbeat error: %s", err)
 	}
 
@@ -124,7 +127,7 @@ func (s *Status) HeartbeatLoop(hostname string) {
 		defer s.wg.Done()
 		for {
 			start := s.clock.Now()
-			if err := s.heartbeat(hostname); err != nil {
+			if err := s.heartbeat(address); err != nil {
 				s.log.Warning("heartbeat error: %s", err)
 			}
 			sleepDur := s.heartbeatInterval - s.since(start)
@@ -142,9 +145,9 @@ func (s *Status) HeartbeatLoop(hostname string) {
 	}()
 }
 
-func (s *Status) heartbeat(hostname string) error {
+func (s *Status) heartbeat(address string) error {
 	return s.storage.UpdateServerStatus(s.group,
-		NodeDesc{Hostname: hostname, Id: NodeId(s.MyID())})
+		NodeDesc{Address: address, Id: NodeId(s.MyID())})
 }
 
 // Shutdown stops the HeartbeatLoop and waits for it to finish.

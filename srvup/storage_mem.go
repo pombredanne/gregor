@@ -19,7 +19,7 @@ type StorageMem struct {
 
 type nodeRow struct {
 	heartbeat time.Time
-	hostname  string
+	address   string
 }
 
 type groupMap map[NodeId]nodeRow
@@ -39,7 +39,7 @@ func (m *StorageMem) UpdateServerStatus(group string, node NodeDesc) error {
 		g = make(groupMap)
 		m.groups[group] = g
 	}
-	g[node.Id] = nodeRow{heartbeat: m.clock.Now(), hostname: node.Hostname}
+	g[node.Id] = nodeRow{heartbeat: m.clock.Now(), address: node.Address}
 	return nil
 }
 
@@ -55,7 +55,7 @@ func (m *StorageMem) AliveServers(group string, threshold time.Duration) ([]Node
 		if m.clock.Now().Sub(row.heartbeat) >= threshold {
 			continue
 		}
-		alive = append(alive, NodeDesc{Id: id, Hostname: row.hostname})
+		alive = append(alive, NodeDesc{Id: id, Address: row.address})
 	}
 	return alive, nil
 }

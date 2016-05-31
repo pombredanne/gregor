@@ -93,7 +93,7 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) (*srvup.Status, error) 
 	if err != nil {
 		return nil, err
 	}
-	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore)
+	statusGroup := srvup.New("gregord", opts.HeartbeatInterval, opts.AliveThreshold, mstore, log)
 
 	alive, err := statusGroup.Alive()
 	if err != nil {

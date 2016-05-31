@@ -8,11 +8,12 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 )
 
 func setupMem(t *testing.T) (*Status, clockwork.FakeClock) {
 	c := clockwork.NewFakeClock()
-	s := New("gregord", 1*time.Second, 2*time.Second, NewStorageMem(c))
+	s := New("gregord", 1*time.Second, 2*time.Second, NewStorageMem(c), rpc.SimpleLogOutput{})
 	s.setClock(c)
 	return s, c
 }
@@ -21,7 +22,7 @@ func setupMysql(t *testing.T) (*Status, clockwork.FakeClock) {
 	c := clockwork.NewFakeClock()
 	m := connectMysql(t)
 	m.setClock(c)
-	s := New("gregord", 1*time.Second, 2*time.Second, m)
+	s := New("gregord", 1*time.Second, 2*time.Second, m, rpc.SimpleLogOutput{})
 	s.setClock(c)
 	return s, c
 }

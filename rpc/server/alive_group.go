@@ -68,10 +68,10 @@ func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 		wg.Add(1)
 		go func() {
 			if err := conn.CallConsumePublishMessage(ctx, msg); err != nil {
-				a.log.Warning("consumePubMessage error: id: %s host: %s err: %s", id, conn.hostname, err)
-				perr.Add(conn.hostname, err)
+				a.log.Warning("consumePubMessage error: id: %s addr: %s err: %s", id, conn.address, err)
+				perr.Add(conn.address, err)
 			} else {
-				a.log.Debug("consumePubMessage success: id: %s host: %s", id, conn.hostname)
+				a.log.Debug("consumePubMessage success: id: %s addr: %s", id, conn.address)
 			}
 			wg.Done()
 		}()
@@ -160,9 +160,9 @@ func (a *aliveGroup) update() error {
 		if conn, ok := a.group[node.Id]; ok {
 			newgroup[node.Id] = conn
 		} else {
-			newconn, err := NewSibConn(node.Hostname, a.authToken, a.timeout, a.log)
+			newconn, err := NewSibConn(node.Address, a.authToken, a.timeout, a.log)
 			if err != nil {
-				a.log.Warning("error connecting to %q: %s", node.Hostname, err)
+				a.log.Warning("error connecting to %q: %s", node.Address, err)
 			} else {
 				newgroup[node.Id] = newconn
 			}
@@ -172,8 +172,8 @@ func (a *aliveGroup) update() error {
 	// Shut down gregors that have disappeared
 	for id, conn := range a.group {
 		if _, exists := newgroup[id]; !exists {
-			a.log.Debug("gregord on host [ id: %s host: %q ] no longer alive, shutting connection down",
-				id, conn.hostname)
+			a.log.Debug("gregord on host [ id: %s addr: %q ] no longer alive, shutting connection down",
+				id, conn.address)
 			conn.Shutdown()
 		}
 	}

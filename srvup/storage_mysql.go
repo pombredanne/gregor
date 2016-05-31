@@ -69,9 +69,9 @@ func (s *StorageMysql) UpdateServerStatus(group string, node NodeDesc) error {
 	var err error
 	if s.update == nil {
 		if s.clock != nil {
-			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, hostname, hbtime, ctime) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
 		} else {
-			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, hostname, hbtime, ctime) VALUES (?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime) VALUES (?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
 		}
 		if err != nil {
 			return err
@@ -80,9 +80,9 @@ func (s *StorageMysql) UpdateServerStatus(group string, node NodeDesc) error {
 
 	if s.clock != nil {
 		now := s.now()
-		_, err = s.update.Exec(group, string(node.Id), node.Hostname, now, now, now)
+		_, err = s.update.Exec(group, string(node.Id), node.Address, now, now, now)
 	} else {
-		_, err = s.update.Exec(group, string(node.Id), node.Hostname)
+		_, err = s.update.Exec(group, string(node.Id), node.Address)
 	}
 	return err
 }
@@ -92,9 +92,9 @@ func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]No
 	var err error
 	if s.alive == nil {
 		if s.clock != nil {
-			s.alive, err = s.db.Prepare("SELECT id,hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
+			s.alive, err = s.db.Prepare("SELECT id,address FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(?, INTERVAL ? SECOND)")
 		} else {
-			s.alive, err = s.db.Prepare("SELECT id,hostname FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(NOW(), INTERVAL ? SECOND)")
+			s.alive, err = s.db.Prepare("SELECT id,address FROM server_status WHERE groupname=? AND hbtime >= DATE_SUB(NOW(), INTERVAL ? SECOND)")
 		}
 		if err != nil {
 			return nil, err
@@ -114,12 +114,12 @@ func (s *StorageMysql) AliveServers(group string, threshold time.Duration) ([]No
 
 	var nodes []NodeDesc
 	for rows.Next() {
-		var id, host string
-		err = rows.Scan(&id, &host)
+		var id, addr string
+		err = rows.Scan(&id, &addr)
 		if err != nil {
 			return nil, err
 		}
-		nodes = append(nodes, NodeDesc{Id: NodeId(id), Hostname: host})
+		nodes = append(nodes, NodeDesc{Id: NodeId(id), Address: addr})
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -181,8 +181,8 @@ func (s *StorageMysql) resetSchema() error {
 var schema = []string{
 	`CREATE TABLE IF NOT EXISTS server_status (
 		groupname varchar(32) NOT NULL,
-		id varchar(64) NOT NULL,
-		hostname varchar(128) NOT NULL,
+		id char(16) NOT NULL,
+		address varchar(128) NOT NULL,
 		hbtime datetime(6) NOT NULL,
 		ctime datetime NOT NULL,
 		PRIMARY KEY (groupname,id),
