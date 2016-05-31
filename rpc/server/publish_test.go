@@ -8,6 +8,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/net/context"
 
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/srvup"
 )
 
@@ -83,5 +84,34 @@ func TestPublish(t *testing.T) {
 	}
 	if !bytes.Equal(m2.Oobm_.Body_, m1.Oobm_.Body_) {
 		t.Errorf("m2 body: %s, expected %s", m2.Oobm_.Body_, m2.Oobm_.Body_)
+	}
+}
+
+func TestNodeIds(t *testing.T) {
+	c := clockwork.NewFakeClock()
+	m := srvup.NewStorageMem(c)
+
+	incoming1 := newStorageStateMachine()
+	s1, l1, _ := startTestServer(incoming1)
+	defer s1.Shutdown()
+	s1.superCh <- superToken
+	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	defer sg1.Shutdown()
+	sg1.HeartbeatLoop(l1.Addr().String())
+	s1.SetStatusGroup(sg1)
+
+	incoming2 := newStorageStateMachine()
+	s2, l2, _ := startTestServer(incoming2)
+	defer s2.Shutdown()
+	s2.superCh <- superToken
+	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m)
+	defer sg2.Shutdown()
+	sg2.HeartbeatLoop(l2.Addr().String())
+	s2.SetStatusGroup(sg2)
+
+	ag := newAliveGroup(sg1, sg1.MyID(), s1.superCh, s1.publishTimeout, c, s1.closeCh,
+		rpc.SimpleLogOutput{})
+	if len(ag.group) != 1 {
+		t.Fatalf("alive group is wrong size %d != 1", len(ag.group))
 	}
 }

@@ -113,6 +113,12 @@ func (s *Status) MyID() NodeId {
 // HeartbeatLoop runs a loop in a separate goroutine that sends a
 // heartbeat every s.pingInterval.
 func (s *Status) HeartbeatLoop(hostname string) {
+
+	// Put one out right away to make testing this easier
+	if err := s.heartbeat(hostname); err != nil {
+		s.log.Warning("heartbeat error: %s", err)
+	}
+
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
