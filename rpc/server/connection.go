@@ -167,6 +167,9 @@ func validateConsumeMessage(m gregor1.Message) error {
 	}
 	ibm := m.ToInBandMessage()
 	obm := m.ToOutOfBandMessage()
+	if ibm == nil && obm == nil {
+		return errfunc("unknown message type")
+	}
 	if ibm != nil {
 		upd := ibm.ToStateUpdateMessage()
 		if upd != nil {
@@ -180,25 +183,31 @@ func validateConsumeMessage(m gregor1.Message) error {
 					return errfunc("missing UID")
 				}
 			}
-			if upd.Creation() != nil {
-				if upd.Creation().Category() == nil {
-					return errfunc("missing category")
-				}
-				if upd.Creation().Body() == nil {
-					return errfunc("missing body")
-				}
-			} else if upd.Dismissal() != nil {
-				if upd.Dismissal().MsgIDsToDismiss() == nil {
-					return errfunc("missing msg IDs to dismiss")
-				}
-				if upd.Dismissal().RangesToDismiss() == nil {
-					return errfunc("missing ranges to dismiss")
-				}
-			} else {
+
+			if upd.Creation() == nil && upd.Dismissal() == nil {
 				return errfunc("unknown state update message type")
+			} else {
+				if upd.Creation() != nil {
+					if upd.Creation().Category() == nil {
+						return errfunc("missing category")
+					}
+					if upd.Creation().Body() == nil {
+						return errfunc("missing body")
+					}
+				}
+				if upd.Dismissal() != nil {
+					if upd.Dismissal().MsgIDsToDismiss() == nil {
+						return errfunc("missing msg IDs to dismiss")
+					}
+					if upd.Dismissal().RangesToDismiss() == nil {
+						return errfunc("missing ranges to dismiss")
+					}
+				}
 			}
 		}
-	} else if obm != nil {
+	}
+
+	if obm != nil {
 		if obm.UID() == nil {
 			return errfunc("missing UID")
 		}
@@ -208,8 +217,6 @@ func validateConsumeMessage(m gregor1.Message) error {
 		if obm.Body() == nil {
 			return errfunc("missing body")
 		}
-	} else {
-		return errfunc("unknown message type")
 	}
 
 	return nil
