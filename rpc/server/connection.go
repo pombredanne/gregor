@@ -161,33 +161,55 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 }
 
 func validateConsumeMessage(m gregor1.Message) error {
-	err := errors.New("invalid consume call, missing required fields")
+	errfunc := func(msg string) error {
+		s := fmt.Sprintf("invalid consume call: %s", msg)
+		return errors.New(s)
+	}
 	ibm := m.ToInBandMessage()
 	obm := m.ToOutOfBandMessage()
 	if ibm != nil {
 		upd := ibm.ToStateUpdateMessage()
 		if upd != nil {
-			if upd.Metadata() == nil || upd.Metadata().MsgID() == nil || upd.Metadata().UID() == nil {
-				return err
+			if upd.Metadata() == nil {
+				return errfunc("missing metadata fields")
+			} else {
+				if upd.Metadata().MsgID() == nil {
+					return errfunc("missing msg ID")
+				}
+				if upd.Metadata().UID() == nil {
+					return errfunc("missing UID")
+				}
 			}
 			if upd.Creation() != nil {
-				if upd.Creation().Category() == nil || upd.Creation().Body() == nil {
-					return err
+				if upd.Creation().Category() == nil {
+					return errfunc("missing category")
+				}
+				if upd.Creation().Body() == nil {
+					return errfunc("missing body")
 				}
 			} else if upd.Dismissal() != nil {
-				if upd.Dismissal().MsgIDsToDismiss() == nil || upd.Dismissal().RangesToDismiss() == nil {
-					return err
+				if upd.Dismissal().MsgIDsToDismiss() == nil {
+					return errfunc("missing msg IDs to dismiss")
+				}
+				if upd.Dismissal().RangesToDismiss() == nil {
+					return errfunc("missing ranges to dismiss")
 				}
 			} else {
-				return err
+				return errfunc("unknown state update message type")
 			}
 		}
 	} else if obm != nil {
-		if obm.UID() == nil || obm.System() == nil || obm.Body() == nil {
-			return err
+		if obm.UID() == nil {
+			return errfunc("missing UID")
+		}
+		if obm.System() == nil {
+			return errfunc("missing system")
+		}
+		if obm.Body() == nil {
+			return errfunc("missing body")
 		}
 	} else {
-		return err
+		return errfunc("unknown message type")
 	}
 
 	return nil
