@@ -1,7 +1,7 @@
 FROM alpine:3.3
 MAINTAINER Keybase <admin@keybase.io>
 
-RUN apk add --update wget ca-certificates && \
+RUN apk add --update wget ca-certificates bash && \
     cd /tmp && \
     wget "https://github.com/andyshinn/alpine-pkg-glibc/releases/download/2.23-r1/glibc-2.23-r1.apk" \
         "https://github.com/andyshinn/alpine-pkg-glibc/releases/download/2.23-r1/glibc-bin-2.23-r1.apk" && \
@@ -14,5 +14,8 @@ USER keybase
 ENV PATH=/home/keybase:$PATH
 WORKDIR /home/keybase
 
+COPY gregor.sh /home/keybase/gregor.sh
 COPY gregord/gregord /home/keybase/gregord
 COPY dbinit/dbinit /home/keybase/dbinit
+
+ENTRYPOINT ["gregor.sh"]
