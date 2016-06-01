@@ -33,7 +33,7 @@ before_script:
   - (cd bin/dbinit && go build && ./dbinit -y)
 script:
   - go test -v ./...
-  - (cd bin/gregord && go build && docker build -t kbgregor .)
+  - (cd bin/gregord && go build && cd .. && docker build -t kbgregor .)
 after_success:
   - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_BRANCH == 'master' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
       echo "Logging into docker..." &&
