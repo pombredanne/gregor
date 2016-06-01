@@ -14,4 +14,5 @@ USER keybase
 ENV PATH=/home/keybase:$PATH
 WORKDIR /home/keybase
 
-COPY gregord /home/keybase/gregord
+COPY gregord/gregord /home/keybase/gregord
+COPY dbinit/dbinit /home/keybase/dbinit
