@@ -7,8 +7,8 @@ _term() {
 }
 trap _term SIGTERM
 
-dbinit -y -mysql-dsn=$GREGOR_MYSQL_DSN
-gregord -bind-address=$GREGOR_BIND_ADDRESS -auth-server=$GREGOR_AUTH_SERVER -mysql-dsn=$GREGOR_MYSQL_DSN -debug &
+dbinit -y -mysql-dsn=$MYSQL_DSN
+gregord -bind-address=$GREGOR_BIND_ADDRESS -auth-server=$GREGOR_AUTH_SERVER -mysql-dsn=$MYSQL_DSN -debug &
 GREGOR=$!
 
 wait "$GREGOR"
