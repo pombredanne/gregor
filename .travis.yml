@@ -1,10 +1,13 @@
+sudo: required
+dist: trusty
 os:
   - linux
 language: go
 go:
   - 1.6
-dist: trusty
-sudo: required
+install: true
+services:
+  - docker
 addons:
   apt:
     packages:
@@ -22,26 +25,19 @@ matrix:
 branches:
   only:
     - master
-services:
-  - docker
 before_install:
   - mysql -e "create database IF NOT EXISTS test;" -uroot
-install:
-  - true
 before_script:
   - (cd protocol && npm i && git diff --quiet --exit-code)
   - (cd bin/dbinit && go build && ./dbinit -y)
 script:
   - go test -v ./...
-  - (cd bin/gregord && go build && cd .. && docker build -t kbgregor .)
-after_success:
-  - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_BRANCH == 'master' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
+  - (cd bin/gregord && go build && cd .. && docker build -t $DOCKER_USER/kbgregor .)
+  - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
       echo "Logging into docker..." &&
-      docker login -e "$CI_EMAIL" -u "$CI_USER" -p "$CI_PASS" "$CI_HOST" &&
-      echo "Tagging kbgregor locally..." &&
-      docker tag kbgregor $CI_HOST/kbgregor &&
+      docker login -e "$CI_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS" &&
       echo "Pushing kbgregor..." &&
-      docker push $CI_HOST/kbgregor;
+      docker push $DOCKER_USER/kbgregor;
     else
       echo "Not pushing to Docker, because this isn't a push to master.";
     fi
