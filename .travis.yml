@@ -33,6 +33,7 @@ before_script:
 script:
   - go test -v ./...
   - (cd bin/gregord && go build && cd .. && docker build -t $DOCKER_USER/kbgregor .)
+after_success:
   - if [ $TRAVIS_OS_NAME == 'linux' ] && [ $TRAVIS_PULL_REQUEST == 'false' ]; then
       echo "Logging into docker..." &&
       docker login -e "$CI_EMAIL" -u "$DOCKER_USER" -p "$DOCKER_PASS" &&
