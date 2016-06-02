@@ -87,11 +87,13 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	var options Options
 	var s3conf bin.S3Config
 	var tlsKey, tlsCert string
+	var useAwsExternalAddr bool
 	authServer := &bin.FMPURIGetter{S: os.Getenv("AUTH_SERVER")}
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&options.IncomingAddress, "incoming-address", os.Getenv("INCOMING_ADDRESS"), "hostname:port for external connections (will use bind-address if empty)")
+	fs.BoolVar(&useAwsExternalAddr, "aws-set-external-addr", os.Getenv("AWS_SET_EXTERNAL_ADDR") != "", "set external address to EC2 local IP")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", os.Getenv("DEBUG") != "", "turn on debugging")
@@ -130,15 +132,29 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		return nil, bin.BadUsage("No valid bind-address specified")
 	}
 
-	if _, port, err := net.SplitHostPort(options.BindAddress); err != nil {
+	_, port, err := net.SplitHostPort(options.BindAddress)
+	if err != nil {
 		return nil, bin.BadUsage("bad bind-address: %s", err)
 	} else if _, err := strconv.ParseUint(port, 10, 16); err != nil {
 		return nil, bin.BadUsage("bad port (%q) in bind-address: %s", port, err)
 	}
 
-	var err error
 	if options.TLSConfig, err = bin.ParseTLSConfig(&s3conf, tlsCert, tlsKey); err != nil {
 		return nil, err
+	}
+
+	// Use AWS instance IP if instructed for our "incoming address"
+	if useAwsExternalAddr {
+		// Make sure the user didn't also supply their own incoming addr
+		if options.IncomingAddress != "" {
+			return nil, bin.BadUsage("incoming-address specified with aws-set-external-addr")
+		}
+		if awsip, err := bin.GetAWSLocalIP(); err != nil {
+			return nil, err
+		} else {
+			options.IncomingAddress = fmt.Sprintf("%s:%s", awsip, port)
+			fmt.Printf("incoming: %s\n", options.IncomingAddress)
+		}
 	}
 
 	switch v := mysqlDSN.Get().(type) {

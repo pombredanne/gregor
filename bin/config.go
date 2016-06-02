@@ -98,6 +98,14 @@ func ParseTLSConfig(s3conf *S3Config, tlsCert, tlsKey string) (*tls.Config, erro
 
 }
 
+func GetAWSLocalIP() (string, error) {
+	if ip, err := aws.GetMetaData("local-ipv4"); err != nil {
+		return "", BadConfig("error fetching AWS IP: %s", err)
+	} else {
+		return string(ip[:]), nil
+	}
+}
+
 type S3Config struct {
 	AWSRegion, ConfigBucket string
 }
