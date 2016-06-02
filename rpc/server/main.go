@@ -55,6 +55,7 @@ type Stats struct {
 	UserServerCount int
 }
 
+
 type storageReq interface{}
 
 // Aliver is an interface to an object that can tell Server which
@@ -330,6 +331,13 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 	return res.res, res.err
 }
 
+// stateByCategoryPrefix gets called from the connecytino object that exists
+// for each client for a state get call.  It is on a different thread from
+// the main loop, but its request has to be served from the main loop.
+func (s *Server) stateByCategoryPrefix(c context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	return gregor1.State{}, nil
+}
+
 // runConsumeMessageMainSequence is the main entry point to the gregor flow described in the
 // architecture documents. It receives a new message, writes it to the StateMachine,
 // and broadcasts it to the other clients. Like startSync, this function is called
@@ -451,6 +459,16 @@ type syncReq struct {
 	respCh chan<- syncRet
 }
 
+type stateByCategoryPrefixRes struct {
+	res gregor1.State
+	err error
+}
+
+type stateByCategoryPrefixReq struct {
+	arg gregor1.StateByCategoryPrefixArg
+	respCh chan<- stateByCategoryPrefixRes
+}
+
 // storageConsumeMessage schedules a Consume request on the dispatch handler
 func (s *Server) storageConsumeMessage(m gregor.Message) consumeMessageRet {
 	retCh := make(chan consumeMessageRet)
@@ -504,6 +522,14 @@ func (s *Server) storageDispatchHandler() {
 		case syncReq:
 			res, err := grpc.Sync(req.sm, req.log, req.arg)
 			req.respCh <- syncRet{res: res, err: err}
+		case stateByCategoryPrefixReq:
+			res, err := s.storage.StateByCategoryPrefix(req.arg.Uid, nil, nil, req.arg.CategoryPrefix)
+			var resExportable gregor1.State
+			var ok bool
+			if resExportable, ok = res.(gregor1.State); !ok {
+				err = errors.New("cannot export to gregor1.State as expected")
+			}
+			req.respCh <- stateByCategoryPrefixRes{ res :resExportable, err : err }
 		default:
 			s.log.Error("storageDispatchHandler(): unknown request type!")
 		}

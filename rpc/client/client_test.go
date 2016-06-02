@@ -55,6 +55,10 @@ func (sm *clientServerSM) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOr
 	return sm.client.State(u, d, t)
 }
 
+func (sm *clientServerSM) StateByCategoryPrefix(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, cp gregor.Category) (gregor.State, error) {
+	return sm.client.StateByCategoryPrefix(u, d, t, cp)
+}
+
 func (sm *clientServerSM) IsEphemeral() bool {
 	return sm.client.IsEphemeral()
 }
@@ -98,6 +102,9 @@ func (m mockLocalIncoming) Sync(_ context.Context, arg gregor1.SyncArg) (gregor1
 }
 func (m mockLocalIncoming) ConsumeMessage(_ context.Context, _ gregor1.Message) error {
 	return errors.New("unimplemented")
+}
+func (m mockLocalIncoming) StateByCategoryPrefix(_ context.Context, _ gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	return gregor1.State{}, errors.New("unimplemented")
 }
 func (m mockLocalIncoming) ConsumePublishMessage(_ context.Context, _ gregor1.Message) error {
 	return errors.New("unimplemented")

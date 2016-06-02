@@ -330,6 +330,18 @@ func (m *MemEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	return user.state(m.clock.Now(), m.objFactory, d, t)
 }
 
+func (m *MemEngine) StateByCategoryPrefix(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, cp gregor.Category) (gregor.State, error) {
+	state, err := m.State(u, d, t)
+	if err != nil {
+		return nil, err
+	}
+	items, err := state.ItemsInCategory(cp)
+	if err != nil {
+		return nil, err
+	}
+	return m.objFactory.MakeState(items)
+}
+
 func (m *MemEngine) Clear() error {
 	m.users = make(map[string](*user))
 	return nil

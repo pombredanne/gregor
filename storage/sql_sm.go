@@ -334,14 +334,22 @@ func (s *SQLEngine) rowToReminder(rows *sql.Rows) (gregor.Reminder, error) {
 }
 
 func (s *SQLEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {
-	items, err := s.items(u, d, t, nil)
+	items, err := s.items(u, d, t, nil, nil)
 	if err != nil {
 		return nil, err
 	}
 	return s.objFactory.MakeState(items)
 }
 
-func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, m gregor.MsgID) ([]gregor.Item, error) {
+func (s *SQLEngine) StateByCategoryPrefix(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, cp gregor.Category) (gregor.State, error) {
+	items, err := s.items(u, d, t, nil, cp)
+	if err != nil {
+		return nil, err
+	}
+	return s.objFactory.MakeState(items)
+}
+
+func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset, m gregor.MsgID, cp gregor.Category) ([]gregor.Item, error) {
 	qry := `SELECT i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime
 	        FROM gregor_items AS i
 	        INNER JOIN gregor_messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
@@ -365,6 +373,9 @@ func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 	}
 	if m != nil {
 		qb.Build("AND i.msgid=?", hexEnc(m))
+	}
+	if cp != nil {
+		qb.Build(" AND i.category LIKE ?%", cp.String())
 	}
 	qb.Build("ORDER BY m.ctime ASC")
 	stmt, err := s.driver.Prepare(qb.Query())
