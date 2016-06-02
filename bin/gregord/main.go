@@ -110,8 +110,17 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) (*srvup.Status, error) 
 		// only use opts.IncomingAddress if it is set
 		externalAddr = opts.IncomingAddress
 	}
-	log.Debug("starting heartbeat loop for address %s", externalAddr)
-	statusGroup.HeartbeatLoop(externalAddr)
+
+	// put a TLS URI in if we are listening using it
+	var externalURI string
+	if opts.TLSConfig != nil {
+		externalURI = "fmprpc+tls://" + externalAddr
+	} else {
+		externalURI = "fmprpc://" + externalAddr
+	}
+
+	log.Debug("starting heartbeat loop for URI %s", externalURI)
+	statusGroup.HeartbeatLoop(externalURI)
 
 	if len(alive) > 0 {
 		// there are other gregors up
