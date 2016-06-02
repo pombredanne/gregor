@@ -101,6 +101,9 @@ func setupPubSub(opts *Options, log *bin.StandardLogger) (*srvup.Status, error) 
 		return nil, err
 	}
 
+	// Tag logger with our ID
+	log.SetMyID(statusGroup.MyID())
+
 	// start sending heartbeats
 	externalAddr := opts.BindAddress
 	if len(opts.IncomingAddress) > 0 {
