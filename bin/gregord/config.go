@@ -93,7 +93,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	fs.StringVar(&options.BindAddress, "bind-address", os.Getenv("BIND_ADDRESS"), "hostname:port to bind to")
 	fs.StringVar(&options.IncomingAddress, "incoming-address", os.Getenv("INCOMING_ADDRESS"), "hostname:port for external connections (will use bind-address if empty)")
-	fs.BoolVar(&useAwsExternalAddr, "aws-use-external-addr", os.Getenv("AWS_USE_EXTERNAL_ADDR") != "", "set external address to EC2 local IP")
+	fs.BoolVar(&useAwsExternalAddr, "aws-set-external-addr", os.Getenv("AWS_SET_EXTERNAL_ADDR") != "", "set external address to EC2 local IP")
 	fs.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	fs.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	fs.BoolVar(&options.Debug, "debug", os.Getenv("DEBUG") != "", "turn on debugging")
@@ -147,7 +147,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	if useAwsExternalAddr {
 		// Make sure the user didn't also supply their own incoming addr
 		if options.IncomingAddress != "" {
-			return nil, bin.BadUsage("incoming-address specified with aws-use-external-addr")
+			return nil, bin.BadUsage("incoming-address specified with aws-set-external-addr")
 		}
 		if awsip, err := bin.GetAWSLocalIP(); err != nil {
 			return nil, err
