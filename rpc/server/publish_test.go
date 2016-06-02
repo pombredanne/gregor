@@ -44,7 +44,7 @@ func TestPublish(t *testing.T) {
 	<-e2.ConnCreated
 
 	// s1 consumes a message
-	m1 := newOOBMessage(goodUID, "sys", nil)
+	m1 := newOOBMessage(goodUID, "sys", []byte{})
 	if err := s1.runConsumeMessageMainSequence(context.TODO(), m1); err != nil {
 		t.Fatal(err)
 	}

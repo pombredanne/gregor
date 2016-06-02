@@ -160,7 +160,74 @@ func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.Syn
 	return c.parent.startSync(ctx, arg)
 }
 
+func validateConsumeMessage(m gregor1.Message) error {
+	errfunc := func(msg string) error {
+		s := fmt.Sprintf("invalid consume call: %s", msg)
+		return errors.New(s)
+	}
+	ibm := m.ToInBandMessage()
+	obm := m.ToOutOfBandMessage()
+	if ibm == nil && obm == nil {
+		return errfunc("unknown message type")
+	}
+	if ibm != nil {
+		upd := ibm.ToStateUpdateMessage()
+		if upd != nil {
+			if upd.Metadata() == nil {
+				return errfunc("missing metadata fields")
+			} else {
+				if upd.Metadata().MsgID() == nil {
+					return errfunc("missing msg ID")
+				}
+				if upd.Metadata().UID() == nil {
+					return errfunc("missing UID")
+				}
+			}
+
+			if upd.Creation() == nil && upd.Dismissal() == nil {
+				return errfunc("unknown state update message type")
+			} else {
+				if upd.Creation() != nil {
+					if upd.Creation().Category() == nil {
+						return errfunc("missing category")
+					}
+					if upd.Creation().Body() == nil {
+						return errfunc("missing body")
+					}
+				}
+				if upd.Dismissal() != nil {
+					if upd.Dismissal().MsgIDsToDismiss() == nil {
+						return errfunc("missing msg IDs to dismiss")
+					}
+					if upd.Dismissal().RangesToDismiss() == nil {
+						return errfunc("missing ranges to dismiss")
+					}
+				}
+			}
+		}
+	}
+
+	if obm != nil {
+		if obm.UID() == nil {
+			return errfunc("missing UID")
+		}
+		if obm.System() == nil {
+			return errfunc("missing system")
+		}
+		if obm.Body() == nil {
+			return errfunc("missing body")
+		}
+	}
+
+	return nil
+}
+
 func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) error {
+
+	// Check the validity of the message first
+	if err := validateConsumeMessage(m); err != nil {
+		return err
+	}
 
 	// Debugging
 	ibm := m.ToInBandMessage()
@@ -171,15 +238,22 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
+	// Check authorization
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		return err
 	}
 
+	// Start up the main processing procedure
 	return c.parent.runConsumeMessageMainSequence(ctx, m)
 }
 
 func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Message) error {
 
+	// Check the validity of the message first
+	if err := validateConsumeMessage(m); err != nil {
+		return err
+	}
+
 	// Debugging
 	ibm := m.ToInBandMessage()
 	if ibm != nil {
@@ -189,6 +263,7 @@ func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Messag
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
+	// Check authorization
 	if err := c.checkMessageAuth(ctx, m); err != nil {
 		c.close()
 		return err
