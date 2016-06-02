@@ -7,6 +7,7 @@ import (
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	logging "github.com/keybase/go-logging"
+	"github.com/keybase/gregor/srvup"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -20,24 +21,36 @@ import (
 type StandardLogger struct {
 	inner  *logging.Logger
 	module string
+	myID   *srvup.NodeId
 }
 
 var _ rpc.LogOutput = (*StandardLogger)(nil)
 
+func (g *StandardLogger) appendID(s string) string {
+	if g.myID != nil {
+		return fmt.Sprintf("[%s] %s", string(*g.myID), s)
+	}
+	return s
+}
+
+func (g *StandardLogger) SetMyID(id srvup.NodeId) {
+	g.myID = &id
+}
+
 func (g *StandardLogger) Error(s string, args ...interface{}) {
-	g.inner.Errorf(s, args...)
+	g.inner.Errorf(g.appendID(s), args...)
 }
 func (g *StandardLogger) Warning(s string, args ...interface{}) {
-	g.inner.Warningf(s, args...)
+	g.inner.Warningf(g.appendID(s), args...)
 }
 func (g *StandardLogger) Info(s string, args ...interface{}) {
-	g.inner.Infof(s, args...)
+	g.inner.Infof(g.appendID(s), args...)
 }
 func (g *StandardLogger) Debug(s string, args ...interface{}) {
-	g.inner.Debugf(s, args...)
+	g.inner.Debugf(g.appendID(s), args...)
 }
 func (g *StandardLogger) Profile(s string, args ...interface{}) {
-	g.inner.Debugf(s, args...)
+	g.inner.Debugf(g.appendID(s), args...)
 }
 
 func (g *StandardLogger) Configure(debug bool) {
@@ -48,9 +61,9 @@ func (g *StandardLogger) Configure(debug bool) {
 	}
 }
 
-var noColorFormat = `%{level:.4s} %{time:15:04:05.000} %{shortfile} %{message}`
-
-var colorFormat = "%{color}" + noColorFormat + "%{color:reset}"
+var formatMetaData = `%{time:15:04:05.000} ▶ %{level:.4s} %{program} %{shortfile} %{id:03x}`
+var noColorFormat = formatMetaData + " %{message}"
+var colorFormat = "%{color}" + formatMetaData + "%{color:reset} %{message}"
 
 func NewLogger(module string) *StandardLogger {
 	backend := logging.NewLogBackend(os.Stderr, "", 0)
@@ -84,5 +97,5 @@ func NewLogger(module string) *StandardLogger {
 	logger := logging.MustGetLogger(module)
 	logger.SetBackend(logging.MultiLogger(backends...))
 	logger.ExtraCalldepth = 1
-	return &StandardLogger{logger, module}
+	return &StandardLogger{inner: logger, module: module}
 }
