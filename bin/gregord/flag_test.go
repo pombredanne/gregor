@@ -41,6 +41,7 @@ func TestUsage(t *testing.T) {
 		"-tls-cert", "bye", "-s3-config-bucket", "foo", "-mysql-dsn", "gregor:@/gregor_test"}, ebu, "you must provide an AWS Region and a Config bucket")
 	testBadUsage(t, []string{"gregor", "-bind-address", ":4000", "-auth-server", "fmprpc://localhost:30000", "-tls-key", "hi",
 		"-tls-cert", "file:///does/not/exist", "-mysql-dsn", "gregor:@/gregor_test"}, bin.ErrBadConfig(""), "no such file or directory")
+	testBadUsage(t, []string{"gregor", "-bind-address", "localhost:9911", "-incoming-address", "localhost:9911", "-aws-use-external-addr"}, ebu, "incoming-address specified with aws-use-external-addr")
 
 	testGoodUsage(t, []string{"gregor", "-auth-server", "fmprpc://localhost:30000", "-bind-address", ":4000", "-mysql-dsn", "gregor:@/gregor_test"})
 	testGoodUsage(t, []string{"gregor", "-auth-server", "fmprpc://localhost:30000", "-bind-address", "127.0.0.1:4000", "-mysql-dsn", "gregor:@/gregor_test"})
