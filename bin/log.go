@@ -26,6 +26,9 @@ type StandardLogger struct {
 
 var _ rpc.LogOutput = (*StandardLogger)(nil)
 
+// appendID will add in the node ID of the current gregor to all log output.
+// Note that there can be tough if g.myID has a % in it, but that should
+// never happen since all IDs are hex encoded.
 func (g *StandardLogger) appendID(s string) string {
 	if g.myID != nil {
 		return fmt.Sprintf("[%s] %s", string(*g.myID), s)
