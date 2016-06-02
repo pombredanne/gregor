@@ -25,6 +25,10 @@ type InBandMessage struct {
 	StateSync_   *StateSyncMessage   `codec:"stateSync,omitempty" json:"stateSync,omitempty"`
 }
 
+type State struct {
+	Items_ []ItemAndMetadata `codec:"items" json:"items"`
+}
+
 type StateUpdateMessage struct {
 	Md_        Metadata   `codec:"md" json:"md"`
 	Creation_  *Item      `codec:"creation,omitempty" json:"creation,omitempty"`

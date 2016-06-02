@@ -20,6 +20,10 @@ protocol common {
 		union { null, StateSyncMessage} stateSync;
 	}
 
+	record State {
+		array<ItemAndMetadata> items;
+	}
+
 	record StateUpdateMessage {
 		Metadata md;
 		union { null, Item } creation;

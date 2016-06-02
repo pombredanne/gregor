@@ -272,6 +272,13 @@ func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Messag
 	return c.parent.consumePublish(ctx, m)
 }
 
+func (c *connection) StateByCategoryPrefix(ctx context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	if err := c.checkUIDAuth(ctx, arg.Uid); err != nil {
+		return gregor1.State{}, err
+	}
+	return c.parent.stateByCategoryPrefix(ctx, arg)
+}
+
 func (c *connection) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }

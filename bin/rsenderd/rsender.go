@@ -25,7 +25,7 @@ func newRSender(db *sql.DB, remindServer *rpc.FMPURI, log rpc.LogOutput) *rSende
 	transport := rpc.NewConnectionTransport(remindServer, rpc.NewSimpleLogFactory(log, nil), keybase1.WrapError)
 	conn := rpc.NewConnectionWithTransport(nil, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
-	return &rSender{db, storage.NewMySQLEngine(db, of), gregor1.RemindClient{conn.GetClient()}, log}
+	return &rSender{db, storage.NewMySQLEngine(db, of), gregor1.RemindClient{Cli: conn.GetClient()}, log}
 }
 
 func (r *rSender) sendReminders() error {

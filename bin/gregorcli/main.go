@@ -73,7 +73,7 @@ func setup() (*rpc.Client, error) {
 }
 
 func testAuth(Cli *rpc.Client) (gregor1.UID, error) {
-	auth := gregor1.AuthClient{Cli}
+	auth := gregor1.AuthClient{Cli: Cli}
 	authRes, err := auth.AuthenticateSessionToken(context.TODO(), gregor1.SessionToken(tok))
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func main() {
 	}
 
 	// Test Ping
-	incoming := gregor1.IncomingClient{Cli}
+	incoming := gregor1.IncomingClient{Cli: Cli}
 	if err := testPing(incoming); err != nil {
 		log.Fatal(err)
 	}

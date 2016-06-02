@@ -66,7 +66,7 @@ func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 	var wg sync.WaitGroup
 	for id, conn := range a.group {
 		wg.Add(1)
-		go func() {
+		go func(id srvup.NodeId, conn *sibConn) {
 			if err := conn.CallConsumePublishMessage(ctx, msg); err != nil {
 				a.log.Warning("consumePubMessage error: id: %s addr: %s err: %s", id, conn.address, err)
 				perr.Add(conn.address, err)
@@ -74,7 +74,7 @@ func (a *aliveGroup) Publish(ctx context.Context, msg gregor1.Message) error {
 				a.log.Debug("consumePubMessage success: id: %s addr: %s", id, conn.address)
 			}
 			wg.Done()
-		}()
+		}(id, conn)
 	}
 	wg.Wait()
 

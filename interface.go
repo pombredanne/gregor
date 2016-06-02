@@ -108,6 +108,7 @@ type Dismissal interface {
 type State interface {
 	Items() ([]Item, error)
 	ItemsInCategory(c Category) ([]Item, error)
+	ItemsWithCategoryPrefix(c Category) ([]Item, error)
 	Marshal() ([]byte, error)
 	Hash() ([]byte, error)
 }
@@ -139,6 +140,11 @@ type StateMachine interface {
 	// is returned. If t is nil, then use Now, otherwise, return the state
 	// at the given time.
 	State(u UID, d DeviceID, t TimeOrOffset) (State, error)
+
+	// StateByCategoryPrefix returns the IBMs in the given state that match
+	// the given category prefix. It's similar to calling State().ItemsInCategory()
+	// but results in less data transfer.
+	StateByCategoryPrefix(u UID, d DeviceID, t TimeOrOffset, cp Category) (State, error)
 
 	// IsEphemeral returns whether the backend storage needs to be saved/restored.
 	IsEphemeral() bool

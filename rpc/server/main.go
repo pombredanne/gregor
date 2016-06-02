@@ -330,6 +330,14 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 	return res.res, res.err
 }
 
+// stateByCategoryPrefix gets called from the connecytino object that exists
+// for each client for a state get call.  It is on a different thread from
+// the main loop, but its request has to be served from the main loop.
+func (s *Server) stateByCategoryPrefix(_ context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	res := s.storageStateByCategoryPrefix(arg)
+	return res.res, res.err
+}
+
 // runConsumeMessageMainSequence is the main entry point to the gregor flow described in the
 // architecture documents. It receives a new message, writes it to the StateMachine,
 // and broadcasts it to the other clients. Like startSync, this function is called
@@ -446,10 +454,18 @@ type consumeMessageReq struct {
 }
 
 type syncReq struct {
-	sm     gregor.StateMachine
-	log    rpc.LogOutput
 	arg    gregor1.SyncArg
 	respCh chan<- syncRet
+}
+
+type stateByCategoryPrefixRes struct {
+	res gregor1.State
+	err error
+}
+
+type stateByCategoryPrefixReq struct {
+	arg    gregor1.StateByCategoryPrefixArg
+	respCh chan<- stateByCategoryPrefixRes
 }
 
 // storageConsumeMessage schedules a Consume request on the dispatch handler
@@ -468,7 +484,7 @@ func (s *Server) storageConsumeMessage(m gregor.Message) consumeMessageRet {
 // storageSync schedules a Sync request on the dispatch handler
 func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg gregor1.SyncArg) syncRet {
 	retCh := make(chan syncRet)
-	req := syncReq{sm: sm, log: log, arg: arg, respCh: retCh}
+	req := syncReq{arg: arg, respCh: retCh}
 	err := s.storageDispatch(req)
 	if err != nil {
 		return syncRet{
@@ -477,6 +493,21 @@ func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg greg
 		}
 	}
 	return <-retCh
+}
+
+// storageStateByCategoryPrefix schedules a query of the state filtered by
+// category prefix on the dispatch handler thread.
+func (s *Server) storageStateByCategoryPrefix(arg gregor1.StateByCategoryPrefixArg) stateByCategoryPrefixRes {
+	respCh := make(chan stateByCategoryPrefixRes)
+	req := stateByCategoryPrefixReq{arg: arg, respCh: respCh}
+	err := s.storageDispatch(req)
+	if err != nil {
+		var ret stateByCategoryPrefixRes
+		ret.err = err
+		return ret
+	}
+	return <-respCh
+
 }
 
 // storageDispatch dispatches a new StorageMachine request. The storageDispatchCh channel
@@ -503,8 +534,16 @@ func (s *Server) storageDispatchHandler() {
 			ctime, err := s.storage.ConsumeMessage(req.m)
 			req.respCh <- consumeMessageRet{ctime: ctime, err: err}
 		case syncReq:
-			res, err := grpc.Sync(req.sm, req.log, req.arg)
+			res, err := grpc.Sync(s.storage, s.log, req.arg)
 			req.respCh <- syncRet{res: res, err: err}
+		case stateByCategoryPrefixReq:
+			res, err := s.storage.StateByCategoryPrefix(req.arg.Uid, nil, nil, req.arg.CategoryPrefix)
+			var resExportable gregor1.State
+			var ok bool
+			if resExportable, ok = res.(gregor1.State); !ok {
+				err = errors.New("cannot export to gregor1.State as expected")
+			}
+			req.respCh <- stateByCategoryPrefixRes{res: resExportable, err: err}
 		default:
 			s.log.Error("storageDispatchHandler(): unknown request type!")
 		}
