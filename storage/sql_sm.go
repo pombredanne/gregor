@@ -375,7 +375,7 @@ func (s *SQLEngine) items(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset
 		qb.Build("AND i.msgid=?", hexEnc(m))
 	}
 	if cp != nil {
-		qb.Build(" AND i.category LIKE ?%", cp.String())
+		qb.Build(" AND i.category LIKE ?", cp.String()+"%")
 	}
 	qb.Build("ORDER BY m.ctime ASC")
 	stmt, err := s.driver.Prepare(qb.Query())

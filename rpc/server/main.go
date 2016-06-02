@@ -55,7 +55,6 @@ type Stats struct {
 	UserServerCount int
 }
 
-
 type storageReq interface{}
 
 // Aliver is an interface to an object that can tell Server which
@@ -464,7 +463,7 @@ type stateByCategoryPrefixRes struct {
 }
 
 type stateByCategoryPrefixReq struct {
-	arg gregor1.StateByCategoryPrefixArg
+	arg    gregor1.StateByCategoryPrefixArg
 	respCh chan<- stateByCategoryPrefixRes
 }
 
@@ -499,7 +498,7 @@ func (s *Server) storageSync(sm gregor.StateMachine, log rpc.LogOutput, arg greg
 // category prefix on the dispatch handler thread.
 func (s *Server) storageStateByCategoryPrefix(arg gregor1.StateByCategoryPrefixArg) stateByCategoryPrefixRes {
 	respCh := make(chan stateByCategoryPrefixRes)
-	req := stateByCategoryPrefixReq{ arg: arg, respCh: respCh }
+	req := stateByCategoryPrefixReq{arg: arg, respCh: respCh}
 	err := s.storageDispatch(req)
 	if err != nil {
 		var ret stateByCategoryPrefixRes
@@ -543,7 +542,7 @@ func (s *Server) storageDispatchHandler() {
 			if resExportable, ok = res.(gregor1.State); !ok {
 				err = errors.New("cannot export to gregor1.State as expected")
 			}
-			req.respCh <- stateByCategoryPrefixRes{ res :resExportable, err : err }
+			req.respCh <- stateByCategoryPrefixRes{res: resExportable, err: err}
 		default:
 			s.log.Error("storageDispatchHandler(): unknown request type!")
 		}

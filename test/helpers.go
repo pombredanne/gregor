@@ -268,6 +268,13 @@ func TestStateMachineAllDevices(t *testing.T, sm gregor.StateMachine) gregor.UID
 	require.Equal(t, c2.String(), rangesToDismiss[0].Category().String(), "the right category")
 	require.Equal(t, tm5.UnixNano(), rangesToDismiss[0].EndTime().Time().UnixNano(), "the right dismissal time")
 
+	// Test out StateByPrefixCategory
+	state, err := sm.StateByCategoryPrefix(u1, nil, nil, makeCategory(of, "f"))
+	require.Nil(t, err, "no error from StateByPrefixCategory")
+	it, err := state.Items()
+	require.Nil(t, err, "no error in getting items")
+	require.Equal(t, 1, len(it), "the right number of items")
+
 	return u1
 }
 

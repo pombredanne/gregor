@@ -335,7 +335,7 @@ func (m *MemEngine) StateByCategoryPrefix(u gregor.UID, d gregor.DeviceID, t gre
 	if err != nil {
 		return nil, err
 	}
-	items, err := state.ItemsInCategory(cp)
+	items, err := state.ItemsWithCategoryPrefix(cp)
 	if err != nil {
 		return nil, err
 	}
