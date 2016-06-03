@@ -90,3 +90,21 @@ func CreateDB(engine string, name string) (*sql.DB, error) {
 
 	return db, nil
 }
+
+func DBExists(engine string, dsn string) (bool, error) {
+	db, err := sql.Open(engine, dsn)
+	if err != nil {
+		return false, err
+	}
+
+	q, err := db.Prepare("SHOW TABLES LIKE 'gregor%'")
+	if err != nil {
+		return false, err
+	}
+	rows, err := q.Query()
+	if err != nil {
+		return false, err
+	}
+
+	return rows.Next(), nil
+}

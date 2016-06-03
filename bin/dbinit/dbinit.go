@@ -14,14 +14,16 @@ import (
 )
 
 var (
-	skipCheck bool
-	dsnVar    = "MYSQL_DSN"
-	s3conf    bin.S3Config
-	mysqlDSN  = &bin.DSNGetter{S: os.Getenv(dsnVar), S3conf: &s3conf}
+	skipSanityCheck bool
+	skipExistsCheck bool
+	dsnVar          = "MYSQL_DSN"
+	s3conf          bin.S3Config
+	mysqlDSN        = &bin.DSNGetter{S: os.Getenv(dsnVar), S3conf: &s3conf}
 )
 
 func init() {
-	flag.BoolVar(&skipCheck, "y", false, "skip confirmation and init db")
+	flag.BoolVar(&skipSanityCheck, "y", false, "skip confirmation and init db")
+	flag.BoolVar(&skipExistsCheck, "force", false, "create the database even if tables exist")
 	flag.StringVar(&s3conf.AWSRegion, "aws-region", os.Getenv("AWS_REGION"), "AWS region if running on AWS")
 	flag.StringVar(&s3conf.ConfigBucket, "s3-config-bucket", os.Getenv("S3_CONFIG_BUCKET"), "where our S3 configs are stored")
 	flag.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
@@ -45,7 +47,7 @@ func main() {
 		log.Fatal("Error parsing mysql DSN")
 	}
 
-	if !skipCheck {
+	if !skipSanityCheck {
 		fmt.Println("Creating/Reseting DB at", dsn)
 		fmt.Println("This will lead to irreversible loss of data currently in the DB.")
 		fmt.Print("Are you sure? (Y/N): ")
@@ -63,6 +65,18 @@ func main() {
 			log.Fatal("Chose not to create DB.")
 		default:
 			log.Fatal("Invalid response")
+		}
+	}
+
+	// Check if the gregor tables already exist, unless we are just charging forward
+	if !skipExistsCheck {
+		exists, err := schema.DBExists("mysql", dsn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if exists {
+			fmt.Println("database already exists, exiting...")
+			os.Exit(0)
 		}
 	}
 
