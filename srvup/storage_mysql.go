@@ -69,9 +69,9 @@ func (s *StorageMysql) UpdateServerStatus(group string, node NodeDesc) error {
 	var err error
 	if s.update == nil {
 		if s.clock != nil {
-			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime, uri) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime, uri) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE hbtime=?")
 		} else {
-			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime, uri) VALUES (?, ?, ?, NOW(), NOW()) ON DUPLICATE KEY UPDATE hbtime=NOW()")
+			s.update, err = s.db.Prepare("INSERT INTO server_status (groupname, id, address, hbtime, ctime, uri) VALUES (?, ?, ?, NOW(), NOW(), ?) ON DUPLICATE KEY UPDATE hbtime=NOW()")
 		}
 		if err != nil {
 			return err
@@ -80,7 +80,7 @@ func (s *StorageMysql) UpdateServerStatus(group string, node NodeDesc) error {
 
 	if s.clock != nil {
 		now := s.now()
-		_, err = s.update.Exec(group, string(node.Id), node.URI, now, now, now, node.URI)
+		_, err = s.update.Exec(group, string(node.Id), node.URI, now, now, node.URI, now)
 	} else {
 		_, err = s.update.Exec(group, string(node.Id), node.URI, node.URI)
 	}

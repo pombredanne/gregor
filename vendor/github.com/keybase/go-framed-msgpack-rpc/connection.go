@@ -132,6 +132,7 @@ type ConnectionHandler interface {
 type ConnectionTransportTLS struct {
 	rootCerts []byte
 	srvAddr   string
+	srvName   string
 
 	// Protects everything below.
 	mutex           sync.Mutex
@@ -155,9 +156,13 @@ func (ct *ConnectionTransportTLS) Dial(ctx context.Context) (
 		if !certs.AppendCertsFromPEM(ct.rootCerts) {
 			return errors.New("Unable to load root certificates")
 		}
+
 		// connect
-		config := tls.Config{RootCAs: certs}
 		var err error
+		config := tls.Config{RootCAs: certs}
+		if ct.srvName != "" {
+			config.ServerName = ct.srvName
+		}
 		conn, err = tls.DialWithDialer(&net.Dialer{
 			KeepAlive: 10 * time.Second,
 		}, "tcp", ct.srvAddr, &config)
@@ -246,6 +251,24 @@ func NewTLSConnection(srvAddr string, rootCerts []byte,
 	transport := &ConnectionTransportTLS{
 		rootCerts:  rootCerts,
 		srvAddr:    srvAddr,
+		logFactory: l,
+		wef:        wef,
+	}
+	return NewConnectionWithTransport(handler, transport, errorUnwrapper,
+		connectNow, wef, log, tagsFunc)
+}
+
+// NewTLSConnectionWithServerName returns a connection that tries to connect to the
+// given server address with TLS. You can specify a server name that you expect
+// the certificate to contain.
+func NewTLSConnectionWithServerName(srvAddr string, srvName string, rootCerts []byte,
+	errorUnwrapper ErrorUnwrapper, handler ConnectionHandler,
+	connectNow bool, l LogFactory, wef WrapErrorFunc, log LogOutput,
+	tagsFunc LogTagsFromContext) *Connection {
+	transport := &ConnectionTransportTLS{
+		rootCerts:  rootCerts,
+		srvAddr:    srvAddr,
+		srvName:    srvName,
 		logFactory: l,
 		wef:        wef,
 	}
@@ -369,12 +392,10 @@ func (c *Connection) DoCommand(ctx context.Context, name string,
 				defer c.mutex.Unlock()
 				return c.client
 			}()
-			// try the rpc call. this can also be canceled
-			// by the caller, and will retry connectivity
-			// errors w/backoff.
-			throttleErr := runUnlessCanceled(ctx, func() error {
-				return rpcFunc(rawClient)
-			})
+			// try the rpc call, assuming that it exits
+			// immediately when ctx is canceled. will
+			// retry connectivity errors w/backoff.
+			throttleErr := rpcFunc(rawClient)
 			if throttleErr != nil && c.handler.ShouldRetry(name, throttleErr) {
 				return throttleErr
 			}
@@ -555,7 +576,6 @@ func (c connectionClient) Call(ctx context.Context, s string, args interface{}, 
 
 func (c connectionClient) Notify(ctx context.Context, s string, args interface{}) error {
 	return c.conn.DoCommand(ctx, s, func(rawClient GenericClient) error {
-		rawClient.Notify(ctx, s, args)
-		return nil
+		return rawClient.Notify(ctx, s, args)
 	})
 }

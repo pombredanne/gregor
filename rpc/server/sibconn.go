@@ -73,9 +73,9 @@ func (s *sibConn) connect() error {
 	// Connect to our peer using proper protocol
 	if s.uri.UseTLS() {
 		s.debug("connecting to gregord (tls)")
-		s.conn = rpc.NewTLSConnection(s.uri.HostPort, []byte(gregor.BundledCAs[env]),
-			keybase1.ErrorUnwrapper{}, s, true, rpc.NewSimpleLogFactory(s.log, nil), keybase1.WrapError,
-			s.log, nil)
+		s.conn = rpc.NewTLSConnectionWithServerName(s.uri.HostPort, gregor.TLSHostNames[env],
+			[]byte(gregor.BundledCAs[env]), keybase1.ErrorUnwrapper{}, s, true,
+			rpc.NewSimpleLogFactory(s.log, nil), keybase1.WrapError, s.log, nil)
 	} else {
 		s.debug("connecting to gregord (no tls)")
 		t := transport.NewConnTransport(s.log, nil, s.uri)

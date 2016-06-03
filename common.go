@@ -22,6 +22,11 @@ var BundledCAs = map[string]string{
 	"staging": kbfsDevCA,
 }
 
+var TLSHostNames = map[string]string{
+	"prod":    "gregord.kbfs.keybase.io",
+	"staging": "gregord.dev.keybase.io",
+}
+
 const kbfsCA = `-----BEGIN CERTIFICATE-----
 MIIDkDCCAnigAwIBAgIRAL1MQ3C37AuGO8gFqfhqb9EwDQYJKoZIhvcNAQELBQAw
 UTESMBAGCgmSJomT8ixkARkWAmlvMRwwGgYKCZImiZPyLGQBGRYMa2Jmcy5rZXli
