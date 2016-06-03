@@ -75,7 +75,8 @@ func main() {
 			log.Fatal(err)
 		}
 		if exists {
-			log.Fatal("database already exists, exiting...")
+			fmt.Println("database already exists, exiting...")
+			os.Exit(0)
 		}
 	}
 
