@@ -2,12 +2,14 @@ package rpc
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"golang.org/x/net/context"
 
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
+	"github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/keybase/gregor/rpc/transport"
 )
@@ -20,23 +22,22 @@ type sibConn struct {
 	log       rpc.LogOutput
 	conn      *rpc.Connection
 	logPrefix string
-	address   string
 }
 
-func NewSibConn(address string, authToken gregor1.SessionToken, timeout time.Duration,
+func NewSibConn(suri string, authToken gregor1.SessionToken, timeout time.Duration,
 	log rpc.LogOutput) (*sibConn, error) {
 
-	uri, err := rpc.ParseFMPURI("fmprpc://" + address)
+	uri, err := rpc.ParseFMPURI(suri)
 	if err != nil {
 		return nil, err
 	}
+
 	s := &sibConn{
 		uri:       uri,
 		authToken: authToken,
 		timeout:   timeout,
 		log:       log,
 		logPrefix: fmt.Sprintf("[sibConn %s]", uri),
-		address:   address,
 	}
 
 	if err := s.connect(); err != nil {
@@ -62,10 +63,25 @@ func (s *sibConn) Shutdown() {
 }
 
 func (s *sibConn) connect() error {
-	s.debug("connecting to gregord")
-	t := transport.NewConnTransport(s.log, nil, s.uri)
-	s.conn = rpc.NewConnectionWithTransport(s, t, keybase1.ErrorUnwrapper{}, true, keybase1.WrapError, s.log, nil)
 
+	// Get the key for selecting the right bundled CA
+	env := os.Getenv("KEYBASE_RUN_MODE")
+	if env == "" {
+		env = "staging"
+	}
+
+	// Connect to our peer using proper protocol
+	if s.uri.UseTLS() {
+		s.debug("connecting to gregord (tls)")
+		s.conn = rpc.NewTLSConnectionWithServerName(s.uri.HostPort, gregor.TLSHostNames[env],
+			[]byte(gregor.BundledCAs[env]), keybase1.ErrorUnwrapper{}, s, true,
+			rpc.NewSimpleLogFactory(s.log, nil), keybase1.WrapError, s.log, nil)
+	} else {
+		s.debug("connecting to gregord (no tls)")
+		t := transport.NewConnTransport(s.log, nil, s.uri)
+		s.conn = rpc.NewConnectionWithTransport(s, t, keybase1.ErrorUnwrapper{}, true, keybase1.WrapError,
+			s.log, nil)
+	}
 	return nil
 }
 

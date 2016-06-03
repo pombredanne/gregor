@@ -19,12 +19,12 @@ type NodeId string
 
 // NodeDesc identifies a node in the group
 type NodeDesc struct {
-	Address string
-	Id      NodeId
+	URI string
+	Id  NodeId
 }
 
 func (n NodeDesc) String() string {
-	return fmt.Sprintf("[ %s, %s ]", n.Id, n.Address)
+	return fmt.Sprintf("[ %s, %s ]", n.Id, n.URI)
 }
 
 // Storage is an interface for storing and querying server status.
@@ -115,10 +115,10 @@ func (s *Status) MyID() NodeId {
 
 // HeartbeatLoop runs a loop in a separate goroutine that sends a
 // heartbeat every s.pingInterval.
-func (s *Status) HeartbeatLoop(address string) {
+func (s *Status) HeartbeatLoop(uri string) {
 
 	// Put one out right away to make testing this easier
-	if err := s.heartbeat(address); err != nil {
+	if err := s.heartbeat(uri); err != nil {
 		s.log.Warning("heartbeat error: %s", err)
 	}
 
@@ -127,7 +127,7 @@ func (s *Status) HeartbeatLoop(address string) {
 		defer s.wg.Done()
 		for {
 			start := s.clock.Now()
-			if err := s.heartbeat(address); err != nil {
+			if err := s.heartbeat(uri); err != nil {
 				s.log.Warning("heartbeat error: %s", err)
 			}
 			sleepDur := s.heartbeatInterval - s.since(start)
@@ -145,9 +145,9 @@ func (s *Status) HeartbeatLoop(address string) {
 	}()
 }
 
-func (s *Status) heartbeat(address string) error {
+func (s *Status) heartbeat(uri string) error {
 	return s.storage.UpdateServerStatus(s.group,
-		NodeDesc{Address: address, Id: NodeId(s.MyID())})
+		NodeDesc{URI: uri, Id: NodeId(s.MyID())})
 }
 
 // Shutdown stops the HeartbeatLoop and waits for it to finish.

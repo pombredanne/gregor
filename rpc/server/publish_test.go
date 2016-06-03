@@ -23,7 +23,7 @@ func TestPublish(t *testing.T) {
 	s1.superCh <- superToken
 	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
-	sg1.HeartbeatLoop(l1.Addr().String())
+	sg1.HeartbeatLoop("fmprpc://" + l1.Addr().String())
 	s1.SetStatusGroup(sg1)
 
 	incoming2 := newStorageStateMachine()
@@ -32,7 +32,7 @@ func TestPublish(t *testing.T) {
 	s2.superCh <- superToken
 	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
-	sg2.HeartbeatLoop(l2.Addr().String())
+	sg2.HeartbeatLoop("fmprpc://" + l2.Addr().String())
 	s2.SetStatusGroup(sg2)
 
 	// connect a client to s2
@@ -99,7 +99,7 @@ func TestNodeIds(t *testing.T) {
 	s1.superCh <- superToken
 	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
-	sg1.HeartbeatLoop(l1.Addr().String())
+	sg1.HeartbeatLoop("fmprpc://" + l1.Addr().String())
 	s1.SetStatusGroup(sg1)
 
 	incoming2 := newStorageStateMachine()
@@ -108,7 +108,7 @@ func TestNodeIds(t *testing.T) {
 	s2.superCh <- superToken
 	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
-	sg2.HeartbeatLoop(l2.Addr().String())
+	sg2.HeartbeatLoop("fmprpc://" + l2.Addr().String())
 	s2.SetStatusGroup(sg2)
 
 	ag := newAliveGroup(sg1, sg1.MyID(), s1.superCh, s1.publishTimeout, c, s1.closeCh,
