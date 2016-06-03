@@ -19,28 +19,29 @@ func sqlWrapper(s string) string {
 }
 
 type SQLEngine struct {
-	driver     *sql.DB
-	objFactory gregor.ObjFactory
-	clock      clockwork.Clock
-	stw        sqlTimeWriter
+	driver      *sql.DB
+	objFactory  gregor.ObjFactory
+	clock       clockwork.Clock
+	stw         sqlTimeWriter
+	updateLocks bool
 }
 
-func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock) *SQLEngine {
-	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl}
+func NewSQLEngine(d *sql.DB, of gregor.ObjFactory, stw sqlTimeWriter, cl clockwork.Clock, updateLocks bool) *SQLEngine {
+	return &SQLEngine{driver: d, objFactory: of, stw: stw, clock: cl, updateLocks: updateLocks}
 }
 
 func NewMySQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock())
+	return NewSQLEngine(d, of, mysqlTimeWriter{}, clockwork.NewRealClock(), true)
 }
 
 func NewTestMySQLEngine(d *sql.DB, of gregor.ObjFactory) (*SQLEngine, clockwork.FakeClock) {
 	clock := clockwork.NewFakeClock()
-	eng := NewSQLEngine(d, of, mysqlTimeWriter{}, clock)
+	eng := NewSQLEngine(d, of, mysqlTimeWriter{}, clock, true)
 	return eng, clock
 }
 
 func NewTestSqlLiteSQLEngine(d *sql.DB, of gregor.ObjFactory) *SQLEngine {
-	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewFakeClock())
+	return NewSQLEngine(d, of, sqliteTimeWriter{}, clockwork.NewFakeClock(), false)
 }
 
 type builder interface {
@@ -66,6 +67,15 @@ func (q *queryBuilder) Now() {
 
 func (q *queryBuilder) TimeOrOffset(too gregor.TimeOrOffset) {
 	q.stw.TimeOrOffset(q, q.clock, too)
+}
+
+func (q *queryBuilder) InSet(s []string) {
+	var qmarks []string
+	for _, val := range s {
+		qmarks = append(qmarks, "?")
+		q.args = append(q.args, val)
+	}
+	q.Build("(" + strings.Join(qmarks, ",") + ")")
 }
 
 func (q *queryBuilder) TimeArg(t time.Time) interface{} {
@@ -270,13 +280,7 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (ctim
 	if err != nil {
 		return time.Time{}, err
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		} else {
-			err = tx.Commit()
-		}
-	}()
+	defer tx.Rollback()
 
 	md := m.Metadata()
 	if md, err = s.consumeInBandMessageMetadata(tx, md, gregor.InBandMsgTypeUpdate); err != nil {
@@ -296,6 +300,10 @@ func (s *SQLEngine) consumeStateUpdateMessage(m gregor.StateUpdateMessage) (ctim
 		if err = s.consumeRangesToDismiss(tx, md.UID(), md.MsgID(), m.Dismissal().RangesToDismiss(), md.CTime()); err != nil {
 			return ctime, err
 		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return time.Time{}, err
 	}
 
 	return ctime, nil
@@ -477,6 +485,7 @@ func (s *SQLEngine) Clear() error {
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
 	for _, stmt := range schema.Schema("") {
 		if _, err = tx.Exec(stmt); err != nil {
@@ -554,32 +563,71 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	return ret, nil
 }
 
-func (s *SQLEngine) Reminders() ([]gregor.Reminder, error) {
-	qry := `SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.rtime
-	        FROM gregor_items AS i
-	        INNER JOIN gregor_messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
-	        INNER JOIN gregor_reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
-	        WHERE i.dtime IS NULL AND r.rtime <= ?`
-	rows, err := s.driver.Query(qry, s.clock.Now())
+func (s *SQLEngine) Reminders() (gregor.ReminderSet, error) {
+	tx, err := s.driver.Begin()
 	if err != nil {
 		return nil, err
 	}
+	defer tx.Rollback()
 
+	qb := s.newQueryBuilder()
+	qb.Build(`SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.rtime
+	        FROM gregor_items AS i
+	        INNER JOIN gregor_messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
+	        INNER JOIN gregor_reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
+	        WHERE i.dtime IS NULL AND r.rtime <=`)
+	qb.Now()
+	qb.Build(`AND (r.lock_time IS NULL OR r.lock_time <=`)
+	too, _ := s.objFactory.MakeTimeOrOffsetFromOffset(-s.ReminderLockDuration())
+	qb.TimeOrOffset(too)
+	qb.Build(`) ORDER BY rtime DESC LIMIT 100`)
+	if s.updateLocks {
+		qb.Build("FOR UPDATE")
+	}
+
+	stmt, err := s.driver.Prepare(qb.Query())
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(qb.Args()...)
+	if err != nil {
+		return nil, err
+	}
 	var reminders []gregor.Reminder
+	var msgIDs []string
 	for rows.Next() {
 		not, err := s.rowToReminder(rows)
 		if err != nil {
 			return nil, err
 		}
 		reminders = append(reminders, not)
+		msgIDs = append(msgIDs, hexEnc(not.Item().Metadata().MsgID()))
 	}
-	return reminders, nil
+
+	if len(msgIDs) > 0 {
+		qb = s.newQueryBuilder()
+		qb.Build("UPDATE gregor_reminders SET lock_time=")
+		qb.Now()
+		qb.Build("WHERE msgid IN")
+		qb.InSet(msgIDs)
+		if err = qb.Exec(tx); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return s.objFactory.MakeReminderSetFromReminders(reminders)
 }
 
-func (s *SQLEngine) DeleteReminder(r gregor.Reminder) error {
-	qry := `DELETE FROM gregor_reminders WHERE
-			uid = ? AND msgid = ? AND rtime = ?`
-	_, err := s.driver.Exec(qry, hexEnc(r.Item().Metadata().UID()), hexEnc(r.Item().Metadata().MsgID()), r.RemindTime())
+func (s *SQLEngine) DeleteReminder(r gregor.ReminderID) error {
+	qb := s.newQueryBuilder()
+	qb.Build("DELETE FROM gregor_reminders WHERE uid=? AND msgid=? AND rtime=", hexEnc(r.UID()), hexEnc(r.MsgID()))
+	qb.AddTime(r.RemindTime())
+	_, err := s.driver.Exec(qb.Query(), qb.Args()...)
 	return err
 }
 
@@ -598,5 +646,7 @@ func (s *SQLEngine) ObjFactory() gregor.ObjFactory {
 func (s *SQLEngine) Clock() clockwork.Clock {
 	return s.clock
 }
+
+func (s *SQLEngine) ReminderLockDuration() time.Duration { return 10 * time.Minute }
 
 var _ gregor.StateMachine = (*SQLEngine)(nil)

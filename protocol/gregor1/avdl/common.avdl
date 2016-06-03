@@ -61,10 +61,20 @@ protocol common {
 		Time remindTime;
 	}
 
+	record ReminderID {
+		UID uid;
+		MsgID msgID;
+		Time remindTime;
+	}
+
 	record OutOfBandMessage {
 		UID uid;
 		System system;
 		Body body;
+	}
+
+	record ReminderSet {
+		array<Reminder> reminders;
 	}
 
 	record Message {

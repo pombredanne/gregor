@@ -1,5 +1,14 @@
 @namespace("gregor.1")
 
 protocol remind {
-	void remind(Reminder r);
+
+	/**
+	 getReminders gets the reminders waiting to be sent out as a batch
+	 */
+	ReminderSet getReminders();
+
+	/**
+	 deleteReminders deletes all of the reminders by ReminderID
+	 */
+	void deleteReminders(array<ReminderID> msgs);
 }

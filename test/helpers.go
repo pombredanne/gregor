@@ -1,14 +1,14 @@
 package test
 
 import (
+	"bytes"
 	"crypto/rand"
-	"testing"
-	"time"
-
 	"github.com/jonboulle/clockwork"
 	gregor "github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
 	"github.com/stretchr/testify/require"
+	"testing"
+	"time"
 )
 
 func assertNItems(t *testing.T, sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID, too gregor.TimeOrOffset, n int) {
@@ -334,6 +334,77 @@ func TestStateMachinePerDevice(t *testing.T, sm gregor.StateMachine) (gregor.UID
 	assert5(nil)
 
 	return u1, d1
+}
+
+func assertRemindersEqual(t *testing.T, r1 gregor.Reminder, r2 gregor.Reminder) {
+	require.Equal(t, r1.Item().Metadata().MsgID().Bytes(), r2.Item().Metadata().MsgID().Bytes(), "reminders have same Msg ID")
+	require.Equal(t, r1.Item().Body().Bytes(), r2.Item().Body().Bytes(), "reminders have same body")
+	require.Equal(t, r1.Item().Category().String(), r2.Item().Category().String(), "reminders have same category")
+}
+
+func filterRemindersByUID(v []gregor.Reminder, u gregor.UID) []gregor.Reminder {
+	var out []gregor.Reminder
+	for _, r := range v {
+		if bytes.Equal(r.Item().Metadata().UID().Bytes(), u.Bytes()) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func assertReminderListsEqual(t *testing.T, r1 []gregor.Reminder, r2 []gregor.Reminder) {
+	require.Equal(t, len(r1), len(r2), "lists are the same length")
+	for i, r := range r1 {
+		assertRemindersEqual(t, r, r2[i])
+	}
+}
+
+func TestStateMachineReminders(t *testing.T, sm gregor.StateMachine) {
+
+	remindLag := 5 * time.Second
+	r := AddReminder(sm, remindLag)
+	uid := r.Item().Metadata().UID()
+	cl := sm.Clock()
+
+	// It's not time for a reminder yet, so make sure we don't get one
+	advanceClock(cl, time.Second)
+	reminders, err := sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	require.Equal(t, len(reminders.Reminders()), 0, "no reminders ready yet")
+
+	// Ok, now it's time for a reminder, make sure we get it.
+	advanceClock(cl, remindLag)
+	reminders, err = sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	assertReminderListsEqual(t, []gregor.Reminder{r}, filterRemindersByUID(reminders.Reminders(), uid))
+
+	// Reminders should still be locked
+	reminders, err = sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
+
+	// Lock should be expired by now...
+	advanceClock(cl, remindLag+sm.ReminderLockDuration())
+	reminders, err = sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	assertReminderListsEqual(t, []gregor.Reminder{r}, filterRemindersByUID(reminders.Reminders(), uid))
+
+	of := sm.ObjFactory()
+	rid, err := of.MakeReminderID(uid, r.Item().Metadata().MsgID(), r.RemindTime())
+	require.Nil(t, err, "reminder ID constructed properly")
+	err = sm.DeleteReminder(rid)
+	require.Nil(t, err, "reminder deleted without error")
+
+	// Assert that none come back
+	reminders, err = sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
+
+	// Assert that none come back even after a lock
+	advanceClock(cl, time.Second+sm.ReminderLockDuration())
+	reminders, err = sm.Reminders()
+	require.Nil(t, err, "no problem getting reminders")
+	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
 }
 
 func AddStateMachinePerDevice(sm gregor.StateMachine, u gregor.UID, d gregor.DeviceID) {

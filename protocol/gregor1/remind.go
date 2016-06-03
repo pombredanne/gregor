@@ -8,30 +8,47 @@ import (
 	context "golang.org/x/net/context"
 )
 
-type RemindArg struct {
-	R Reminder `codec:"r" json:"r"`
+type GetRemindersArg struct {
+}
+
+type DeleteRemindersArg struct {
+	Msgs []ReminderID `codec:"msgs" json:"msgs"`
 }
 
 type RemindInterface interface {
-	Remind(context.Context, Reminder) error
+	// getReminders gets the reminders waiting to be sent out as a batch
+	GetReminders(context.Context) (ReminderSet, error)
+	// deleteReminders deletes all of the reminders by ReminderID
+	DeleteReminders(context.Context, []ReminderID) error
 }
 
 func RemindProtocol(i RemindInterface) rpc.Protocol {
 	return rpc.Protocol{
 		Name: "gregor.1.remind",
 		Methods: map[string]rpc.ServeHandlerDescription{
-			"remind": {
+			"getReminders": {
 				MakeArg: func() interface{} {
-					ret := make([]RemindArg, 1)
+					ret := make([]GetRemindersArg, 1)
 					return &ret
 				},
 				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
-					typedArgs, ok := args.(*[]RemindArg)
+					ret, err = i.GetReminders(ctx)
+					return
+				},
+				MethodType: rpc.MethodCall,
+			},
+			"deleteReminders": {
+				MakeArg: func() interface{} {
+					ret := make([]DeleteRemindersArg, 1)
+					return &ret
+				},
+				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
+					typedArgs, ok := args.(*[]DeleteRemindersArg)
 					if !ok {
-						err = rpc.NewTypeError((*[]RemindArg)(nil), args)
+						err = rpc.NewTypeError((*[]DeleteRemindersArg)(nil), args)
 						return
 					}
-					err = i.Remind(ctx, (*typedArgs)[0].R)
+					err = i.DeleteReminders(ctx, (*typedArgs)[0].Msgs)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -44,8 +61,15 @@ type RemindClient struct {
 	Cli rpc.GenericClient
 }
 
-func (c RemindClient) Remind(ctx context.Context, r Reminder) (err error) {
-	__arg := RemindArg{R: r}
-	err = c.Cli.Call(ctx, "gregor.1.remind.remind", []interface{}{__arg}, nil)
+// getReminders gets the reminders waiting to be sent out as a batch
+func (c RemindClient) GetReminders(ctx context.Context) (res ReminderSet, err error) {
+	err = c.Cli.Call(ctx, "gregor.1.remind.getReminders", []interface{}{GetRemindersArg{}}, &res)
+	return
+}
+
+// deleteReminders deletes all of the reminders by ReminderID
+func (c RemindClient) DeleteReminders(ctx context.Context, msgs []ReminderID) (err error) {
+	__arg := DeleteRemindersArg{Msgs: msgs}
+	err = c.Cli.Call(ctx, "gregor.1.remind.deleteReminders", []interface{}{__arg}, nil)
 	return
 }

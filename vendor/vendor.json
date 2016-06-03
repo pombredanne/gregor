@@ -39,8 +39,8 @@
 		},
 		{
 			"path": "github.com/keybase/client/go/protocol",
-			"revision": "b9e157c28856998f1fd59c6c912b9fc2bddbc0f1",
-			"revisionTime": "2016-04-18T14:31:43-07:00"
+			"revision": "edae984644164457f1f87059bbf1feeef7fe109f",
+			"revisionTime": "2016-06-03T17:43:04-07:00"
 		},
 		{
 			"path": "github.com/keybase/go-codec/codec",

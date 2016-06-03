@@ -238,4 +238,24 @@ func (o ObjFactory) MakeTimeOrOffsetFromTime(t time.Time) (gregor.TimeOrOffset, 
 	return timeToTimeOrOffset(&t), nil
 }
 
+func (o ObjFactory) MakeTimeOrOffsetFromOffset(d time.Duration) (gregor.TimeOrOffset, error) {
+	return TimeOrOffset{Offset_: DurationMsec(d / time.Millisecond)}, nil
+}
+
+func (o ObjFactory) MakeReminderID(u gregor.UID, msgid gregor.MsgID, t time.Time) (gregor.ReminderID, error) {
+	return ReminderID{Uid_: u.Bytes(), MsgID_: msgid.Bytes(), RemindTime_: ToTime(t)}, nil
+}
+
+func (o ObjFactory) MakeReminderSetFromReminders(reminders []gregor.Reminder) (gregor.ReminderSet, error) {
+	ret := ReminderSet{}
+	for _, reminder := range reminders {
+		if r, ok := reminder.(Reminder); ok {
+			ret.Reminders_ = append(ret.Reminders_, r)
+		} else {
+			return nil, errors.New("Can't upcast reminder")
+		}
+	}
+	return ret, nil
+}
+
 var _ gregor.ObjFactory = ObjFactory{}

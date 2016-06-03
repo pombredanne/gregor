@@ -66,10 +66,20 @@ type Reminder struct {
 	RemindTime_ Time            `codec:"remindTime" json:"remindTime"`
 }
 
+type ReminderID struct {
+	Uid_        UID   `codec:"uid" json:"uid"`
+	MsgID_      MsgID `codec:"msgID" json:"msgID"`
+	RemindTime_ Time  `codec:"remindTime" json:"remindTime"`
+}
+
 type OutOfBandMessage struct {
 	Uid_    UID    `codec:"uid" json:"uid"`
 	System_ System `codec:"system" json:"system"`
 	Body_   Body   `codec:"body" json:"body"`
+}
+
+type ReminderSet struct {
+	Reminders_ []Reminder `codec:"reminders" json:"reminders"`
 }
 
 type Message struct {

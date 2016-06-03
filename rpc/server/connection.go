@@ -90,6 +90,8 @@ func newConnection(c net.Conn, parent *Server) (*connection, error) {
 
 var superUID = []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00}
 
+func SuperUID() []byte { return superUID }
+
 func matchUIDorSuperuser(uid, expected []byte) bool {
 	return bytes.Equal(uid, superUID) || bytes.Equal(uid, expected)
 }
@@ -101,7 +103,7 @@ func (c *connection) checkUIDAuth(ctx context.Context, uid gregor1.UID) error {
 	}
 
 	if !matchUIDorSuperuser(res.Uid, uid.Bytes()) {
-		return fmt.Errorf("mismatched UIDs: %v != %v", uid, res.Uid)
+		return AuthError(fmt.Sprintf("mismatched UIDs: %v != %v", uid, res.Uid))
 	}
 	return nil
 }
@@ -283,12 +285,32 @@ func (c *connection) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }
 
+func (c *connection) GetReminders(ctx context.Context) (ret gregor1.ReminderSet, err error) {
+
+	// Need to have super user for GetReminders
+	if err = c.checkUIDAuth(ctx, superUID); err != nil {
+		return ret, err
+	}
+
+	return c.parent.getReminders(ctx)
+}
+
+func (c *connection) DeleteReminders(ctx context.Context, rids []gregor1.ReminderID) error {
+
+	// Need to have super user for DeleteReminders
+	if err := c.checkUIDAuth(ctx, superUID); err != nil {
+		return err
+	}
+	return c.parent.deleteReminders(ctx, rids)
+}
+
 func (c *connection) startRPCServer() error {
 	c.server = rpc.NewServer(c.xprt, keybase1.WrapError)
 
 	prots := []rpc.Protocol{
 		gregor1.AuthProtocol(c),
 		gregor1.IncomingProtocol(c),
+		gregor1.RemindProtocol(c),
 	}
 	for _, prot := range prots {
 		c.log.Info("registering protocol %s", prot.Name)

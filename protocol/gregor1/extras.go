@@ -242,6 +242,10 @@ func (m *Message) SetCTime(ctime time.Time) {
 func (r Reminder) Item() gregor.Item     { return r.Item_ }
 func (r Reminder) RemindTime() time.Time { return FromTime(r.RemindTime_) }
 
+func (r ReminderID) UID() gregor.UID       { return r.Uid_ }
+func (r ReminderID) MsgID() gregor.MsgID   { return r.MsgID_ }
+func (r ReminderID) RemindTime() time.Time { return FromTime(r.RemindTime_) }
+
 func (s State) Items() ([]gregor.Item, error) {
 	var ret []gregor.Item
 	for _, i := range s.Items_ {
@@ -349,6 +353,14 @@ func (s SyncArg) CTime() time.Time {
 	return FromTime(s.Ctime)
 }
 
+func (r ReminderSet) Reminders() []gregor.Reminder {
+	var out []gregor.Reminder
+	for _, reminder := range r.Reminders_ {
+		out = append(out, reminder)
+	}
+	return out
+}
+
 var _ gregor.UID = UID{}
 var _ gregor.MsgID = MsgID{}
 var _ gregor.DeviceID = DeviceID{}
@@ -367,3 +379,5 @@ var _ gregor.InBandMessage = InBandMessage{}
 var _ gregor.OutOfBandMessage = OutOfBandMessage{}
 var _ gregor.Message = Message{}
 var _ gregor.State = State{}
+var _ gregor.ReminderID = ReminderID{}
+var _ gregor.ReminderSet = ReminderSet{}
