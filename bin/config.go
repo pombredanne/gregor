@@ -74,6 +74,12 @@ func ReadAWSEnvOrFile(s3conf *S3Config, name string) ([]byte, error) {
 }
 
 func ParseTLSConfig(s3conf *S3Config, tlsCert, tlsKey, tlsCA string, tlsHostname string) (*tls.Config, error) {
+
+	// No need to use TLS, since no flags were provided
+	if tlsCert == "" && tlsKey == "" && tlsCA == "" && tlsHostname == "" {
+		return nil, nil
+	}
+
 	if (tlsCert == "") != (tlsKey == "") {
 		return nil, BadUsage("you must provide a TLS Key and a TLS cert, or neither")
 	}
