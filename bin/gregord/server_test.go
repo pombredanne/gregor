@@ -219,6 +219,7 @@ func TestRunTLS(t *testing.T) {
 }
 
 func TestRunTCP(t *testing.T) {
+	t.Skip()
 	bindAddress := "localhost:39999"
 
 	opts, err := ParseOptions([]string{

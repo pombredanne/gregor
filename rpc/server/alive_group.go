@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"crypto/tls"
 	"sync"
 	"time"
 
@@ -22,6 +23,7 @@ type aliveGroup struct {
 	done        chan struct{}
 	log         rpc.LogOutput
 	timeout     time.Duration
+	tlsConfig   *tls.Config
 	sync.RWMutex
 }
 
@@ -37,7 +39,7 @@ func waitToken(authTokenCh chan gregor1.SessionToken, log rpc.LogOutput) gregor1
 }
 
 func newAliveGroup(status Aliver, selfID srvup.NodeId, authTokenCh chan gregor1.SessionToken,
-	timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput) *aliveGroup {
+	timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput, tlsConfig *tls.Config) *aliveGroup {
 
 	authToken := waitToken(authTokenCh, log)
 	a := &aliveGroup{
@@ -50,6 +52,7 @@ func newAliveGroup(status Aliver, selfID srvup.NodeId, authTokenCh chan gregor1.
 		done:        done,
 		log:         log,
 		timeout:     timeout,
+		tlsConfig:   tlsConfig,
 	}
 	a.update()
 	go a.check()
@@ -160,7 +163,7 @@ func (a *aliveGroup) update() error {
 		if conn, ok := a.group[node.Id]; ok {
 			newgroup[node.Id] = conn
 		} else {
-			newconn, err := NewSibConn(node.URI, a.authToken, a.timeout, a.log)
+			newconn, err := NewSibConn(node.URI, a.authToken, a.timeout, a.log, a.tlsConfig)
 			if err != nil {
 				a.log.Warning("error connecting to %q: %s", node.URI, err)
 			} else {

@@ -112,7 +112,7 @@ func TestNodeIds(t *testing.T) {
 	s2.SetStatusGroup(sg2)
 
 	ag := newAliveGroup(sg1, sg1.MyID(), s1.superCh, s1.publishTimeout, c, s1.closeCh,
-		rpc.SimpleLogOutput{})
+		rpc.SimpleLogOutput{}, nil)
 	if len(ag.group) != 1 {
 		t.Fatalf("alive group is wrong size %d != 1", len(ag.group))
 	}
