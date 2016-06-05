@@ -12,7 +12,7 @@ type GetRemindersArg struct {
 }
 
 type DeleteRemindersArg struct {
-	Msgs []ReminderID `codec:"msgs" json:"msgs"`
+	ReminderIDs []ReminderID `codec:"reminderIDs" json:"reminderIDs"`
 }
 
 type RemindInterface interface {
@@ -48,7 +48,7 @@ func RemindProtocol(i RemindInterface) rpc.Protocol {
 						err = rpc.NewTypeError((*[]DeleteRemindersArg)(nil), args)
 						return
 					}
-					err = i.DeleteReminders(ctx, (*typedArgs)[0].Msgs)
+					err = i.DeleteReminders(ctx, (*typedArgs)[0].ReminderIDs)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -68,8 +68,8 @@ func (c RemindClient) GetReminders(ctx context.Context) (res ReminderSet, err er
 }
 
 // deleteReminders deletes all of the reminders by ReminderID
-func (c RemindClient) DeleteReminders(ctx context.Context, msgs []ReminderID) (err error) {
-	__arg := DeleteRemindersArg{Msgs: msgs}
+func (c RemindClient) DeleteReminders(ctx context.Context, reminderIDs []ReminderID) (err error) {
+	__arg := DeleteRemindersArg{ReminderIDs: reminderIDs}
 	err = c.Cli.Call(ctx, "gregor.1.remind.deleteReminders", []interface{}{__arg}, nil)
 	return
 }

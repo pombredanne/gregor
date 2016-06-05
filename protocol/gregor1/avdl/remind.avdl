@@ -10,5 +10,5 @@ protocol remind {
 	/**
 	 deleteReminders deletes all of the reminders by ReminderID
 	 */
-	void deleteReminders(array<ReminderID> msgs);
+	void deleteReminders(array<ReminderID> reminderIDs);
 }
