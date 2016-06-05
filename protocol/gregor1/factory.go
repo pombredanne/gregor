@@ -246,8 +246,8 @@ func (o ObjFactory) MakeReminderID(u gregor.UID, msgid gregor.MsgID, t time.Time
 	return ReminderID{Uid_: u.Bytes(), MsgID_: msgid.Bytes(), RemindTime_: ToTime(t)}, nil
 }
 
-func (o ObjFactory) MakeReminderSetFromReminders(reminders []gregor.Reminder) (gregor.ReminderSet, error) {
-	ret := ReminderSet{}
+func (o ObjFactory) MakeReminderSetFromReminders(reminders []gregor.Reminder, moreRemindersReady bool) (gregor.ReminderSet, error) {
+	ret := ReminderSet{MoreRemindersReady_: moreRemindersReady}
 	for _, reminder := range reminders {
 		if r, ok := reminder.(Reminder); ok {
 			ret.Reminders_ = append(ret.Reminders_, r)

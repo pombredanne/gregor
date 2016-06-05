@@ -113,7 +113,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 		t.Fatal("Wrong msg ID returned in sync")
 	}
 
-	_, err = clients[0].RemindClient().GetReminders(context.TODO())
+	_, err = clients[0].RemindClient().GetReminders(context.TODO(), 0)
 	if err == nil {
 		t.Fatal("wanted an authentication error")
 	} else if status, ok := err.(keybase1.Status); !ok {
@@ -129,7 +129,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	superCli, superClean := startTestClient(t, superToken, srvAddr)
 	defer superClean()
 
-	reminders, err := superCli.RemindClient().GetReminders(context.TODO())
+	reminders, err := superCli.RemindClient().GetReminders(context.TODO(), 0)
 	if err != nil {
 		t.Fatal("Error fetching reminders: %s", err)
 	}
@@ -149,7 +149,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 
 	clock.Advance(remindIn)
 
-	reminders, err = superCli.RemindClient().GetReminders(context.TODO())
+	reminders, err = superCli.RemindClient().GetReminders(context.TODO(), 0)
 	if err != nil {
 		t.Fatal("Error fetching reminders: %s", err)
 	}
@@ -178,7 +178,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 
 	clock.Advance(24 * time.Hour)
-	reminders, err = superCli.RemindClient().GetReminders(context.TODO())
+	reminders, err = superCli.RemindClient().GetReminders(context.TODO(), 0)
 	if err != nil {
 		t.Fatal("Error fetching reminders: %s", err)
 	}

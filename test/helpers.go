@@ -368,24 +368,24 @@ func TestStateMachineReminders(t *testing.T, sm gregor.StateMachine) {
 
 	// It's not time for a reminder yet, so make sure we don't get one
 	advanceClock(cl, time.Second)
-	reminders, err := sm.Reminders()
+	reminders, err := sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	require.Equal(t, len(reminders.Reminders()), 0, "no reminders ready yet")
 
 	// Ok, now it's time for a reminder, make sure we get it.
 	advanceClock(cl, remindLag)
-	reminders, err = sm.Reminders()
+	reminders, err = sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	assertReminderListsEqual(t, []gregor.Reminder{r}, filterRemindersByUID(reminders.Reminders(), uid))
 
 	// Reminders should still be locked
-	reminders, err = sm.Reminders()
+	reminders, err = sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
 
 	// Lock should be expired by now...
 	advanceClock(cl, remindLag+sm.ReminderLockDuration())
-	reminders, err = sm.Reminders()
+	reminders, err = sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	assertReminderListsEqual(t, []gregor.Reminder{r}, filterRemindersByUID(reminders.Reminders(), uid))
 
@@ -396,13 +396,13 @@ func TestStateMachineReminders(t *testing.T, sm gregor.StateMachine) {
 	require.Nil(t, err, "reminder deleted without error")
 
 	// Assert that none come back
-	reminders, err = sm.Reminders()
+	reminders, err = sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
 
 	// Assert that none come back even after a lock
 	advanceClock(cl, time.Second+sm.ReminderLockDuration())
-	reminders, err = sm.Reminders()
+	reminders, err = sm.Reminders(0)
 	require.Nil(t, err, "no problem getting reminders")
 	require.Equal(t, 0, len(filterRemindersByUID(reminders.Reminders(), uid)), "0 reminders expected")
 }

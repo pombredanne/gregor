@@ -371,7 +371,7 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	return msgs, nil
 }
 
-func (m *MemEngine) Reminders() (gregor.ReminderSet, error) {
+func (m *MemEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 	// Unimplemented for MemEngine
 	return nil, nil
 }

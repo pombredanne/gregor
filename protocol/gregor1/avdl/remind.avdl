@@ -3,9 +3,10 @@
 protocol remind {
 
 	/**
-	 getReminders gets the reminders waiting to be sent out as a batch
+	 getReminders gets the reminders waiting to be sent out as a batch. Get at most
+	 maxReminders back.
 	 */
-	ReminderSet getReminders();
+	ReminderSet getReminders(int maxReminders);
 
 	/**
 	 deleteReminders deletes all of the reminders by ReminderID

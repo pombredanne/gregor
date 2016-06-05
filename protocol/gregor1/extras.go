@@ -361,6 +361,8 @@ func (r ReminderSet) Reminders() []gregor.Reminder {
 	return out
 }
 
+func (r ReminderSet) MoreRemindersReady() bool { return r.MoreRemindersReady_ }
+
 var _ gregor.UID = UID{}
 var _ gregor.MsgID = MsgID{}
 var _ gregor.DeviceID = DeviceID{}

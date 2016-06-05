@@ -75,8 +75,8 @@ func (sm *clientServerSM) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t
 	return sm.server.InBandMessagesSince(u, d, t)
 }
 
-func (sm *clientServerSM) Reminders() (gregor.ReminderSet, error) {
-	return sm.server.Reminders()
+func (sm *clientServerSM) Reminders(maxReminders int) (gregor.ReminderSet, error) {
+	return sm.server.Reminders(maxReminders)
 }
 
 func (sm *clientServerSM) DeleteReminder(r gregor.ReminderID) error {

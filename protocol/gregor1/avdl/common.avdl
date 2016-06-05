@@ -75,6 +75,7 @@ protocol common {
 
 	record ReminderSet {
 		array<Reminder> reminders;
+		bool moreRemindersReady;
 	}
 
 	record Message {

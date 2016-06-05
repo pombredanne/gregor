@@ -120,6 +120,7 @@ type Message interface {
 
 type ReminderSet interface {
 	Reminders() []Reminder
+	MoreRemindersReady() bool
 }
 
 type ReminderID interface {
@@ -177,7 +178,7 @@ type StateMachine interface {
 	InBandMessagesSince(u UID, d DeviceID, t time.Time) ([]InBandMessage, error)
 
 	// Reminders returns a slice of non-dismissed items past their RemindTimes.
-	Reminders() (ReminderSet, error)
+	Reminders(maxReminders int) (ReminderSet, error)
 
 	// DeleteReminder deletes a reminder so it won't be in the queue any longer.
 	DeleteReminder(r ReminderID) error
@@ -211,7 +212,7 @@ type ObjFactory interface {
 	MakeMessageFromInBandMessage(i InBandMessage) (Message, error)
 	MakeTimeOrOffsetFromTime(t time.Time) (TimeOrOffset, error)
 	MakeTimeOrOffsetFromOffset(d time.Duration) (TimeOrOffset, error)
-	MakeReminderSetFromReminders([]Reminder) (ReminderSet, error)
+	MakeReminderSetFromReminders([]Reminder, bool) (ReminderSet, error)
 	UnmarshalState([]byte) (State, error)
 }
 

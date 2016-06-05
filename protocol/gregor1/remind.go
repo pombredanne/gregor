@@ -9,6 +9,7 @@ import (
 )
 
 type GetRemindersArg struct {
+	MaxReminders int `codec:"maxReminders" json:"maxReminders"`
 }
 
 type DeleteRemindersArg struct {
@@ -16,8 +17,9 @@ type DeleteRemindersArg struct {
 }
 
 type RemindInterface interface {
-	// getReminders gets the reminders waiting to be sent out as a batch
-	GetReminders(context.Context) (ReminderSet, error)
+	// getReminders gets the reminders waiting to be sent out as a batch. Get at most
+	// maxReminders back.
+	GetReminders(context.Context, int) (ReminderSet, error)
 	// deleteReminders deletes all of the reminders by ReminderID
 	DeleteReminders(context.Context, []ReminderID) error
 }
@@ -32,7 +34,12 @@ func RemindProtocol(i RemindInterface) rpc.Protocol {
 					return &ret
 				},
 				Handler: func(ctx context.Context, args interface{}) (ret interface{}, err error) {
-					ret, err = i.GetReminders(ctx)
+					typedArgs, ok := args.(*[]GetRemindersArg)
+					if !ok {
+						err = rpc.NewTypeError((*[]GetRemindersArg)(nil), args)
+						return
+					}
+					ret, err = i.GetReminders(ctx, (*typedArgs)[0].MaxReminders)
 					return
 				},
 				MethodType: rpc.MethodCall,
@@ -61,9 +68,11 @@ type RemindClient struct {
 	Cli rpc.GenericClient
 }
 
-// getReminders gets the reminders waiting to be sent out as a batch
-func (c RemindClient) GetReminders(ctx context.Context) (res ReminderSet, err error) {
-	err = c.Cli.Call(ctx, "gregor.1.remind.getReminders", []interface{}{GetRemindersArg{}}, &res)
+// getReminders gets the reminders waiting to be sent out as a batch. Get at most
+// maxReminders back.
+func (c RemindClient) GetReminders(ctx context.Context, maxReminders int) (res ReminderSet, err error) {
+	__arg := GetRemindersArg{MaxReminders: maxReminders}
+	err = c.Cli.Call(ctx, "gregor.1.remind.getReminders", []interface{}{__arg}, &res)
 	return
 }
 

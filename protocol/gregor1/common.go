@@ -79,7 +79,8 @@ type OutOfBandMessage struct {
 }
 
 type ReminderSet struct {
-	Reminders_ []Reminder `codec:"reminders" json:"reminders"`
+	Reminders_          []Reminder `codec:"reminders" json:"reminders"`
+	MoreRemindersReady_ bool       `codec:"moreRemindersReady" json:"moreRemindersReady"`
 }
 
 type Message struct {

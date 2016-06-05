@@ -339,8 +339,8 @@ func (s *Server) stateByCategoryPrefix(_ context.Context, arg gregor1.StateByCat
 }
 
 // getReminders gets called from the connection thread.
-func (s *Server) getReminders(_ context.Context) (gregor1.ReminderSet, error) {
-	res := s.storageGetReminders()
+func (s *Server) getReminders(_ context.Context, maxReminders int) (gregor1.ReminderSet, error) {
+	res := s.storageGetReminders(maxReminders)
 	return res.reminderSet, res.err
 }
 
@@ -485,7 +485,8 @@ type getRemindersRes struct {
 }
 
 type getRemindersReq struct {
-	respCh chan<- getRemindersRes
+	maxReminders int
+	respCh       chan<- getRemindersRes
 }
 
 type deleteRemindersReq struct {
@@ -536,9 +537,9 @@ func (s *Server) storageStateByCategoryPrefix(arg gregor1.StateByCategoryPrefixA
 }
 
 // storageGetReminders fetches a batch of reminders and locks them in the database.
-func (s *Server) storageGetReminders() getRemindersRes {
+func (s *Server) storageGetReminders(maxReminders int) getRemindersRes {
 	respCh := make(chan getRemindersRes)
-	req := getRemindersReq{respCh: respCh}
+	req := getRemindersReq{respCh: respCh, maxReminders: maxReminders}
 	err := s.storageDispatch(req)
 	if err != nil {
 		var ret getRemindersRes
@@ -597,7 +598,7 @@ func (s *Server) storageDispatchHandler() {
 			req.respCh <- stateByCategoryPrefixRes{res: resExportable, err: err}
 
 		case getRemindersReq:
-			reminderSet, err := s.storage.Reminders()
+			reminderSet, err := s.storage.Reminders(req.maxReminders)
 			var ok bool
 			var reminderSetExportable gregor1.ReminderSet
 			if reminderSetExportable, ok = reminderSet.(gregor1.ReminderSet); !ok {

@@ -285,14 +285,14 @@ func (c *connection) Ping(ctx context.Context) (string, error) {
 	return "pong", nil
 }
 
-func (c *connection) GetReminders(ctx context.Context) (ret gregor1.ReminderSet, err error) {
+func (c *connection) GetReminders(ctx context.Context, maxReminders int) (ret gregor1.ReminderSet, err error) {
 
 	// Need to have super user for GetReminders
 	if err = c.checkUIDAuth(ctx, superUID); err != nil {
 		return ret, err
 	}
 
-	return c.parent.getReminders(ctx)
+	return c.parent.getReminders(ctx, maxReminders)
 }
 
 func (c *connection) DeleteReminders(ctx context.Context, rids []gregor1.ReminderID) error {

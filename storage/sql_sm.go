@@ -563,7 +563,7 @@ func (s *SQLEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	return ret, nil
 }
 
-func (s *SQLEngine) Reminders() (gregor.ReminderSet, error) {
+func (s *SQLEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 	tx, err := s.driver.Begin()
 	if err != nil {
 		return nil, err
@@ -580,7 +580,11 @@ func (s *SQLEngine) Reminders() (gregor.ReminderSet, error) {
 	qb.Build(`AND (r.lock_time IS NULL OR r.lock_time <=`)
 	too, _ := s.objFactory.MakeTimeOrOffsetFromOffset(-s.ReminderLockDuration())
 	qb.TimeOrOffset(too)
-	qb.Build(`) ORDER BY rtime DESC LIMIT 100`)
+	limit := 1000
+	if maxReminders > limit || maxReminders == 0 {
+		maxReminders = limit
+	}
+	qb.Build(`) ORDER BY rtime DESC LIMIT ?`, maxReminders)
 	if s.updateLocks {
 		qb.Build("FOR UPDATE")
 	}
@@ -620,7 +624,7 @@ func (s *SQLEngine) Reminders() (gregor.ReminderSet, error) {
 		return nil, err
 	}
 
-	return s.objFactory.MakeReminderSetFromReminders(reminders)
+	return s.objFactory.MakeReminderSetFromReminders(reminders, (len(reminders) == maxReminders))
 }
 
 func (s *SQLEngine) DeleteReminder(r gregor.ReminderID) error {
