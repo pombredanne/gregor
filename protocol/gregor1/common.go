@@ -63,13 +63,14 @@ type ItemAndMetadata struct {
 
 type Reminder struct {
 	Item_       ItemAndMetadata `codec:"item" json:"item"`
+	Seqno_      int             `codec:"seqno" json:"seqno"`
 	RemindTime_ Time            `codec:"remindTime" json:"remindTime"`
 }
 
 type ReminderID struct {
-	Uid_        UID   `codec:"uid" json:"uid"`
-	MsgID_      MsgID `codec:"msgID" json:"msgID"`
-	RemindTime_ Time  `codec:"remindTime" json:"remindTime"`
+	Uid_   UID   `codec:"uid" json:"uid"`
+	MsgID_ MsgID `codec:"msgID" json:"msgID"`
+	Seqno_ int   `codec:"seqno" json:"seqno"`
 }
 
 type OutOfBandMessage struct {

@@ -101,14 +101,15 @@ func (o ObjFactory) MakeItem(u gregor.UID, msgid gregor.MsgID, deviceid gregor.D
 	}, nil
 }
 
-func (o ObjFactory) MakeReminder(i gregor.Item, t time.Time) (gregor.Reminder, error) {
+func (o ObjFactory) MakeReminder(i gregor.Item, seqno int, t time.Time) (gregor.Reminder, error) {
 	it, ok := i.(ItemAndMetadata)
 	if !ok {
 		return nil, errors.New("item is not gregor1.ItemAndMetadata")
 	}
 	return Reminder{
-		Item_:       it,
-		RemindTime_: ToTime(t),
+		Item_:          it,
+		Seqno_: seqno,
+		RemindTime_:    ToTime(t),
 	}, nil
 }
 
@@ -242,8 +243,8 @@ func (o ObjFactory) MakeTimeOrOffsetFromOffset(d time.Duration) (gregor.TimeOrOf
 	return TimeOrOffset{Offset_: DurationMsec(d / time.Millisecond)}, nil
 }
 
-func (o ObjFactory) MakeReminderID(u gregor.UID, msgid gregor.MsgID, t time.Time) (gregor.ReminderID, error) {
-	return ReminderID{Uid_: u.Bytes(), MsgID_: msgid.Bytes(), RemindTime_: ToTime(t)}, nil
+func (o ObjFactory) MakeReminderID(u gregor.UID, msgid gregor.MsgID, seqno int) (gregor.ReminderID, error) {
+	return ReminderID{Uid_: u.Bytes(), MsgID_: msgid.Bytes(), Seqno_ : seqno }, nil
 }
 
 func (o ObjFactory) MakeReminderSetFromReminders(reminders []gregor.Reminder, moreRemindersReady bool) (gregor.ReminderSet, error) {

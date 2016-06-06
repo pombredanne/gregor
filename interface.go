@@ -93,6 +93,7 @@ type Item interface {
 type Reminder interface {
 	Item() Item
 	RemindTime() time.Time
+	Seqno() int
 }
 
 type MsgRange interface {
@@ -126,7 +127,7 @@ type ReminderSet interface {
 type ReminderID interface {
 	MsgID() MsgID
 	UID() UID
-	RemindTime() time.Time
+	Seqno() int
 }
 
 // MessageConsumer consumes state update messages. It's half of
@@ -201,8 +202,8 @@ type ObjFactory interface {
 	MakeBody(b []byte) (Body, error)
 	MakeCategory(s string) (Category, error)
 	MakeItem(u UID, msgid MsgID, deviceid DeviceID, ctime time.Time, c Category, dtime *time.Time, body Body) (Item, error)
-	MakeReminder(i Item, t time.Time) (Reminder, error)
-	MakeReminderID(u UID, msgid MsgID, t time.Time) (ReminderID, error)
+	MakeReminder(i Item, seqno int, t time.Time) (Reminder, error)
+	MakeReminderID(u UID, msgid MsgID, seqno int) (ReminderID, error)
 	MakeDismissalByRange(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, c Category, d time.Time) (InBandMessage, error)
 	MakeDismissalByIDs(uid UID, msgid MsgID, devid DeviceID, ctime time.Time, d []MsgID) (InBandMessage, error)
 	MakeStateSyncMessage(uid UID, msgid MsgID, devid DeviceID, ctime time.Time) (InBandMessage, error)

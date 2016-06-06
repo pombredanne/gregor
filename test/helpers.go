@@ -390,7 +390,7 @@ func TestStateMachineReminders(t *testing.T, sm gregor.StateMachine) {
 	assertReminderListsEqual(t, []gregor.Reminder{r}, filterRemindersByUID(reminders.Reminders(), uid))
 
 	of := sm.ObjFactory()
-	rid, err := of.MakeReminderID(uid, r.Item().Metadata().MsgID(), r.RemindTime())
+	rid, err := of.MakeReminderID(uid, r.Item().Metadata().MsgID(), r.Seqno())
 	require.Nil(t, err, "reminder ID constructed properly")
 	err = sm.DeleteReminder(rid)
 	require.Nil(t, err, "reminder deleted without error")
@@ -432,7 +432,7 @@ func AddReminder(sm gregor.StateMachine, d time.Duration) gregor.Reminder {
 	msg := newCreation(of, makeUID(of), makeMsgID(of), makeDeviceID(of), cl.Now(), c1, "b1", nil, []time.Time{ntime})
 	sm.ConsumeMessage(msg)
 
-	rm, err := of.MakeReminder(msg.ToInBandMessage().ToStateUpdateMessage().Creation(), ntime)
+	rm, err := of.MakeReminder(msg.ToInBandMessage().ToStateUpdateMessage().Creation(), 0, ntime)
 	if err != nil {
 		panic(err)
 	}

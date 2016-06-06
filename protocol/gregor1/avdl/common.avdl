@@ -58,13 +58,14 @@ protocol common {
 
 	record Reminder {
 		ItemAndMetadata item;
+		int seqno;
 		Time remindTime;
 	}
 
 	record ReminderID {
 		UID uid;
 		MsgID msgID;
-		Time remindTime;
+		int seqno;
 	}
 
 	record OutOfBandMessage {

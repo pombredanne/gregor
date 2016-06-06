@@ -170,7 +170,7 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	rid := gregor1.ReminderID{
 		Uid_:        rem.Item_.Md_.Uid_,
 		MsgID_:      rem.Item_.Md_.MsgID_,
-		RemindTime_: rem.RemindTime_,
+		Seqno_: rem.Seqno_,
 	}
 	err = superCli.RemindClient().DeleteReminders(context.TODO(), []gregor1.ReminderID{rid})
 	if err != nil {

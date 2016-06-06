@@ -38,11 +38,14 @@ var schema = []string{
 	`CREATE TABLE gregor_reminders (
 		uid   CHAR(32) NOT NULL,
 		msgid CHAR(32) NOT NULL,
+		seqno INT UNSIGNED NOT NULL,
 		rtime DATETIME(6) NOT NULL,
 		lock_time DATETIME(6),
 		FOREIGN KEY(uid, msgid) REFERENCES gregor_messages (uid, msgid) ON DELETE CASCADE,
-		PRIMARY KEY(uid, msgid, rtime)
+		PRIMARY KEY(uid, msgid, seqno)
 	)`,
+
+	`CREATE INDEX gregor_reminder_order ON gregor_reminders (rtime)`,
 
 	`CREATE TABLE gregor_dismissals_by_id (
 		uid   CHAR(32) NOT NULL,

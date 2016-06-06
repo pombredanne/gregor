@@ -138,12 +138,12 @@ func (s *SQLEngine) consumeCreation(tx *sql.Tx, i gregor.Item) error {
 		return err
 	}
 
-	for _, t := range i.RemindTimes() {
+	for i, t := range i.RemindTimes() {
 		if t == nil {
 			continue
 		}
 		nqb := s.newQueryBuilder()
-		nqb.Build("INSERT INTO gregor_reminders(uid, msgid, rtime) VALUES(?,?,", hexEnc(md.UID()), hexEnc(md.MsgID()))
+		nqb.Build("INSERT INTO gregor_reminders(uid, msgid, seqno, rtime) VALUES(?,?,?,", hexEnc(md.UID()), hexEnc(md.MsgID()), i)
 		nqb.TimeOrOffset(t)
 		nqb.Build(")")
 		err = nqb.Exec(tx)
@@ -331,14 +331,15 @@ func (s *SQLEngine) rowToReminder(rows *sql.Rows) (gregor.Reminder, error) {
 	var dtime timeScanner
 	var ctime timeScanner
 	var rtime timeScanner
-	if err := rows.Scan(&uid, &msgID, &deviceID, &category, &dtime, &body, &ctime, &rtime); err != nil {
+	var seqno int
+	if err := rows.Scan(&uid, &msgID, &deviceID, &category, &dtime, &body, &ctime, &rtime, &seqno); err != nil {
 		return nil, err
 	}
 	it, err := s.objFactory.MakeItem(uid.UID(), msgID.MsgID(), deviceID.DeviceID(), ctime.Time(), category.Category(), dtime.TimeOrNil(), body.Body())
 	if err != nil {
 		return nil, err
 	}
-	return s.objFactory.MakeReminder(it, rtime.Time())
+	return s.objFactory.MakeReminder(it, seqno, rtime.Time())
 }
 
 func (s *SQLEngine) State(u gregor.UID, d gregor.DeviceID, t gregor.TimeOrOffset) (gregor.State, error) {
@@ -571,7 +572,7 @@ func (s *SQLEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 	defer tx.Rollback()
 
 	qb := s.newQueryBuilder()
-	qb.Build(`SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.rtime
+	qb.Build(`SELECT i.uid, i.msgid, m.devid, i.category, i.dtime, i.body, m.ctime, r.rtime, r.seqno
 	        FROM gregor_items AS i
 	        INNER JOIN gregor_messages AS m ON (i.uid=m.uid AND i.msgid=m.msgid)
 	        INNER JOIN gregor_reminders AS r ON (i.uid=r.uid AND i.msgid=r.msgid)
@@ -598,23 +599,24 @@ func (s *SQLEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var reminders []gregor.Reminder
-	var msgIDs []string
 	for rows.Next() {
-		not, err := s.rowToReminder(rows)
+		reminder, err := s.rowToReminder(rows)
 		if err != nil {
 			return nil, err
 		}
-		reminders = append(reminders, not)
-		msgIDs = append(msgIDs, hexEnc(not.Item().Metadata().MsgID()))
+		reminders = append(reminders, reminder)
 	}
 
-	if len(msgIDs) > 0 {
+	for _, reminder := range reminders {
 		qb = s.newQueryBuilder()
 		qb.Build("UPDATE gregor_reminders SET lock_time=")
 		qb.Now()
-		qb.Build("WHERE msgid IN")
-		qb.InSet(msgIDs)
+		qb.Build("WHERE uid=? AND msgid=? AND seqno=?",
+			hexEnc(reminder.Item().Metadata().UID()),
+			hexEnc(reminder.Item().Metadata().MsgID()),
+			reminder.Seqno())
 		if err = qb.Exec(tx); err != nil {
 			return nil, err
 		}
@@ -624,13 +626,12 @@ func (s *SQLEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 		return nil, err
 	}
 
-	return s.objFactory.MakeReminderSetFromReminders(reminders, (len(reminders) == maxReminders))
+	return s.objFactory.MakeReminderSetFromReminders(reminders, false)
 }
 
 func (s *SQLEngine) DeleteReminder(r gregor.ReminderID) error {
 	qb := s.newQueryBuilder()
-	qb.Build("DELETE FROM gregor_reminders WHERE uid=? AND msgid=? AND rtime=", hexEnc(r.UID()), hexEnc(r.MsgID()))
-	qb.AddTime(r.RemindTime())
+	qb.Build("DELETE FROM gregor_reminders WHERE uid=? AND msgid=? AND seqno=?", hexEnc(r.UID()), hexEnc(r.MsgID()), r.Seqno())
 	_, err := s.driver.Exec(qb.Query(), qb.Args()...)
 	return err
 }
