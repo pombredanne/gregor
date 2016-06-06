@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"crypto/tls"
 	"encoding/hex"
 	"errors"
 	"net"
@@ -114,6 +115,9 @@ type Server struct {
 
 	// Timeout for publish RPC calls
 	publishTimeout time.Duration
+
+	// TLS Config for reaching out to other similar peers
+	tlsConfig *tls.Config
 }
 
 type ServerOpts struct {
@@ -123,6 +127,7 @@ type ServerOpts struct {
 	PublishTimeout   time.Duration
 	StorageHandlers  int
 	StorageQueueSize int
+	TLSConfig        *tls.Config
 }
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
@@ -144,6 +149,7 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		superCh:           make(chan gregor1.SessionToken, 1),
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
+		tlsConfig:         opts.TLSConfig,
 	}
 
 	for i := 0; i < opts.StorageHandlers; i++ {
@@ -395,7 +401,7 @@ func (s *Server) createAliveGroup() {
 		id = s.statusGroup.MyID()
 	}
 
-	s.group = newAliveGroup(s.statusGroup, id, s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log)
+	s.group = newAliveGroup(s.statusGroup, id, s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log, s.tlsConfig)
 }
 
 func (s *Server) publish(m gregor1.Message) error {

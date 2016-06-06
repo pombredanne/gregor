@@ -41,6 +41,7 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 		PublishTimeout:   opts.PublishTimeout,
 		StorageHandlers:  opts.StorageHandlers,
 		StorageQueueSize: opts.StorageQueueSize,
+		TLSConfig:        opts.TLSConfig,
 	}
 	srv := server.NewServer(log, srvopts)
 

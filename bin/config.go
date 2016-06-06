@@ -2,6 +2,7 @@ package bin
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"flag"
 	"fmt"
@@ -72,29 +73,53 @@ func ReadAWSEnvOrFile(s3conf *S3Config, name string) ([]byte, error) {
 	return []byte(name), nil
 }
 
-func ParseTLSConfig(s3conf *S3Config, tlsCert, tlsKey string) (*tls.Config, error) {
-	if (tlsCert == "") != (tlsKey == "") {
-		return nil, BadUsage("you must provide a TLS Key and a TLS cert, or neither")
-	}
-	if tlsCert == "" || tlsKey == "" {
+func ParseTLSConfig(s3conf *S3Config, tlsCert, tlsKey, tlsCA string, tlsHostname string) (*tls.Config, error) {
+
+	// No need to use TLS, since no flags were provided
+	if tlsCert == "" && tlsKey == "" && tlsCA == "" && tlsHostname == "" {
 		return nil, nil
 	}
 
-	cert, err := ReadAWSEnvOrFile(s3conf, tlsCert)
-	if err != nil {
-		return nil, BadConfig("error fetching TLS cert from S3: %s", err)
+	if (tlsCert == "") != (tlsKey == "") {
+		return nil, BadUsage("you must provide a TLS Key and a TLS cert, or neither")
 	}
 
-	key, err := ReadAWSEnvOrFile(s3conf, tlsKey)
-	if err != nil {
-		return nil, BadConfig("error fetching TLS key from S3: %s", err)
+	var certificates []tls.Certificate
+	if tlsCert != "" {
+		cert, err := ReadAWSEnvOrFile(s3conf, tlsCert)
+		if err != nil {
+			return nil, BadConfig("error fetching TLS cert from S3: %s", err)
+		}
+
+		key, err := ReadAWSEnvOrFile(s3conf, tlsKey)
+		if err != nil {
+			return nil, BadConfig("error fetching TLS key from S3: %s", err)
+		}
+		x509kp, err := tls.X509KeyPair([]byte(cert), []byte(key))
+		if err != nil {
+			return nil, err
+		}
+		certificates = append(certificates, x509kp)
 	}
 
-	x509kp, err := tls.X509KeyPair([]byte(cert), []byte(key))
-	if err != nil {
-		return nil, err
+	var rootCAs *x509.CertPool
+
+	if len(tlsCA) > 0 {
+		ca, err := ReadAWSEnvOrFile(s3conf, tlsCA)
+		if err != nil {
+			return nil, BadConfig("error fetching TLS CA from S3: %s", err)
+		}
+		rootCAs = x509.NewCertPool()
+		if !rootCAs.AppendCertsFromPEM([]byte(ca)) {
+			return nil, errors.New("Unable to load root certificates")
+		}
 	}
-	return &tls.Config{Certificates: []tls.Certificate{x509kp}}, nil
+
+	return &tls.Config{
+		Certificates: certificates,
+		ServerName:   tlsHostname,
+		RootCAs:      rootCAs,
+	}, nil
 
 }
 

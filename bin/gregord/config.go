@@ -38,7 +38,7 @@ type Options struct {
 const usageStr = `Usage:
 gregord -auth-server=<uri> -bind-address=[<host>]:<port> -incoming-address=[<host>]:<port> [-mysql-dsn=<user:pw@host/dbname>] [-debug]
     [-tls-key=<file|bucket|key>] [-tls-cert=<file|bucket|key>] [-aws-region=<region>] [-s3-config-bucket=<bucket>]
-    [-rpc-debug=<debug str>] [-child-mode]
+    [-rpc-debug=<debug str>] [-child-mode] [-tls-ca=<file|bucket|ca>] [-tls-hostname=<hostname>]
 
 Configuring TLS
 
@@ -49,6 +49,12 @@ Configuring TLS
     - via local files; in this case make -tls-key and -tls-cert look like filenames
       via the file:/// prefix.
     - via raw values; in this case, specify big ugly strings replete with newlines.
+
+  TLS Clients
+    - the -tls-ca option can be used to specify an optional root CA for TLS,
+      independent of cert and key above.
+    - for an anonymous host, you can use the tls-hostname to force a hostname
+      (that matches the cert that the host is going to provide)
 
 Environment Variables
 
@@ -61,6 +67,7 @@ Environment Variables
     -debug or DEBUG
     -tls-key or TLS_KEY
     -tls-cert or TLS_CERT
+    -tls-ca or TLS_CA
     -aws-region or AWS_REGION
     -s3-config-bucket or S3_CONFIG_BUCKET
     -rpc-debug or GREGOR_RPC_DEBUG
@@ -86,7 +93,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	var options Options
 	var s3conf bin.S3Config
-	var tlsKey, tlsCert string
+	var tlsKey, tlsCert, tlsCA, tlsHostname string
 	var useAwsExternalAddr bool
 	authServer := &bin.FMPURIGetter{S: os.Getenv("AUTH_SERVER")}
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
@@ -101,6 +108,8 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.BoolVar(&options.ChildMode, "child-mode", false, "exit on EOF on stdin")
 	fs.StringVar(&tlsKey, "tls-key", os.Getenv("TLS_KEY"), "file or S3 bucket or raw TLS key")
 	fs.StringVar(&tlsCert, "tls-cert", os.Getenv("TLS_CERT"), "file or S3 bucket or raw TLS Cert")
+	fs.StringVar(&tlsCA, "tls-ca", os.Getenv("TLS_CA"), "file or S3 bucket or raw TLS CA")
+	fs.StringVar(&tlsHostname, "tls-hostname", os.Getenv("TLS_HOSTNAME"), "the hostname to use with TLS")
 	fs.Var(authServer, "auth-server", "host:port of the auth server")
 	fs.Var(mysqlDSN, "mysql-dsn", "user:pw@host/dbname for MySQL")
 	fs.StringVar(&options.RPCDebug, "rpc-debug", os.Getenv("GREGOR_RPC_DEBUG"), "RPC debug options")
@@ -139,7 +148,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		return nil, bin.BadUsage("bad port (%q) in bind-address: %s", port, err)
 	}
 
-	if options.TLSConfig, err = bin.ParseTLSConfig(&s3conf, tlsCert, tlsKey); err != nil {
+	if options.TLSConfig, err = bin.ParseTLSConfig(&s3conf, tlsCert, tlsKey, tlsCA, tlsHostname); err != nil {
 		return nil, err
 	}
 
