@@ -3,6 +3,7 @@ package rpc
 import (
 	"errors"
 	"fmt"
+	keybase1 "github.com/keybase/client/go/protocol"
 	"strings"
 	"sync"
 )
@@ -56,4 +57,12 @@ func (p *pubErr) Empty() bool {
 	p.Lock()
 	defer p.Unlock()
 	return len(p.errors) == 0
+}
+
+func AuthError(msg string) keybase1.Status {
+	return keybase1.Status{
+		Code: int(keybase1.StatusCode_SCBadSession),
+		Name: "BAD_SESSION",
+		Desc: msg,
+	}
 }

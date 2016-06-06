@@ -13,12 +13,13 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func testEngine(t *testing.T, db *sql.DB, w sqlTimeWriter) {
+func testEngine(t *testing.T, db *sql.DB, w sqlTimeWriter, updateLock bool) {
 	cl := clockwork.NewFakeClock()
 	var of gregor1.ObjFactory
-	eng := NewSQLEngine(db, of, w, cl)
+	eng := NewSQLEngine(db, of, w, cl, updateLock)
 	test.TestStateMachineAllDevices(t, eng)
 	test.TestStateMachinePerDevice(t, eng)
+	test.TestStateMachineReminders(t, eng)
 }
 
 func TestSqliteEngine(t *testing.T) {
@@ -28,11 +29,11 @@ func TestSqliteEngine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	testEngine(t, db, sqliteTimeWriter{})
+	testEngine(t, db, sqliteTimeWriter{}, false)
 }
 
 // Test with: MYSQL_DSN=gregor:@/gregor_test?parseTime=true go test
 func TestMySQLEngine(t *testing.T) {
-	testEngine(t, test.AcquireTestDB(t), mysqlTimeWriter{})
+	testEngine(t, test.AcquireTestDB(t), mysqlTimeWriter{}, true)
 	test.ReleaseTestDB()
 }

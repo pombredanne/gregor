@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/keybase/gregor/protocol/gregor1"
+	rpc "github.com/keybase/gregor/rpc/server"
 	"golang.org/x/net/context"
 )
 
@@ -33,6 +34,9 @@ func (m *mockAuth) newUser() (tok gregor1.SessionToken, auth gregor1.AuthResult,
 	if _, err = rand.Read(id); err != nil {
 		return tok, auth, err
 	}
+	return m.newUserWithUID(id)
+}
+func (m *mockAuth) newUserWithUID(id []byte) (tok gregor1.SessionToken, auth gregor1.AuthResult, err error) {
 	tok = gregor1.SessionToken(fmt.Sprintf("tok%x", id))
 	auth = gregor1.AuthResult{
 		Uid: gregor1.UID(id),
@@ -41,6 +45,10 @@ func (m *mockAuth) newUser() (tok gregor1.SessionToken, auth gregor1.AuthResult,
 	m.n++
 	m.tokens[tok] = auth
 	return tok, auth, nil
+}
+
+func (m *mockAuth) newSuperUser() (tok gregor1.SessionToken, auth gregor1.AuthResult, err error) {
+	return m.newUserWithUID(rpc.SuperUID())
 }
 
 func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.SessionID) error {

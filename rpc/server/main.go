@@ -330,12 +330,23 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 	return res.res, res.err
 }
 
-// stateByCategoryPrefix gets called from the connecytino object that exists
+// stateByCategoryPrefix gets called from the connection object that exists
 // for each client for a state get call.  It is on a different thread from
 // the main loop, but its request has to be served from the main loop.
 func (s *Server) stateByCategoryPrefix(_ context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
 	res := s.storageStateByCategoryPrefix(arg)
 	return res.res, res.err
+}
+
+// getReminders gets called from the connection thread.
+func (s *Server) getReminders(_ context.Context, maxReminders int) (gregor1.ReminderSet, error) {
+	res := s.storageGetReminders(maxReminders)
+	return res.reminderSet, res.err
+}
+
+// deleteReminders is called from the connection thread.
+func (s *Server) deleteReminders(_ context.Context, rids []gregor1.ReminderID) error {
+	return s.storageDeleteReminders(rids)
 }
 
 // runConsumeMessageMainSequence is the main entry point to the gregor flow described in the
@@ -468,6 +479,21 @@ type stateByCategoryPrefixReq struct {
 	respCh chan<- stateByCategoryPrefixRes
 }
 
+type getRemindersRes struct {
+	reminderSet gregor1.ReminderSet
+	err         error
+}
+
+type getRemindersReq struct {
+	maxReminders int
+	respCh       chan<- getRemindersRes
+}
+
+type deleteRemindersReq struct {
+	rids   []gregor1.ReminderID
+	respCh chan<- error
+}
+
 // storageConsumeMessage schedules a Consume request on the dispatch handler
 func (s *Server) storageConsumeMessage(m gregor.Message) consumeMessageRet {
 	retCh := make(chan consumeMessageRet)
@@ -510,6 +536,29 @@ func (s *Server) storageStateByCategoryPrefix(arg gregor1.StateByCategoryPrefixA
 
 }
 
+// storageGetReminders fetches a batch of reminders and locks them in the database.
+func (s *Server) storageGetReminders(maxReminders int) getRemindersRes {
+	respCh := make(chan getRemindersRes)
+	req := getRemindersReq{respCh: respCh, maxReminders: maxReminders}
+	err := s.storageDispatch(req)
+	if err != nil {
+		var ret getRemindersRes
+		ret.err = err
+		return ret
+	}
+	return <-respCh
+}
+
+func (s *Server) storageDeleteReminders(rids []gregor1.ReminderID) error {
+	respCh := make(chan error)
+	req := deleteRemindersReq{respCh: respCh, rids: rids}
+	err := s.storageDispatch(req)
+	if err != nil {
+		return err
+	}
+	return <-respCh
+}
+
 // storageDispatch dispatches a new StorageMachine request. The storageDispatchCh channel
 // is buffered with a lot of space, but in the case where the StorageMachine
 // is totally locked, we will fill the queue and possibly reject the request.
@@ -530,12 +579,15 @@ func (s *Server) storageDispatch(req storageReq) error {
 func (s *Server) storageDispatchHandler() {
 	for req := range s.storageDispatchCh {
 		switch req := req.(type) {
+
 		case consumeMessageReq:
 			ctime, err := s.storage.ConsumeMessage(req.m)
 			req.respCh <- consumeMessageRet{ctime: ctime, err: err}
+
 		case syncReq:
 			res, err := grpc.Sync(s.storage, s.log, req.arg)
 			req.respCh <- syncRet{res: res, err: err}
+
 		case stateByCategoryPrefixReq:
 			res, err := s.storage.StateByCategoryPrefix(req.arg.Uid, nil, nil, req.arg.CategoryPrefix)
 			var resExportable gregor1.State
@@ -544,6 +596,25 @@ func (s *Server) storageDispatchHandler() {
 				err = errors.New("cannot export to gregor1.State as expected")
 			}
 			req.respCh <- stateByCategoryPrefixRes{res: resExportable, err: err}
+
+		case getRemindersReq:
+			reminderSet, err := s.storage.Reminders(req.maxReminders)
+			var ok bool
+			var reminderSetExportable gregor1.ReminderSet
+			if reminderSetExportable, ok = reminderSet.(gregor1.ReminderSet); !ok {
+				err = errors.New("cannot export to gregor1.ReminderSet as expected")
+			}
+			req.respCh <- getRemindersRes{reminderSet: reminderSetExportable, err: err}
+
+		case deleteRemindersReq:
+			var err error
+			for _, rid := range req.rids {
+				if err = s.storage.DeleteReminder(rid); err != nil {
+					break
+				}
+			}
+			req.respCh <- err
+
 		default:
 			s.log.Error("storageDispatchHandler(): unknown request type!")
 		}

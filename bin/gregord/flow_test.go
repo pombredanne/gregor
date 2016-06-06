@@ -89,7 +89,9 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	t0 := clock.Now()
 	clock.Advance(time.Hour)
 
-	m1 := newUpdateMessage(t, clients[0].uid)
+	remindIn := 4 * time.Hour
+	m1 := newUpdateMessageWithReminder(t, clients[0].uid, remindIn)
+
 	if err := clients[0].IncomingClient().ConsumeMessage(context.TODO(), m1); err != nil {
 		t.Fatal(err)
 	}
@@ -110,6 +112,80 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 		m1.ToInBandMessage().Metadata().MsgID().Bytes()) {
 		t.Fatal("Wrong msg ID returned in sync")
 	}
+
+	_, err = clients[0].RemindClient().GetReminders(context.TODO(), 0)
+	if err == nil {
+		t.Fatal("wanted an authentication error")
+	} else if status, ok := err.(keybase1.Status); !ok {
+		t.Fatal("wanted a keybase1.Status from the channel")
+	} else if status.Code != int(keybase1.StatusCode_SCBadSession) {
+		t.Fatal("wrong status code")
+	}
+
+	superToken, _, err := auth.newSuperUser()
+	if err != nil {
+		t.Fatal("error making new super token: %s\n", err)
+	}
+	superCli, superClean := startTestClient(t, superToken, srvAddr)
+	defer superClean()
+
+	reminders, err := superCli.RemindClient().GetReminders(context.TODO(), 0)
+	if err != nil {
+		t.Fatal("Error fetching reminders: %s", err)
+	}
+
+	findReminder := func(m gregor1.Message, reminders gregor1.ReminderSet) *gregor1.Reminder {
+		for _, reminder := range reminders.Reminders_ {
+			if bytes.Equal(m1.Ibm_.StateUpdate_.Md_.MsgID_, reminder.Item_.Md_.MsgID_) {
+				return &reminder
+			}
+		}
+		return nil
+	}
+
+	if findReminder(m1, reminders) != nil {
+		t.Fatal("expected not to find our reminder")
+	}
+
+	clock.Advance(remindIn)
+
+	reminders, err = superCli.RemindClient().GetReminders(context.TODO(), 0)
+	if err != nil {
+		t.Fatal("Error fetching reminders: %s", err)
+	}
+	rem := findReminder(m1, reminders)
+	if rem == nil {
+		t.Fatal("expected to find our reminder")
+	}
+
+	err = clients[0].RemindClient().DeleteReminders(context.TODO(), []gregor1.ReminderID{})
+	if err == nil {
+		t.Fatal("wanted an authentication error")
+	} else if status, ok := err.(keybase1.Status); !ok {
+		t.Fatal("wanted a keybase1.Status from the channel")
+	} else if status.Code != int(keybase1.StatusCode_SCBadSession) {
+		t.Fatal("wrong status code")
+	}
+
+	rid := gregor1.ReminderID{
+		Uid_:        rem.Item_.Md_.Uid_,
+		MsgID_:      rem.Item_.Md_.MsgID_,
+		Seqno_: rem.Seqno_,
+	}
+	err = superCli.RemindClient().DeleteReminders(context.TODO(), []gregor1.ReminderID{rid})
+	if err != nil {
+		t.Fatalf("Error deleting reminder: %s\n", err)
+	}
+
+	clock.Advance(24 * time.Hour)
+	reminders, err = superCli.RemindClient().GetReminders(context.TODO(), 0)
+	if err != nil {
+		t.Fatal("Error fetching reminders: %s", err)
+	}
+	if findReminder(m1, reminders) != nil {
+		t.Fatal("expected not to find our reminder (since we've deleted it)")
+	}
+
 }
 
 var withSleep time.Duration
@@ -212,6 +288,10 @@ func (c *client) IncomingClient() gregor1.IncomingClient {
 	return gregor1.IncomingClient{Cli: c.cli}
 }
 
+func (c *client) RemindClient() gregor1.RemindClient {
+	return gregor1.RemindClient{Cli: c.cli}
+}
+
 func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {
 	msgid := make([]byte, 8)
 	if _, err := rand.Read(msgid); err != nil {
@@ -232,5 +312,11 @@ func newUpdateMessage(t *testing.T, uid gregor1.UID) gregor1.Message {
 			},
 		},
 	}
+}
 
+func newUpdateMessageWithReminder(t *testing.T, uid gregor1.UID, remindIn time.Duration) gregor1.Message {
+	m := newUpdateMessage(t, uid)
+	remindTimes := []gregor1.TimeOrOffset{{Offset_: gregor1.DurationMsec(remindIn / time.Millisecond)}}
+	m.Ibm_.StateUpdate_.Creation_.RemindTimes_ = remindTimes
+	return m
 }

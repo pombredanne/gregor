@@ -371,12 +371,12 @@ func (m *MemEngine) InBandMessagesSince(u gregor.UID, d gregor.DeviceID, t time.
 	return msgs, nil
 }
 
-func (m *MemEngine) Reminders() ([]gregor.Reminder, error) {
+func (m *MemEngine) Reminders(maxReminders int) (gregor.ReminderSet, error) {
 	// Unimplemented for MemEngine
 	return nil, nil
 }
 
-func (m *MemEngine) DeleteReminder(r gregor.Reminder) error {
+func (m *MemEngine) DeleteReminder(r gregor.ReminderID) error {
 	// Unimplemented for MemEngine
 	return nil
 }
@@ -416,3 +416,5 @@ func (m *MemEngine) ObjFactory() gregor.ObjFactory {
 func (m *MemEngine) Clock() clockwork.Clock {
 	return m.clock
 }
+
+func (m *MemEngine) ReminderLockDuration() time.Duration { return time.Minute }

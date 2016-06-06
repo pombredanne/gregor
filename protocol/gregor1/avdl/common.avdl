@@ -58,13 +58,25 @@ protocol common {
 
 	record Reminder {
 		ItemAndMetadata item;
+		int seqno;
 		Time remindTime;
+	}
+
+	record ReminderID {
+		UID uid;
+		MsgID msgID;
+		int seqno;
 	}
 
 	record OutOfBandMessage {
 		UID uid;
 		System system;
 		Body body;
+	}
+
+	record ReminderSet {
+		array<Reminder> reminders;
+		bool moreRemindersReady;
 	}
 
 	record Message {

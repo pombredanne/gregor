@@ -223,7 +223,7 @@ func (d DeviceID) Exists() bool {
 }
 
 func (d DeviceID) Eq(d2 DeviceID) bool {
-	return d.Eq(d2)
+	return d == d2
 }
 
 func UIDFromString(s string) (UID, error) {
@@ -593,6 +593,10 @@ func WrapError(e error) interface{} {
 	}
 
 	if status, ok := e.(*Status); ok {
+		return status
+	}
+
+	if status, ok := e.(Status); ok {
 		return status
 	}
 
