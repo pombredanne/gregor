@@ -156,31 +156,22 @@ func (sc *SessionCacher) Size() int {
 func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (res gregor1.AuthResult, err error) {
 
 	respCh := make(chan *gregor1.AuthResult)
-	select {
-	case sc.reqCh <- readTokReq{tok, respCh}:
-	case <-ctx.Done():
-		err = ctx.Err()
+
+	// Fire off request for a cached session
+	sc.reqCh <- readTokReq{tok, respCh}
+
+	// Receive the response and return it if we hit the cache
+	resp := <-respCh
+	if resp != nil {
+		res = *resp
 		return
 	}
 
-	select {
-	case resp := <-respCh:
-		if resp != nil {
-			res = *resp
-			return
-		}
-	case <-ctx.Done():
-		err = ctx.Err()
-		return
-	}
-
+	// Call out to authd and store the result
 	if res, err = sc.parent.AuthenticateSessionToken(ctx, tok); err == nil {
-		select {
-		case sc.reqCh <- setResReq{tok, &res}:
-		case <-ctx.Done():
-			err = ctx.Err()
-		}
+		sc.reqCh <- setResReq{tok, &res}
 	}
+
 	return
 }
 
