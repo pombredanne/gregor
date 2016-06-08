@@ -48,6 +48,8 @@ func (a *authdHandler) GetSuperToken() gregor1.SessionToken {
 		a.log.Debug("authd handler: GetSuperToken(): token blank: waiting...")
 		return <-a.superCh
 	} else {
+		a.Lock()
+		defer a.Unlock()
 		return a.superToken
 	}
 }
