@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"errors"
 	"sync"
 	"time"
 
@@ -61,6 +62,9 @@ func (a *authdHandler) setSuperToken(cli gregor1.AuthInternalClient) error {
 	if err != nil {
 		a.log.Debug("setSuperToken: error creating super user session token: %s", err)
 		return err
+	} else if tok == "" {
+		a.log.Error("setSuperToken: got a blank token back with no error")
+		return errors.New("blank token from auth server")
 	} else {
 		a.log.Debug("setSuperToken: created super user session token")
 	}
