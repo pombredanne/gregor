@@ -55,6 +55,10 @@ func (m mockAuth) RevokeSessionIDs(_ context.Context, sessionIDs []gregor1.Sessi
 	return nil
 }
 
+func (m mockAuth) GetSuperToken() gregor1.SessionToken {
+	return ""
+}
+
 func (m mockAuth) CreateGregorSuperUserSessionToken(ctx context.Context) (gregor1.SessionToken, error) {
 	return "", errors.New("mockAuth super token not implemented")
 }

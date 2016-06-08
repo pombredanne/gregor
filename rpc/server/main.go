@@ -65,6 +65,11 @@ type Aliver interface {
 	MyID() srvup.NodeId
 }
 
+type Authenticator interface {
+	AuthenticateSessionToken(context.Context, gregor1.SessionToken) (gregor1.AuthResult, error)
+	GetSuperToken() gregor1.SessionToken
+}
+
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
@@ -72,7 +77,7 @@ type Server struct {
 	// chain them together.
 	storage gregor.StateMachine
 
-	auth  gregor1.AuthInterface
+	auth  Authenticator
 	clock clockwork.Clock
 
 	// key is the Hex-encoding of the binary UIDs
@@ -92,7 +97,6 @@ type Server struct {
 
 	// used to determine which other servers are alive
 	statusGroup Aliver
-	superCh     chan gregor1.SessionToken
 	groupOnce   sync.Once
 	group       *aliveGroup
 
@@ -146,7 +150,6 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
 		log:               log,
 		broadcastTimeout:  opts.BroadcastTimeout,
-		superCh:           make(chan gregor1.SessionToken, 1),
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
 		tlsConfig:         opts.TLSConfig,
@@ -161,15 +164,8 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 	return s
 }
 
-func (s *Server) SetAuthenticator(a gregor1.AuthInterface) {
+func (s *Server) SetAuthenticator(a Authenticator) {
 	s.auth = a
-}
-
-func (s *Server) SetSuperTokenCh(ch chan gregor1.SessionToken) {
-	s.superCh = ch
-	if s.group != nil {
-		s.log.Warning("SetSuperTokenCh called after aliveGroup created")
-	}
 }
 
 func (s *Server) SetEventHandler(e EventHandler) {
@@ -401,7 +397,7 @@ func (s *Server) createAliveGroup() {
 		id = s.statusGroup.MyID()
 	}
 
-	s.group = newAliveGroup(s.statusGroup, id, s.superCh, s.publishTimeout, s.clock, s.closeCh, s.log, s.tlsConfig)
+	s.group = newAliveGroup(s.statusGroup, s.auth, id, s.publishTimeout, s.clock, s.closeCh, s.log, s.tlsConfig)
 }
 
 func (s *Server) publish(m gregor1.Message) error {
@@ -416,7 +412,6 @@ func (s *Server) publish(m gregor1.Message) error {
 	}
 
 	s.groupOnce.Do(s.createAliveGroup)
-
 	if err := s.group.Publish(context.Background(), m); err != nil {
 		return err
 	}

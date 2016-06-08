@@ -16,7 +16,7 @@ import (
 // sibConn manages a connection to a sibling gregord.
 type sibConn struct {
 	uri       *rpc.FMPURI
-	authToken gregor1.SessionToken
+	auth      Authenticator
 	timeout   time.Duration
 	log       rpc.LogOutput
 	conn      *rpc.Connection
@@ -24,8 +24,8 @@ type sibConn struct {
 	logPrefix string
 }
 
-func NewSibConn(suri string, authToken gregor1.SessionToken, timeout time.Duration,
-	log rpc.LogOutput, tlsConfig *tls.Config) (*sibConn, error) {
+func NewSibConn(suri string, auth Authenticator, timeout time.Duration, log rpc.LogOutput,
+	tlsConfig *tls.Config) (*sibConn, error) {
 
 	uri, err := rpc.ParseFMPURI(suri)
 	if err != nil {
@@ -34,7 +34,7 @@ func NewSibConn(suri string, authToken gregor1.SessionToken, timeout time.Durati
 
 	s := &sibConn{
 		uri:       uri,
-		authToken: authToken,
+		auth:      auth,
 		timeout:   timeout,
 		log:       log,
 		logPrefix: fmt.Sprintf("[sibConn %s]", uri),
@@ -87,7 +87,7 @@ func (s *sibConn) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.G
 	s.debug("OnConnect")
 
 	ac := gregor1.AuthClient{Cli: cli}
-	if _, err := ac.AuthenticateSessionToken(ctx, s.authToken); err != nil {
+	if _, err := ac.AuthenticateSessionToken(ctx, s.auth.GetSuperToken()); err != nil {
 		s.warning("auth error: %s", err)
 		return err
 	}
