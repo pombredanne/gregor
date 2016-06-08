@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"sync"
 	"time"
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
@@ -15,6 +16,8 @@ type authdHandler struct {
 	superCh         chan gregor1.SessionToken
 	refreshInterval time.Duration
 	doneCh          chan struct{}
+	superToken      gregor1.SessionToken
+	sync.Mutex
 }
 
 var _ rpc.ConnectionHandler = (*authdHandler)(nil)
@@ -24,14 +27,57 @@ var _ gregor1.AuthUpdateInterface = (*authdHandler)(nil)
 // tokens for connecting to other gregord services on superCh
 // after the first connect to authd and every refreshInterval
 // afterwards.
-func NewAuthdHandler(authserver gregor1.AuthUpdateInterface, log rpc.LogOutput, superCh chan gregor1.SessionToken, refreshInterval time.Duration) *authdHandler {
+func NewAuthdHandler(authserver gregor1.AuthUpdateInterface, log rpc.LogOutput,
+	refreshInterval time.Duration) *authdHandler {
 	return &authdHandler{
 		authserver:      authserver,
 		log:             log,
-		superCh:         superCh,
+		superCh:         make(chan gregor1.SessionToken),
 		refreshInterval: refreshInterval,
 		doneCh:          make(chan struct{}),
 	}
+}
+
+func (a *authdHandler) GetSuperToken() gregor1.SessionToken {
+	a.Lock()
+	blank := (a.superToken == "")
+	a.Unlock()
+
+	// If we don't have a super token yet, wait for one
+	if blank {
+		a.log.Debug("authd handler: GetSuperToken(): token blank: waiting...")
+		return <-a.superCh
+	} else {
+		return a.superToken
+	}
+}
+
+func (a *authdHandler) setSuperToken(cli gregor1.AuthInternalClient) error {
+
+	tok, err := cli.CreateGregorSuperUserSessionToken(context.Background())
+	if err != nil {
+		a.log.Debug("setSuperToken: error creating super user session token: %s", err)
+		return err
+	} else {
+		a.log.Debug("setSuperToken: created super user session token")
+	}
+
+	a.Lock()
+	sendMsg := (a.superToken == "")
+	a.superToken = tok
+	a.Unlock()
+
+	// Someone might be waiting on the first token, send it to them
+	if sendMsg {
+		select {
+		case a.superCh <- tok:
+			a.log.Debug("authd handler: setSuperToken(): sent msg to waiter")
+		default:
+			// If not one is waiting on this, we don't care
+		}
+	}
+
+	return nil
 }
 
 func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli rpc.GenericClient, srv *rpc.Server) error {
@@ -40,15 +86,11 @@ func (a *authdHandler) OnConnect(ctx context.Context, conn *rpc.Connection, cli 
 		return err
 	}
 
-	// get a super user token
+	// Set new super token
 	ac := gregor1.AuthInternalClient{Cli: cli}
-	tok, err := ac.CreateGregorSuperUserSessionToken(ctx)
-	if err != nil {
-		a.log.Debug("authd handler: error creating super user session token: %s", err)
+	if err := a.setSuperToken(ac); err != nil {
 		return err
 	}
-	a.log.Debug("authd handler: created super user session token")
-	a.superCh <- tok
 
 	// Stop any existing update loops.
 	close(a.doneCh)
@@ -101,15 +143,7 @@ func (a *authdHandler) updateSuperToken(conn *rpc.Connection) {
 		case <-a.doneCh:
 			return
 		case <-time.After(a.refreshInterval):
-			cli := conn.GetClient()
-			ac := gregor1.AuthInternalClient{Cli: cli}
-			tok, err := ac.CreateGregorSuperUserSessionToken(context.Background())
-			if err != nil {
-				a.log.Debug("updateSuperToken: error creating super user session token: %s", err)
-			} else {
-				a.log.Debug("updateSuperToken: created super user session token")
-				a.superCh <- tok
-			}
+			a.setSuperToken(gregor1.AuthInternalClient{Cli: conn.GetClient()})
 		}
 	}
 }

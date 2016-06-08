@@ -29,20 +29,18 @@ type SessionCacher struct {
 	sessionIDs   map[gregor1.SessionID]gregor1.SessionToken
 	reqCh        chan request
 	expiryQueue  []expirySt
-	SuperTokenCh chan gregor1.SessionToken
 	authdHandler *authdHandler
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
 func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.Duration) *SessionCacher {
 	sc := &SessionCacher{
-		parent:       a,
-		cl:           cl,
-		timeout:      timeout,
-		sessions:     make(map[gregor1.SessionToken]*gregor1.AuthResult),
-		sessionIDs:   make(map[gregor1.SessionID]gregor1.SessionToken),
-		reqCh:        make(chan request),
-		SuperTokenCh: make(chan gregor1.SessionToken, 1),
+		parent:     a,
+		cl:         cl,
+		timeout:    timeout,
+		sessions:   make(map[gregor1.SessionToken]*gregor1.AuthResult),
+		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
+		reqCh:      make(chan request),
 	}
 	go sc.requestHandler()
 	return sc
@@ -52,13 +50,17 @@ func NewSessionCacherFromURI(uri *rpc.FMPURI, cl clockwork.Clock, timeout time.D
 	log rpc.LogOutput, opts rpc.LogOptions, refreshInterval time.Duration) *SessionCacher {
 	sc := NewSessionCacher(nil, cl, timeout)
 	transport := rpc.NewConnectionTransport(uri, rpc.NewSimpleLogFactory(log, opts), keybase1.WrapError)
-	sc.authdHandler = NewAuthdHandler(sc, log, sc.SuperTokenCh, refreshInterval)
+	sc.authdHandler = NewAuthdHandler(sc, log, refreshInterval)
 
 	log.Debug("Connecting to session server %s", uri.String())
 	conn := rpc.NewConnectionWithTransport(sc.authdHandler, transport, keybase1.ErrorUnwrapper{},
 		true, keybase1.WrapError, log, nil)
 	sc.parent = gregor1.AuthClient{Cli: conn.GetClient()}
 	return sc
+}
+
+func (sc *SessionCacher) GetSuperToken() gregor1.SessionToken {
+	return sc.authdHandler.GetSuperToken()
 }
 
 type request interface{}

@@ -14,45 +14,32 @@ import (
 )
 
 type aliveGroup struct {
-	group       map[srvup.NodeId]*sibConn
-	status      Aliver
-	authToken   gregor1.SessionToken
-	authTokenCh chan gregor1.SessionToken
-	selfID      srvup.NodeId
-	clock       clockwork.Clock
-	done        chan struct{}
-	log         rpc.LogOutput
-	timeout     time.Duration
-	tlsConfig   *tls.Config
+	group     map[srvup.NodeId]*sibConn
+	status    Aliver
+	auth      Authenticator
+	selfID    srvup.NodeId
+	clock     clockwork.Clock
+	done      chan struct{}
+	log       rpc.LogOutput
+	timeout   time.Duration
+	tlsConfig *tls.Config
 	sync.RWMutex
 }
 
-func waitToken(authTokenCh chan gregor1.SessionToken, log rpc.LogOutput) gregor1.SessionToken {
-	for {
-		select {
-		case t := <-authTokenCh:
-			return t
-		case <-time.After(1 * time.Second):
-			log.Debug("newAliveGroup: slow receive of super user session token")
-		}
-	}
-}
+func newAliveGroup(status Aliver, auth Authenticator, selfID srvup.NodeId,
+	timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput,
+	tlsConfig *tls.Config) *aliveGroup {
 
-func newAliveGroup(status Aliver, selfID srvup.NodeId, authTokenCh chan gregor1.SessionToken,
-	timeout time.Duration, clock clockwork.Clock, done chan struct{}, log rpc.LogOutput, tlsConfig *tls.Config) *aliveGroup {
-
-	authToken := waitToken(authTokenCh, log)
 	a := &aliveGroup{
-		group:       make(map[srvup.NodeId]*sibConn),
-		status:      status,
-		selfID:      selfID,
-		authToken:   authToken,
-		authTokenCh: authTokenCh,
-		clock:       clock,
-		done:        done,
-		log:         log,
-		timeout:     timeout,
-		tlsConfig:   tlsConfig,
+		group:     make(map[srvup.NodeId]*sibConn),
+		status:    status,
+		auth:      auth,
+		selfID:    selfID,
+		clock:     clock,
+		done:      done,
+		log:       log,
+		timeout:   timeout,
+		tlsConfig: tlsConfig,
 	}
 	a.update()
 	go a.check()
@@ -92,9 +79,6 @@ func (a *aliveGroup) check() {
 		select {
 		case <-a.done:
 			return
-		case t := <-a.authTokenCh:
-			a.log.Debug("aliveGroup received new super auth token")
-			a.authToken = t
 		case <-a.clock.After(1 * time.Second):
 		}
 
@@ -163,11 +147,12 @@ func (a *aliveGroup) update() error {
 		if conn, ok := a.group[node.Id]; ok {
 			newgroup[node.Id] = conn
 		} else {
-			newconn, err := NewSibConn(node.URI, a.authToken, a.timeout, a.log, a.tlsConfig)
+			newconn, err := NewSibConn(node.URI, a.auth, a.timeout, a.log, a.tlsConfig)
 			if err != nil {
 				a.log.Warning("error connecting to %q: %s", node.URI, err)
 			} else {
 				newgroup[node.Id] = newconn
+				a.log.Debug("connected to sib: [ id: %s uri: %q ]", node.Id, node.URI)
 			}
 		}
 	}

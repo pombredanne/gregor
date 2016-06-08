@@ -48,6 +48,10 @@ func (m mockAuth) CreateGregorSuperUserSessionToken(_ context.Context) (gregor1.
 	return superToken, nil
 }
 
+func (m mockAuth) GetSuperToken() gregor1.SessionToken {
+	return superToken
+}
+
 func newStorageStateMachine() gregor.StateMachine {
 	var of gregor1.ObjFactory
 	return storage.NewMemEngine(of, clockwork.NewRealClock())
@@ -71,7 +75,7 @@ var (
 	superResult = gregor1.AuthResult{Uid: superUID, Sid: superSID}
 )
 
-var mockAuthenticator gregor1.AuthInterface = mockAuth{
+var mockAuthenticator Authenticator = mockAuth{
 	sessions: map[gregor1.SessionToken]gregor1.AuthResult{
 		goodToken:  goodResult,
 		evilToken:  evilResult,
