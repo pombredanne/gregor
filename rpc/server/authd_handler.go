@@ -13,7 +13,7 @@ import (
 type authdHandler struct {
 	authserver      gregor1.AuthUpdateInterface
 	log             rpc.LogOutput
-	superCh         chan gregor1.SessionToken
+	superCh         chan struct{}
 	refreshInterval time.Duration
 	doneCh          chan struct{}
 	superToken      gregor1.SessionToken
@@ -32,7 +32,7 @@ func NewAuthdHandler(authserver gregor1.AuthUpdateInterface, log rpc.LogOutput,
 	return &authdHandler{
 		authserver:      authserver,
 		log:             log,
-		superCh:         make(chan gregor1.SessionToken),
+		superCh:         make(chan struct{}),
 		refreshInterval: refreshInterval,
 		doneCh:          make(chan struct{}),
 	}
@@ -46,12 +46,12 @@ func (a *authdHandler) GetSuperToken() gregor1.SessionToken {
 	// If we don't have a super token yet, wait for one
 	if blank {
 		a.log.Debug("authd handler: GetSuperToken(): token blank: waiting...")
-		return <-a.superCh
-	} else {
-		a.Lock()
-		defer a.Unlock()
-		return a.superToken
+		<-a.superCh
 	}
+
+	a.Lock()
+	defer a.Unlock()
+	return a.superToken
 }
 
 func (a *authdHandler) setSuperToken(cli gregor1.AuthInternalClient) error {
@@ -69,14 +69,9 @@ func (a *authdHandler) setSuperToken(cli gregor1.AuthInternalClient) error {
 	a.superToken = tok
 	a.Unlock()
 
-	// Someone might be waiting on the first token, send it to them
+	// People might be waiting on this, close this to wake them all up
 	if sendMsg {
-		select {
-		case a.superCh <- tok:
-			a.log.Debug("authd handler: setSuperToken(): sent msg to waiter")
-		default:
-			// If not one is waiting on this, we don't care
-		}
+		close(a.superCh)
 	}
 
 	return nil
