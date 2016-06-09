@@ -376,8 +376,9 @@ func (c instrumentedConnection) instrument(name string) func() {
 	return func() {
 		dur := time.Since(now)
 		durms := int(dur.Nanoseconds() / 1000000)
-		if durms > 2000 {
+		if durms > 10000 {
 			c.conn.stats.Count("slow response - " + name)
+			c.conn.log.Error("slow response time: rpc: %s time: %dms", name, durms)
 		}
 		c.conn.stats.ValueInt("speed - "+name, durms)
 	}
