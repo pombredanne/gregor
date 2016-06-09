@@ -75,6 +75,7 @@ type BackendType string
 
 const (
 	STATHAT BackendType = "STATHAT"
+	MOCK    BackendType = "MOCK"
 )
 
 func NewBackend(btype BackendType, config interface{}) (Backend, error) {
@@ -86,6 +87,8 @@ func NewBackend(btype BackendType, config interface{}) (Backend, error) {
 		} else {
 			return backend, nil
 		}
+	case MOCK:
+		return mockBackend{}, nil
 	default:
 		return nil, errors.New("unknown stast registry type")
 	}
@@ -110,3 +113,11 @@ func (r DummyRegistry) SetPrefix(prefix string) Registry {
 }
 
 var _ Registry = DummyRegistry{}
+
+type mockBackend struct{}
+
+func (m mockBackend) Count(name string) error                { return nil }
+func (m mockBackend) CountMult(name string, count int) error { return nil }
+func (m mockBackend) Value(name string, value float64) error { return nil }
+
+var _ Backend = mockBackend{}
