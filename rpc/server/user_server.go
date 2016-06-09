@@ -8,12 +8,17 @@ import (
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/stats"
 	"golang.org/x/net/context"
 )
 
 type connectionArgs struct {
 	c  *connection
 	id connectionID
+}
+
+type statsRes struct {
+	totalConns int
 }
 
 type perUIDServer struct {
@@ -27,15 +32,20 @@ type perUIDServer struct {
 	tryShutdownCh    chan bool
 	closeListenCh    chan error
 	parentShutdownCh chan struct{}
+	statsCh          chan chan statsRes
 	selfShutdownCh   chan struct{}
 	events           EventHandler
 
-	log rpc.LogOutput
+	log   rpc.LogOutput
+	stats stats.Registry
 
 	broadcastTimeout time.Duration // in MS
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs, shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, bt time.Duration) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs,
+	shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, stats stats.Registry,
+	bt time.Duration) *perUIDServer {
+
 	s := &perUIDServer{
 		uid:              uid,
 		conns:            make(map[connectionID]*connection),
@@ -45,11 +55,15 @@ func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArg
 		closeListenCh:    make(chan error, 100),            // each connection uses the same closeListenCh, so buffer it more than 1
 		parentConfirmCh:  parentConfirmCh,
 		parentShutdownCh: shutdownCh,
+		statsCh:          make(chan chan statsRes),
 		selfShutdownCh:   make(chan struct{}),
 		events:           events,
 		log:              log,
+		stats:            stats.SetPrefix("user_server"),
 		broadcastTimeout: bt,
 	}
+
+	s.stats.Count("new")
 
 	go s.serve()
 
@@ -67,11 +81,16 @@ func (s *perUIDServer) logError(prefix string, err error) {
 	s.log.Info("[uid %s] %s error: %s", s.uid, prefix, err)
 }
 
+func (s *perUIDServer) sendStats(resChan chan statsRes) {
+	resChan <- statsRes{totalConns: len(s.conns)}
+}
+
 func (s *perUIDServer) serve() {
 	defer func() {
 		if s.events != nil {
 			s.events.UIDServerDestroyed(s.uid)
 		}
+		s.stats.Count("destroyed")
 	}()
 	for {
 		select {
@@ -90,6 +109,8 @@ func (s *perUIDServer) serve() {
 		case <-s.selfShutdownCh:
 			s.removeAllConns()
 			return
+		case r := <-s.statsCh:
+			s.sendStats(r)
 		}
 	}
 }
@@ -100,6 +121,7 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 		<-a.c.serverDoneChan()
 		s.closeListenCh <- a.c.serverDoneErr()
 	}()
+	s.stats.Count("new conn")
 	s.conns[a.id] = a.c
 	s.lastConnID = a.id
 	if s.events != nil {
@@ -112,6 +134,10 @@ func (s *perUIDServer) addConn(a *connectionArgs) error {
 func (s *perUIDServer) broadcast(m gregor1.Message) {
 	var errCh = make(chan connectionArgs)
 	var wg sync.WaitGroup
+
+	s.stats.Count("broadcast")
+	s.stats.ValueInt("broadcast - conns", len(s.conns))
+
 	for id, conn := range s.conns {
 		s.log.Info("uid %s broadcast to %d", s.uid, id)
 		if err := conn.checkMessageAuth(context.Background(), m); err != nil {
@@ -202,6 +228,7 @@ func (s *perUIDServer) isConnDown(err error) bool {
 func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
 	s.log.Info("uid server %s: removing connection %d", s.uid, id)
 	conn.close()
+	s.stats.Count("remove conn")
 	delete(s.conns, id)
 	if s.events != nil {
 		s.events.ConnectionDestroyed(s.uid)

@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/stats"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 )
@@ -38,7 +39,7 @@ func TestSessionCacher(t *testing.T) {
 	checkGood(t, a, goodToken, goodUID)
 	d := 100 * time.Millisecond
 	fc := clockwork.NewFakeClock()
-	sc := NewSessionCacher(a, fc, d)
+	sc := NewSessionCacher(a, stats.DummyRegistry{}, fc, d)
 	defer sc.Close()
 
 	checkBad(t, sc, badToken)

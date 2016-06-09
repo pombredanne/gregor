@@ -14,6 +14,7 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	grpc "github.com/keybase/gregor/rpc"
 	"github.com/keybase/gregor/srvup"
+	"github.com/keybase/gregor/stats"
 	"golang.org/x/net/context"
 )
 
@@ -110,6 +111,9 @@ type Server struct {
 
 	log rpc.LogOutput
 
+	// Stats registry
+	stats stats.Registry
+
 	// The amount of time a perUIDServer should wait on a BroadcastMessage
 	// response (in MS)
 	broadcastTimeout time.Duration
@@ -136,7 +140,7 @@ type ServerOpts struct {
 
 // NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
 // for it to be functional.
-func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
+func NewServer(log rpc.LogOutput, stats stats.Registry, opts ServerOpts) *Server {
 	s := &Server{
 		clock:             clockwork.NewRealClock(),
 		users:             make(map[string]*perUIDServer),
@@ -149,17 +153,23 @@ func NewServer(log rpc.LogOutput, opts ServerOpts) *Server {
 		confirmCh:         make(chan confirmUIDShutdownArgs),
 		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
 		log:               log,
+		stats:             stats.SetPrefix("server"),
 		broadcastTimeout:  opts.BroadcastTimeout,
 		numPublishers:     opts.NumPublishers,
 		publishTimeout:    opts.PublishTimeout,
 		tlsConfig:         opts.TLSConfig,
 	}
 
+	// Spawn threads for handling storage requests
 	for i := 0; i < opts.StorageHandlers; i++ {
 		go s.storageDispatchHandler()
 	}
 
+	// Spawn threads for handling publishing consume message to peers
 	s.publishSpawn()
+
+	// Spawn background thread for stats
+	go s.updateServerValueStatsLoop()
 
 	return s
 }
@@ -189,6 +199,24 @@ func (s *Server) uidKey(u gregor.UID) (string, error) {
 	return hex.EncodeToString(tuid), nil
 }
 
+func (s *Server) updateServerValueStats() {
+	s.stats.ValueInt("total user servers", len(s.users))
+	totalConns := 0
+	for _, usrv := range s.users {
+		rchan := make(chan statsRes)
+		usrv.statsCh <- rchan
+		totalConns += (<-rchan).totalConns
+	}
+	s.stats.ValueInt("total connections", totalConns)
+}
+
+func (s *Server) updateServerValueStatsLoop() {
+	for {
+		s.updateServerValueStats()
+		s.clock.Sleep(1 * time.Second)
+	}
+}
+
 func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 	s.deadlocker()
 	k, err := s.uidKey(u)
@@ -214,16 +242,22 @@ func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
 
 func (s *Server) addUIDConnection(c *connection) error {
 	_, res, _ := c.authInfo.get()
+
 	usrv, err := s.getPerUIDServer(res.Uid)
 	if err != nil {
+		s.stats.Count("addUIDConnection - getPerUIDServer error")
 		return err
 	}
 
+	s.stats.Count("addUIDConnection - newconn")
 	if usrv == nil {
-		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log, s.broadcastTimeout)
+		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log, s.stats,
+			s.broadcastTimeout)
 		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
 			return err
 		}
+	} else {
+		s.stats.Count("addUIDConnection - uidserver hit")
 	}
 
 	k, err := s.uidKey(res.Uid)
@@ -242,11 +276,13 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 	s.deadlocker()
 	k, err := s.uidKey(a.uid)
 	if err != nil {
+		s.stats.Count("uid shutdown - uidKey error")
 		s.log.Info("confirmUIDShutdown, uidKey error: %s", err)
 		return
 	}
 	serverLast, ok := s.lastConns[k]
 	if !ok {
+		s.stats.Count("uid shutdown - lastconns error")
 		s.log.Info("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
 		return
 	}
@@ -259,6 +295,8 @@ func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
 		// remove the perUIDServer from users, lastConns
 		delete(s.users, k)
 		delete(s.lastConns, k)
+
+		s.stats.Count("uid shutdown")
 
 		// close perUser's selfShutdown channel so it will
 		// self-destruct
@@ -312,6 +350,7 @@ func (s *Server) sendBroadcast(m gregor1.Message) error {
 		return nil
 	}
 
+	s.stats.Count("broadcast")
 	// If this is going to block, we just drop the broadcast. It means that
 	// the user has a device that is not responding fast enough
 	select {
@@ -328,6 +367,7 @@ func (s *Server) sendBroadcast(m gregor1.Message) error {
 // client of gregord for a sync call. It is on a different thread than
 // the main Serve loop
 func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	s.stats.Count("startSync")
 	res := s.storageSync(s.storage, s.log, arg)
 	return res.res, res.err
 }
@@ -336,19 +376,47 @@ func (s *Server) startSync(c context.Context, arg gregor1.SyncArg) (gregor1.Sync
 // for each client for a state get call.  It is on a different thread from
 // the main loop, but its request has to be served from the main loop.
 func (s *Server) stateByCategoryPrefix(_ context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	s.stats.Count("stateByCategoryPrefix")
 	res := s.storageStateByCategoryPrefix(arg)
 	return res.res, res.err
 }
 
 // getReminders gets called from the connection thread.
 func (s *Server) getReminders(_ context.Context, maxReminders int) (gregor1.ReminderSet, error) {
+	s.stats.Count("getReminders")
 	res := s.storageGetReminders(maxReminders)
 	return res.reminderSet, res.err
 }
 
 // deleteReminders is called from the connection thread.
 func (s *Server) deleteReminders(_ context.Context, rids []gregor1.ReminderID) error {
+	s.stats.Count("deleteReminders")
 	return s.storageDeleteReminders(rids)
+}
+
+func (s *Server) doConsumeStats(m gregor1.Message) {
+	// Stats
+	s.stats.Count("runConsumeMessageMainSequence")
+	if ibm := m.ToInBandMessage(); ibm != nil {
+		s.stats.Count("runConsumeMessageMainSequence - ibm")
+		if update := ibm.ToStateUpdateMessage(); update != nil {
+			s.stats.Count("runConsumeMessageMainSequence - ibm - state update")
+			if item := update.Creation(); item != nil {
+				s.stats.Count("runConsumeMessageMainSequence - ibm - state update - creation")
+				s.stats.Count("runConsumeMessageMainSequence - ibm - state update - creation - " + item.Category().String())
+			}
+			if dis := update.Dismissal(); dis != nil {
+				s.stats.Count("runConsumeMessageMainSequence - ibm - state update - dismissal")
+			}
+		}
+		if sync := ibm.ToStateSyncMessage(); sync != nil {
+			s.stats.Count("runConsumeMessageMainSequence - ibm - state sync")
+		}
+	}
+	if oobm := m.ToOutOfBandMessage(); oobm != nil {
+		s.stats.Count("runConsumeMessageMainSequence - oobm")
+		s.stats.Count("runConsumeMessageMainSequence - oobm - " + oobm.System().String())
+	}
 }
 
 // runConsumeMessageMainSequence is the main entry point to the gregor flow described in the
@@ -357,8 +425,10 @@ func (s *Server) deleteReminders(_ context.Context, rids []gregor1.ReminderID) e
 // from connection, and is on a different thread than Serve
 func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Message) error {
 
+	s.doConsumeStats(m)
 	res := s.storageConsumeMessage(m)
 	if res.err != nil {
+		s.stats.Count("runConsumeMessageMainSequence - storageConsumeMessage failure")
 		return res.err
 	}
 	m.SetCTime(res.ctime)
@@ -413,6 +483,7 @@ func (s *Server) publish(m gregor1.Message) error {
 
 	s.groupOnce.Do(s.createAliveGroup)
 	if err := s.group.Publish(context.Background(), m); err != nil {
+		s.stats.Count("publish failure")
 		return err
 	}
 
@@ -431,7 +502,8 @@ func (s *Server) publishConsumeMessage(m gregor1.Message) error {
 	select {
 	case s.publishCh <- m:
 	default:
-		s.log.Warning("publishCh full: %d", len(s.publishCh))
+		s.log.Error("publishCh full: %d", len(s.publishCh))
+		s.stats.Count("publish queue full")
 		return ErrPublishChannelFull
 	}
 	return nil
@@ -568,6 +640,7 @@ func (s *Server) storageDispatch(req storageReq) error {
 	case s.storageDispatchCh <- req:
 	default:
 		s.log.Error("XXX: dispatch queue full, rejecting!")
+		s.stats.Count("storageDispatch queue full")
 		return errors.New("dispatch queue full, rejected")
 	}
 	return nil
