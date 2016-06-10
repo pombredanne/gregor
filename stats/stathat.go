@@ -7,6 +7,7 @@ package stats
 import (
 	"errors"
 	stathat "github.com/stathat/go"
+	"time"
 )
 
 type StathatConfig struct {
@@ -18,27 +19,29 @@ func NewStathatConfig(ezkey string) StathatConfig {
 }
 
 type stathatBackend struct {
-	config StathatConfig
+	config   StathatConfig
+	reporter stathat.Reporter
 }
 
 var _ Backend = stathatBackend{}
 
 func (s stathatBackend) Count(name string) error {
-	return stathat.PostEZCountOne(name, s.config.ezkey)
+	return s.reporter.PostEZCountOne(name, s.config.ezkey)
 }
 
 func (s stathatBackend) CountMult(name string, count int) error {
-	return stathat.PostEZCount(name, s.config.ezkey, count)
+	return s.reporter.PostEZCount(name, s.config.ezkey, count)
 }
 
 func (s stathatBackend) Value(name string, value float64) error {
-	return stathat.PostEZValue(name, s.config.ezkey, value)
+	return s.reporter.PostEZValue(name, s.config.ezkey, value)
 }
 
 func newStathatRegistry(iconfig interface{}) (Backend, error) {
 	config, ok := iconfig.(StathatConfig)
 	if ok {
-		return stathatBackend{config: config}, nil
+		reporter := stathat.NewBatchReporter(stathat.DefaultReporter, 200*time.Millisecond)
+		return stathatBackend{config: config, reporter: reporter}, nil
 	} else {
 		return nil, errors.New("invalid stathat config")
 	}
