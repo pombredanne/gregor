@@ -13,6 +13,7 @@ type Backend interface {
 	Count(name string) error
 	CountMult(name string, count int) error
 	Value(name string, value float64) error
+	Shutdown()
 }
 
 type Registry interface {
@@ -21,6 +22,7 @@ type Registry interface {
 	ValueInt(name string, value int)
 	Value(name string, value float64)
 	SetPrefix(prefix string) Registry
+	Shutdown()
 }
 
 type SimpleRegistry struct {
@@ -71,6 +73,11 @@ func (r SimpleRegistry) Value(name string, value float64) {
 	}
 }
 
+func (r SimpleRegistry) Shutdown() {
+	r.log.Info("shutting down stats backend")
+	r.backend.Shutdown()
+}
+
 type BackendType string
 
 const (
@@ -111,6 +118,7 @@ func (r DummyRegistry) ValueInt(name string, value int)  {}
 func (r DummyRegistry) SetPrefix(prefix string) Registry {
 	return r
 }
+func (r DummyRegistry) Shutdown() {}
 
 var _ Registry = DummyRegistry{}
 
@@ -119,5 +127,6 @@ type mockBackend struct{}
 func (m mockBackend) Count(name string) error                { return nil }
 func (m mockBackend) CountMult(name string, count int) error { return nil }
 func (m mockBackend) Value(name string, value float64) error { return nil }
+func (m mockBackend) Shutdown()                              {}
 
 var _ Backend = mockBackend{}

@@ -47,6 +47,8 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 		TLSConfig:        opts.TLSConfig,
 	}
 	stats := setupStats(opts, log)
+	defer stats.Shutdown()
+
 	srv := server.NewServer(log, stats, srvopts)
 
 	if opts.MockAuth {

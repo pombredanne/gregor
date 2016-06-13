@@ -11,11 +11,12 @@ import (
 )
 
 type StathatConfig struct {
-	ezkey string
+	ezkey           string
+	shutdownTimeout time.Duration
 }
 
-func NewStathatConfig(ezkey string) StathatConfig {
-	return StathatConfig{ezkey: ezkey}
+func NewStathatConfig(ezkey string, shutdownTimeout time.Duration) StathatConfig {
+	return StathatConfig{ezkey: ezkey, shutdownTimeout: shutdownTimeout}
 }
 
 type stathatBackend struct {
@@ -35,6 +36,10 @@ func (s stathatBackend) CountMult(name string, count int) error {
 
 func (s stathatBackend) Value(name string, value float64) error {
 	return s.reporter.PostEZValue(name, s.config.ezkey, value)
+}
+
+func (s stathatBackend) Shutdown() {
+	s.reporter.WaitUntilFinished(s.config.shutdownTimeout)
 }
 
 func newStathatRegistry(iconfig interface{}) (Backend, error) {

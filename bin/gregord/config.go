@@ -196,7 +196,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 
 	// Check for StatHat
 	if stathatEZKey != "" {
-		config := stats.NewStathatConfig(stathatEZKey)
+		config := stats.NewStathatConfig(stathatEZKey, 10*time.Second)
 		backend, err := stats.NewBackend(stats.STATHAT, config)
 		if err != nil {
 			return nil, bin.BadUsage("Error processing StatHat config: %s", err)
