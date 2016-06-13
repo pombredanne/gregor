@@ -270,8 +270,8 @@ func TestRunModeStats(t *testing.T) {
 	}
 
 	reg := setupStats(opts, rpc.SimpleLogOutput{})
-	if reg.GetPrefix() != "gregor - [ staging ] - " {
-		t.Fatalf("stat prefix mismatch, %s != %s", reg.GetPrefix(), "gregor - [ staging ] - ")
+	if reg.GetPrefix() != "gregor - [staging] - " {
+		t.Fatalf("stat prefix mismatch, %s != %s", reg.GetPrefix(), "gregor - [staging] - ")
 	}
 
 	opts, err = ParseOptions([]string{
