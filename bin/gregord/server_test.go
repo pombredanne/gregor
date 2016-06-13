@@ -8,6 +8,7 @@ import (
 	"os"
 	"testing"
 
+	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -253,4 +254,56 @@ func TestRunTCP(t *testing.T) {
 	srv.stopCh <- struct{}{}
 	<-doneCh
 	require.Equal(t, tries, mainLoop.conns, "right number of connections")
+}
+
+func TestRunModeStats(t *testing.T) {
+	opts, err := ParseOptions([]string{
+		"gregor",
+		"--bind-address", "localhost:3000",
+		"--auth-server", "fmprpc://localhost:30000",
+		"--mysql-dsn", "gregor:@/gregor_test",
+		"-stathat-ezkey", "test",
+		"-keybase-run-mode", "staging",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reg := setupStats(opts, rpc.SimpleLogOutput{})
+	if reg.GetPrefix() != "gregor - [ staging ] - " {
+		t.Fatalf("stat prefix mismatch, %s != %s", reg.GetPrefix(), "gregor - [ staging ] - ")
+	}
+
+	opts, err = ParseOptions([]string{
+		"gregor",
+		"--bind-address", "localhost:3000",
+		"--auth-server", "fmprpc://localhost:30000",
+		"--mysql-dsn", "gregor:@/gregor_test",
+		"-stathat-ezkey", "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reg = setupStats(opts, rpc.SimpleLogOutput{})
+	if reg.GetPrefix() != "gregor - " {
+		t.Fatalf("stat prefix mismatch, %s != %s", reg.GetPrefix(), "gregor - ")
+	}
+
+	opts, err = ParseOptions([]string{
+		"gregor",
+		"--bind-address", "localhost:3000",
+		"--auth-server", "fmprpc://localhost:30000",
+		"--mysql-dsn", "gregor:@/gregor_test",
+		"-stathat-ezkey", "test",
+		"-keybase-run-mode", "prod",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reg = setupStats(opts, rpc.SimpleLogOutput{})
+	if reg.GetPrefix() != "gregor - " {
+		t.Fatalf("stat prefix mismatch, %s != %s", reg.GetPrefix(), "gregor - ")
+	}
 }
