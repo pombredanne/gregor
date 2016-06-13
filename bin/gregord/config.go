@@ -35,6 +35,7 @@ type Options struct {
 	SuperTokenRefreshInterval time.Duration
 	ChildMode                 bool
 	StatsBackend              stats.Backend
+	RunMode                   string
 }
 
 const usageStr = `Usage:
@@ -128,6 +129,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.DurationVar(&options.PublishTimeout, "publish-timeout", 200*time.Millisecond, "Timeout on publish calls")
 	fs.DurationVar(&options.SuperTokenRefreshInterval, "super-token-refresh-interval", 1*time.Hour, "Time interval in between creating new authd super tokens")
 	fs.StringVar(&stathatEZKey, "stathat-ezkey", os.Getenv("STATHAT_EZKEY"), "stathat ezkey")
+	fs.StringVar(&options.RunMode, "keybase-run-mode", os.Getenv("KEYBASE_RUN_MODE"), "keybase run mode")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())

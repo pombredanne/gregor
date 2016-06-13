@@ -22,6 +22,7 @@ type Registry interface {
 	ValueInt(name string, value int)
 	Value(name string, value float64)
 	SetPrefix(prefix string) Registry
+	GetPrefix() string
 	Shutdown()
 }
 
@@ -49,6 +50,10 @@ func (r SimpleRegistry) SetPrefix(prefix string) Registry {
 		newreg.prefix = r.prefix + prefix + " - "
 	}
 	return newreg
+}
+
+func (r SimpleRegistry) GetPrefix() string {
+	return r.prefix
 }
 
 func (r SimpleRegistry) Count(name string) {
@@ -118,7 +123,8 @@ func (r DummyRegistry) ValueInt(name string, value int)  {}
 func (r DummyRegistry) SetPrefix(prefix string) Registry {
 	return r
 }
-func (r DummyRegistry) Shutdown() {}
+func (r DummyRegistry) Shutdown()         {}
+func (r DummyRegistry) GetPrefix() string { return "" }
 
 var _ Registry = DummyRegistry{}
 
@@ -128,5 +134,6 @@ func (m mockBackend) Count(name string) error                { return nil }
 func (m mockBackend) CountMult(name string, count int) error { return nil }
 func (m mockBackend) Value(name string, value float64) error { return nil }
 func (m mockBackend) Shutdown()                              {}
+func (m mockBackend) GetPrefix() string                      { return "" }
 
 var _ Backend = mockBackend{}
