@@ -100,7 +100,7 @@ func setupStats(opts *Options, log rpc.LogOutput) stats.Registry {
 	if opts.StatsBackend != nil {
 		statreg = stats.NewSimpleRegistry(opts.StatsBackend, log).SetPrefix("gregor")
 		if opts.RunMode != "" && opts.RunMode != "prod" {
-			statreg = statreg.SetPrefix("[ " + opts.RunMode + " ]")
+			statreg = statreg.SetPrefix("[" + opts.RunMode + "]")
 		}
 	} else {
 		statreg = stats.DummyRegistry{}
