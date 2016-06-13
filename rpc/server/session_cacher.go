@@ -23,28 +23,30 @@ type expirySt struct {
 
 // SessionCacher implements gregor1.AuthInterface with a cache of authenticated sessions.
 type SessionCacher struct {
-	parent       gregor1.AuthInterface
-	cl           clockwork.Clock
-	timeout      time.Duration
-	sessions     map[gregor1.SessionToken]*gregor1.AuthResult
-	sessionIDs   map[gregor1.SessionID]gregor1.SessionToken
-	reqCh        chan request
-	expiryQueue  []expirySt
-	authdHandler *authdHandler
-	stats        stats.Registry
+	parent          gregor1.AuthInterface
+	cl              clockwork.Clock
+	timeout         time.Duration
+	sessions        map[gregor1.SessionToken]*gregor1.AuthResult
+	sessionIDs      map[gregor1.SessionID]gregor1.SessionToken
+	reqCh           chan request
+	statsShutdownCh chan struct{}
+	expiryQueue     []expirySt
+	authdHandler    *authdHandler
+	stats           stats.Registry
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
 func NewSessionCacher(a gregor1.AuthInterface, stats stats.Registry, cl clockwork.Clock,
 	timeout time.Duration) *SessionCacher {
 	sc := &SessionCacher{
-		parent:     a,
-		cl:         cl,
-		timeout:    timeout,
-		sessions:   make(map[gregor1.SessionToken]*gregor1.AuthResult),
-		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
-		reqCh:      make(chan request),
-		stats:      stats.SetPrefix("session_cacher"),
+		parent:          a,
+		cl:              cl,
+		timeout:         timeout,
+		sessions:        make(map[gregor1.SessionToken]*gregor1.AuthResult),
+		sessionIDs:      make(map[gregor1.SessionID]gregor1.SessionToken),
+		reqCh:           make(chan request),
+		statsShutdownCh: make(chan struct{}),
+		stats:           stats.SetPrefix("session_cacher"),
 	}
 	go sc.requestHandler()
 	go sc.updateStatsLoop()
@@ -76,8 +78,12 @@ func (sc *SessionCacher) updateStats() {
 
 func (sc *SessionCacher) updateStatsLoop() {
 	for {
-		sc.updateStats()
-		time.Sleep(time.Second)
+		select {
+		case <-sc.statsShutdownCh:
+			return
+		case <-time.After(time.Second):
+			sc.updateStats()
+		}
 	}
 }
 
@@ -157,6 +163,7 @@ func (sc *SessionCacher) requestHandler() {
 // Close allows the SessionCacher to be garbage collected.
 func (sc *SessionCacher) Close() {
 	close(sc.reqCh)
+	close(sc.statsShutdownCh)
 	if sc.authdHandler != nil {
 		sc.authdHandler.Close()
 	}

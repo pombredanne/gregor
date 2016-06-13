@@ -212,8 +212,12 @@ func (s *Server) updateServerValueStats() {
 
 func (s *Server) updateServerValueStatsLoop() {
 	for {
-		s.updateServerValueStats()
-		s.clock.Sleep(1 * time.Second)
+		select {
+		case <-s.closeCh:
+			return
+		case <-time.After(time.Second):
+			s.updateServerValueStats()
+		}
 	}
 }
 

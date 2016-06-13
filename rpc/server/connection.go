@@ -375,8 +375,8 @@ func (c instrumentedConnection) instrument(name string) func() {
 	now := time.Now()
 	return func() {
 		dur := time.Since(now)
-		durms := int(dur.Nanoseconds() / 1000000)
-		if durms > 10000 {
+		durms := int(dur / time.Millisecond)
+		if dur > 10*time.Second {
 			c.conn.stats.Count("slow response - " + name)
 			c.conn.log.Error("slow response time: rpc: %s time: %dms", name, durms)
 		}
@@ -385,51 +385,43 @@ func (c instrumentedConnection) instrument(name string) func() {
 }
 
 func (c instrumentedConnection) AuthenticateSessionToken(ctx context.Context, arg gregor1.SessionToken) (gregor1.AuthResult, error) {
-	f := c.instrument("AuthenticateSessionToken")
-	defer f()
+	defer c.instrument("AuthenticateSessionToken")()
 	return c.conn.AuthenticateSessionToken(ctx, arg)
 }
 
 func (c instrumentedConnection) Sync(ctx context.Context, arg gregor1.SyncArg) (res gregor1.SyncResult, err error) {
-	f := c.instrument("Sync")
-	defer f()
+	defer c.instrument("Sync")()
 	return c.conn.Sync(ctx, arg)
 }
 
 func (c instrumentedConnection) ConsumeMessage(ctx context.Context, arg gregor1.Message) error {
-	f := c.instrument("ConsumeMessage")
-	defer f()
+	defer c.instrument("ConsumeMessage")()
 	return c.conn.ConsumeMessage(ctx, arg)
 }
 
 func (c instrumentedConnection) ConsumePublishMessage(ctx context.Context, arg gregor1.Message) error {
-	f := c.instrument("ConsumePublishMessage")
-	defer f()
+	defer c.instrument("ConsumePublishMessage")()
 	return c.conn.ConsumePublishMessage(ctx, arg)
 }
 
 func (c instrumentedConnection) Ping(ctx context.Context) (string, error) {
-	f := c.instrument("Ping")
-	defer f()
+	defer c.instrument("Ping")()
 	return c.conn.Ping(ctx)
 }
 
 func (c instrumentedConnection) StateByCategoryPrefix(ctx context.Context,
 	arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
-	f := c.instrument("StateByCategoryPrefix")
-	defer f()
+	defer c.instrument("StateByCategoryPrefix")()
 	return c.conn.StateByCategoryPrefix(ctx, arg)
 }
 
 func (c instrumentedConnection) GetReminders(ctx context.Context, arg int) (gregor1.ReminderSet, error) {
-	f := c.instrument("GetReminders")
-	defer f()
+	defer c.instrument("GetReminders")()
 	return c.conn.GetReminders(ctx, arg)
 }
 
 func (c instrumentedConnection) DeleteReminders(ctx context.Context, arg []gregor1.ReminderID) error {
-	f := c.instrument("DeleteReminders")
-	defer f()
+	defer c.instrument("DeleteReminders")()
 	return c.conn.DeleteReminders(ctx, arg)
 }
 
