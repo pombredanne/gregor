@@ -12,6 +12,7 @@ import (
 
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/bin"
+	"github.com/keybase/gregor/stats"
 )
 
 type Options struct {
@@ -33,6 +34,7 @@ type Options struct {
 	PublishTimeout            time.Duration
 	SuperTokenRefreshInterval time.Duration
 	ChildMode                 bool
+	StatsBackend              stats.Backend
 }
 
 const usageStr = `Usage:
@@ -94,6 +96,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	var options Options
 	var s3conf bin.S3Config
 	var tlsKey, tlsCert, tlsCA, tlsHostname string
+	var stathatEZKey string
 	var useAwsExternalAddr bool
 	authServer := &bin.FMPURIGetter{S: os.Getenv("AUTH_SERVER")}
 	mysqlDSN := &bin.DSNGetter{S: os.Getenv("MYSQL_DSN"), S3conf: &s3conf}
@@ -124,6 +127,7 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 	fs.IntVar(&options.NumPublishers, "num-publishers", 10, "Number of publisher goroutines")
 	fs.DurationVar(&options.PublishTimeout, "publish-timeout", 200*time.Millisecond, "Timeout on publish calls")
 	fs.DurationVar(&options.SuperTokenRefreshInterval, "super-token-refresh-interval", 1*time.Hour, "Time interval in between creating new authd super tokens")
+	fs.StringVar(&stathatEZKey, "stathat-ezkey", os.Getenv("STATHAT_EZKEY"), "stathat ezkey")
 
 	if err := fs.Parse(argv[1:]); err != nil {
 		return nil, bin.BadUsage(err.Error())
@@ -188,6 +192,16 @@ func parseOptions(argv []string, quiet bool) (*Options, error) {
 		options.AuthServer = v
 	default:
 		return nil, bin.BadUsage("Error parsing auth server URI")
+	}
+
+	// Check for StatHat
+	if stathatEZKey != "" {
+		config := stats.NewStathatConfig(stathatEZKey, 10*time.Second)
+		backend, err := stats.NewBackend(stats.STATHAT, config)
+		if err != nil {
+			return nil, bin.BadUsage("Error processing StatHat config: %s", err)
+		}
+		options.StatsBackend = backend
 	}
 
 	return &options, nil

@@ -14,6 +14,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
 	server "github.com/keybase/gregor/rpc/server"
+	"github.com/keybase/gregor/stats"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
@@ -168,8 +169,8 @@ func TestConsumeBroadcastFlow(t *testing.T) {
 	}
 
 	rid := gregor1.ReminderID{
-		Uid_:        rem.Item_.Md_.Uid_,
-		MsgID_:      rem.Item_.Md_.MsgID_,
+		Uid_:   rem.Item_.Md_.Uid_,
+		MsgID_: rem.Item_.Md_.MsgID_,
 		Seqno_: rem.Seqno_,
 	}
 	err = superCli.RemindClient().DeleteReminders(context.TODO(), []gregor1.ReminderID{rid})
@@ -205,7 +206,7 @@ func startTestGregord(t *testing.T, db *sql.DB, auth *mockAuth) (net.Addr, *test
 		StorageHandlers:  10,
 		StorageQueueSize: 10000,
 	}
-	srv := server.NewServer(rpc.SimpleLogOutput{}, opts)
+	srv := server.NewServer(rpc.SimpleLogOutput{}, stats.DummyRegistry{}, opts)
 	srv.SetAuthenticator(auth)
 	e := test.NewEvents()
 	srv.SetEventHandler(e)

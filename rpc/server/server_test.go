@@ -16,6 +16,7 @@ import (
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	gregor "github.com/keybase/gregor"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/stats"
 	"github.com/keybase/gregor/storage"
 	"github.com/keybase/gregor/test"
 	"golang.org/x/net/context"
@@ -98,7 +99,7 @@ func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Even
 		StorageHandlers:  10,
 		StorageQueueSize: 10000,
 	}
-	s := NewServer(rpc.SimpleLogOutput{}, opts)
+	s := NewServer(rpc.SimpleLogOutput{}, stats.DummyRegistry{}, opts)
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)

@@ -12,6 +12,7 @@ import (
 	"github.com/keybase/gregor/protocol/gregor1"
 	server "github.com/keybase/gregor/rpc/server"
 	"github.com/keybase/gregor/srvup"
+	"github.com/keybase/gregor/stats"
 	"github.com/keybase/gregor/storage"
 )
 
@@ -34,6 +35,8 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 	rpcopts := rpc.NewStandardLogOptions(opts.RPCDebug, log)
 	log.Configure(opts.Debug)
 	log.Debug("Options Parsed. Creating server...")
+
+	// Create server
 	srvopts := server.ServerOpts{
 		BroadcastTimeout: opts.BroadcastTimeout,
 		PublishChSize:    opts.PublishBufferSize,
@@ -43,12 +46,15 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 		StorageQueueSize: opts.StorageQueueSize,
 		TLSConfig:        opts.TLSConfig,
 	}
-	srv := server.NewServer(log, srvopts)
+	stats := setupStats(opts, log)
+	defer stats.Shutdown()
+
+	srv := server.NewServer(log, stats, srvopts)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
 	} else {
-		sc := server.NewSessionCacherFromURI(opts.AuthServer, clockwork.NewRealClock(),
+		sc := server.NewSessionCacherFromURI(opts.AuthServer, stats, clockwork.NewRealClock(),
 			10*time.Minute, log, rpcopts, opts.SuperTokenRefreshInterval)
 		defer sc.Close()
 
@@ -86,6 +92,17 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 		return 4, err
 	}
 	return 0, nil
+}
+
+func setupStats(opts *Options, log rpc.LogOutput) stats.Registry {
+	// Create stats registry
+	var statreg stats.Registry
+	if opts.StatsBackend != nil {
+		statreg = stats.NewSimpleRegistry(opts.StatsBackend, log).SetPrefix("gregor")
+	} else {
+		statreg = stats.DummyRegistry{}
+	}
+	return statreg
 }
 
 func setupPubSub(opts *Options, log *bin.StandardLogger) (*srvup.Status, error) {

@@ -75,6 +75,12 @@
 			"revisionTime": "2016-04-18T23:58:27+01:00"
 		},
 		{
+			"checksumSHA1": "T/hWBmVscxej9O+T3dLVZ7cFMOM=",
+			"path": "github.com/stathat/go",
+			"revision": "c4a3549d29b0f52331c9f13abc93165ba4a66161",
+			"revisionTime": "2016-06-10T16:56:59Z"
+		},
+		{
 			"path": "github.com/stretchr/testify/assert",
 			"revision": "6fe211e493929a8aac0469b93f28b1d0688a9a3a",
 			"revisionTime": "2016-03-05T16:54:46Z"

@@ -7,6 +7,7 @@ import (
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/stats"
 	"golang.org/x/net/context"
 )
 
@@ -22,33 +23,41 @@ type expirySt struct {
 
 // SessionCacher implements gregor1.AuthInterface with a cache of authenticated sessions.
 type SessionCacher struct {
-	parent       gregor1.AuthInterface
-	cl           clockwork.Clock
-	timeout      time.Duration
-	sessions     map[gregor1.SessionToken]*gregor1.AuthResult
-	sessionIDs   map[gregor1.SessionID]gregor1.SessionToken
-	reqCh        chan request
-	expiryQueue  []expirySt
-	authdHandler *authdHandler
+	parent          gregor1.AuthInterface
+	cl              clockwork.Clock
+	timeout         time.Duration
+	sessions        map[gregor1.SessionToken]*gregor1.AuthResult
+	sessionIDs      map[gregor1.SessionID]gregor1.SessionToken
+	reqCh           chan request
+	statsShutdownCh chan struct{}
+	expiryQueue     []expirySt
+	authdHandler    *authdHandler
+	stats           stats.Registry
 }
 
 // NewSessionCacher creates a new AuthInterface that caches sessions for the given timeout.
-func NewSessionCacher(a gregor1.AuthInterface, cl clockwork.Clock, timeout time.Duration) *SessionCacher {
+func NewSessionCacher(a gregor1.AuthInterface, stats stats.Registry, cl clockwork.Clock,
+	timeout time.Duration) *SessionCacher {
 	sc := &SessionCacher{
-		parent:     a,
-		cl:         cl,
-		timeout:    timeout,
-		sessions:   make(map[gregor1.SessionToken]*gregor1.AuthResult),
-		sessionIDs: make(map[gregor1.SessionID]gregor1.SessionToken),
-		reqCh:      make(chan request),
+		parent:          a,
+		cl:              cl,
+		timeout:         timeout,
+		sessions:        make(map[gregor1.SessionToken]*gregor1.AuthResult),
+		sessionIDs:      make(map[gregor1.SessionID]gregor1.SessionToken),
+		reqCh:           make(chan request),
+		statsShutdownCh: make(chan struct{}),
+		stats:           stats.SetPrefix("session_cacher"),
 	}
 	go sc.requestHandler()
+	go sc.updateStatsLoop()
 	return sc
 }
 
-func NewSessionCacherFromURI(uri *rpc.FMPURI, cl clockwork.Clock, timeout time.Duration,
-	log rpc.LogOutput, opts rpc.LogOptions, refreshInterval time.Duration) *SessionCacher {
-	sc := NewSessionCacher(nil, cl, timeout)
+func NewSessionCacherFromURI(uri *rpc.FMPURI, stats stats.Registry, cl clockwork.Clock,
+	timeout time.Duration, log rpc.LogOutput, opts rpc.LogOptions,
+	refreshInterval time.Duration) *SessionCacher {
+
+	sc := NewSessionCacher(nil, stats, cl, timeout)
 	transport := rpc.NewConnectionTransport(uri, rpc.NewSimpleLogFactory(log, opts), keybase1.WrapError)
 	sc.authdHandler = NewAuthdHandler(sc, log, refreshInterval)
 
@@ -61,6 +70,21 @@ func NewSessionCacherFromURI(uri *rpc.FMPURI, cl clockwork.Clock, timeout time.D
 
 func (sc *SessionCacher) GetSuperToken() gregor1.SessionToken {
 	return sc.authdHandler.GetSuperToken()
+}
+
+func (sc *SessionCacher) updateStats() {
+	sc.stats.ValueInt("cache size", sc.Size())
+}
+
+func (sc *SessionCacher) updateStatsLoop() {
+	for {
+		select {
+		case <-sc.statsShutdownCh:
+			return
+		case <-time.After(time.Second):
+			sc.updateStats()
+		}
+	}
 }
 
 type request interface{}
@@ -139,6 +163,7 @@ func (sc *SessionCacher) requestHandler() {
 // Close allows the SessionCacher to be garbage collected.
 func (sc *SessionCacher) Close() {
 	close(sc.reqCh)
+	close(sc.statsShutdownCh)
 	if sc.authdHandler != nil {
 		sc.authdHandler.Close()
 	}
@@ -158,11 +183,13 @@ func (sc *SessionCacher) AuthenticateSessionToken(ctx context.Context, tok grego
 	respCh := make(chan *gregor1.AuthResult)
 
 	// Fire off request for a cached session
+	sc.stats.Count("AuthenticateSessionToken")
 	sc.reqCh <- readTokReq{tok, respCh}
 
 	// Receive the response and return it if we hit the cache
 	resp := <-respCh
 	if resp != nil {
+		sc.stats.Count("AuthenticateSessionToken - cache hit")
 		res = *resp
 		return
 	}

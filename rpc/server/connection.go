@@ -11,6 +11,7 @@ import (
 	keybase1 "github.com/keybase/client/go/protocol"
 	rpc "github.com/keybase/go-framed-msgpack-rpc"
 	"github.com/keybase/gregor/protocol/gregor1"
+	"github.com/keybase/gregor/stats"
 	"golang.org/x/net/context"
 )
 
@@ -67,7 +68,13 @@ type connection struct {
 	// startAuthentication() finishes successfully.
 	serverDoneCh <-chan struct{}
 
-	log rpc.LogOutput
+	log   rpc.LogOutput
+	stats stats.Registry
+}
+
+// instrumentedConnection times all of the RPC calls served for stats purposes
+type instrumentedConnection struct {
+	conn *connection
 }
 
 func newConnection(c net.Conn, parent *Server) (*connection, error) {
@@ -79,6 +86,7 @@ func newConnection(c net.Conn, parent *Server) (*connection, error) {
 		parent: parent,
 		authCh: make(chan error, 1),
 		log:    parent.log,
+		stats:  parent.stats.SetPrefix("connection"),
 	}
 
 	if err := conn.startRPCServer(); err != nil {
@@ -130,6 +138,7 @@ func (c *connection) checkMessageAuth(ctx context.Context, m gregor1.Message) er
 
 func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.SessionToken) (gregor1.AuthResult, error) {
 
+	c.stats.Count("AuthenticateSessionToken")
 	c.log.Debug("Authenticate: %+v", tok)
 	if tok == "" {
 		var UnauthenticatedSessionError = keybase1.Status{
@@ -137,6 +146,7 @@ func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.S
 			Code: int(keybase1.StatusCode_SCBadSession),
 			Desc: "unauthed session"}
 		c.log.Error("Authenticate: blank session token for connection!")
+		c.stats.Count("AuthenticateSessionToken - blank")
 		return gregor1.AuthResult{}, UnauthenticatedSessionError
 	}
 
@@ -155,6 +165,7 @@ func (c *connection) AuthenticateSessionToken(ctx context.Context, tok gregor1.S
 }
 
 func (c *connection) Sync(ctx context.Context, arg gregor1.SyncArg) (gregor1.SyncResult, error) {
+	c.stats.Count("Sync")
 	if err := c.checkUIDAuth(ctx, arg.Uid); err != nil {
 		return gregor1.SyncResult{}, err
 	}
@@ -228,15 +239,19 @@ func (c *connection) ConsumeMessage(ctx context.Context, m gregor1.Message) erro
 
 	// Check the validity of the message first
 	if err := validateConsumeMessage(m); err != nil {
+		c.stats.Count("validateConsumeMessage failed")
 		return err
 	}
 
+	c.stats.Count("ConsumeMessage")
 	// Debugging
 	ibm := m.ToInBandMessage()
 	if ibm != nil {
+		c.stats.Count("ConsumeMessage - ibm")
 		c.log.Debug("ConsumeMessage: in-band message: msgID: %s Ctime: %s",
 			m.ToInBandMessage().Metadata().MsgID(), m.ToInBandMessage().Metadata().CTime())
 	} else {
+		c.stats.Count("ConsumeMessage - oobm")
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
@@ -259,9 +274,11 @@ func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Messag
 	// Debugging
 	ibm := m.ToInBandMessage()
 	if ibm != nil {
+		c.stats.Count("ConsumePublishMessage - ibm")
 		c.log.Debug("ConsumeMessage: in-band message: msgID: %s Ctime: %s",
 			m.ToInBandMessage().Metadata().MsgID(), m.ToInBandMessage().Metadata().CTime())
 	} else {
+		c.stats.Count("ConsumePublishMessage - oobm")
 		c.log.Debug("ConsumeMessage: out-of-band message: uid: %s", m.ToOutOfBandMessage().UID())
 	}
 
@@ -275,6 +292,7 @@ func (c *connection) ConsumePublishMessage(ctx context.Context, m gregor1.Messag
 }
 
 func (c *connection) StateByCategoryPrefix(ctx context.Context, arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	c.stats.Count("StateByCategoryPrefix")
 	if err := c.checkUIDAuth(ctx, arg.Uid); err != nil {
 		return gregor1.State{}, err
 	}
@@ -282,11 +300,12 @@ func (c *connection) StateByCategoryPrefix(ctx context.Context, arg gregor1.Stat
 }
 
 func (c *connection) Ping(ctx context.Context) (string, error) {
+	c.stats.Count("Ping")
 	return "pong", nil
 }
 
 func (c *connection) GetReminders(ctx context.Context, maxReminders int) (ret gregor1.ReminderSet, err error) {
-
+	c.stats.Count("GetReminders")
 	// Need to have super user for GetReminders
 	if err = c.checkUIDAuth(ctx, superUID); err != nil {
 		return ret, err
@@ -296,6 +315,8 @@ func (c *connection) GetReminders(ctx context.Context, maxReminders int) (ret gr
 }
 
 func (c *connection) DeleteReminders(ctx context.Context, rids []gregor1.ReminderID) error {
+
+	c.stats.Count("DeleteReminders")
 
 	// Need to have super user for DeleteReminders
 	if err := c.checkUIDAuth(ctx, superUID); err != nil {
@@ -307,10 +328,11 @@ func (c *connection) DeleteReminders(ctx context.Context, rids []gregor1.Reminde
 func (c *connection) startRPCServer() error {
 	c.server = rpc.NewServer(c.xprt, keybase1.WrapError)
 
+	iconn := instrumentedConnection{conn: c}
 	prots := []rpc.Protocol{
-		gregor1.AuthProtocol(c),
-		gregor1.IncomingProtocol(c),
-		gregor1.RemindProtocol(c),
+		gregor1.AuthProtocol(iconn),
+		gregor1.IncomingProtocol(iconn),
+		gregor1.RemindProtocol(iconn),
 	}
 	for _, prot := range prots {
 		c.log.Info("registering protocol %s", prot.Name)
@@ -349,5 +371,62 @@ func (c *connection) close() {
 	c.c.Close()
 }
 
+func (c instrumentedConnection) instrument(name string) func() {
+	now := time.Now()
+	return func() {
+		dur := time.Since(now)
+		durms := int(dur / time.Millisecond)
+		if dur > 10*time.Second {
+			c.conn.stats.Count("slow response - " + name)
+			c.conn.log.Error("slow response time: rpc: %s time: %dms", name, durms)
+		}
+		c.conn.stats.ValueInt("speed - "+name, durms)
+	}
+}
+
+func (c instrumentedConnection) AuthenticateSessionToken(ctx context.Context, arg gregor1.SessionToken) (gregor1.AuthResult, error) {
+	defer c.instrument("AuthenticateSessionToken")()
+	return c.conn.AuthenticateSessionToken(ctx, arg)
+}
+
+func (c instrumentedConnection) Sync(ctx context.Context, arg gregor1.SyncArg) (res gregor1.SyncResult, err error) {
+	defer c.instrument("Sync")()
+	return c.conn.Sync(ctx, arg)
+}
+
+func (c instrumentedConnection) ConsumeMessage(ctx context.Context, arg gregor1.Message) error {
+	defer c.instrument("ConsumeMessage")()
+	return c.conn.ConsumeMessage(ctx, arg)
+}
+
+func (c instrumentedConnection) ConsumePublishMessage(ctx context.Context, arg gregor1.Message) error {
+	defer c.instrument("ConsumePublishMessage")()
+	return c.conn.ConsumePublishMessage(ctx, arg)
+}
+
+func (c instrumentedConnection) Ping(ctx context.Context) (string, error) {
+	defer c.instrument("Ping")()
+	return c.conn.Ping(ctx)
+}
+
+func (c instrumentedConnection) StateByCategoryPrefix(ctx context.Context,
+	arg gregor1.StateByCategoryPrefixArg) (gregor1.State, error) {
+	defer c.instrument("StateByCategoryPrefix")()
+	return c.conn.StateByCategoryPrefix(ctx, arg)
+}
+
+func (c instrumentedConnection) GetReminders(ctx context.Context, arg int) (gregor1.ReminderSet, error) {
+	defer c.instrument("GetReminders")()
+	return c.conn.GetReminders(ctx, arg)
+}
+
+func (c instrumentedConnection) DeleteReminders(ctx context.Context, arg []gregor1.ReminderID) error {
+	defer c.instrument("DeleteReminders")()
+	return c.conn.DeleteReminders(ctx, arg)
+}
+
 var _ gregor1.AuthInterface = (*connection)(nil)
 var _ gregor1.IncomingInterface = (*connection)(nil)
+var _ gregor1.AuthInterface = instrumentedConnection{}
+var _ gregor1.IncomingInterface = instrumentedConnection{}
+var _ gregor1.RemindInterface = instrumentedConnection{}
