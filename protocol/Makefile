@@ -6,7 +6,7 @@ AVDL2JSON=node_modules/.bin/avdl2json
 
 build: gregor1/*.avdl | install
 	$(AVDLC) -b -l go -o gregor1/ gregor1/*.avdl
-	$(AVDL2JSON) -2 -o gregor1/common.json -i gregor1/common.avdl
+	$(AVDL2JSON) -2 -b -o gregor1 gregor1/*.avdl
 	go fmt ./...
 	date > go-build-stamp
 
