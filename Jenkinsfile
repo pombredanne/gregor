@@ -38,7 +38,6 @@ node("linux") {
                 sh "npm i && git diff --quiet --exit-code"
             }
             sh "$GOPATH/bin/dbinit -y"
-            sh "cp $GOPATH/bin/gregord bin/gregord/gregord"
 
             stage "Test"
             sh "go test ./..."
@@ -46,6 +45,8 @@ node("linux") {
         }
 
         stage "Dockerize"
+        sh "cp $GOPATH/bin/gregord bin/gregord/gregord"
+        sh "cp $GOPATH/bin/dbinit bin/dbinit/dbinit"
         def gregorImage = docker.build("keybaseprivate/kbgregor", "bin")
         def kbgregor = "kbgregor_${env.BUILD_TAG}.tar"
         sh "docker save -o $kbgregor keybaseprivate/kbgregor"
