@@ -91,9 +91,7 @@ func (sc *SessionCacher) setRes(tok gregor1.SessionToken, res *gregor1.AuthResul
 
 func (sc *SessionCacher) deleteSID(sid gregor1.SessionID) {
 	if tok, ok := sc.sessionIDs[sid]; ok {
-		if _, ok := sc.sessions[tok]; ok {
-			delete(sc.sessions, sc.sessionIDs[sid])
-		}
+		delete(sc.sessions, tok)
 		delete(sc.sessionIDs, sid)
 	}
 }
@@ -120,7 +118,7 @@ func (sc *SessionCacher) clearExpiryQueue() {
 			return
 		}
 
-		sc.deleteSID(sc.expiryQueue[0].sid)
+		sc.deleteSID(e.sid)
 		sc.expiryQueue = sc.expiryQueue[1:]
 	}
 }
