@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -12,29 +13,20 @@ import (
 	"golang.org/x/net/context"
 )
 
-type connectionArgs struct {
-	c  *connection
-	id connectionID
-}
-
 type statsRes struct {
 	totalConns int
 }
 
 type perUIDServer struct {
-	uid        gregor1.UID
-	conns      map[connectionID]*connection
-	lastConnID connectionID
+	sync.RWMutex
 
-	parentConfirmCh  chan confirmUIDShutdownArgs
-	newConnectionCh  chan *connectionArgs
-	sendBroadcastCh  chan gregor1.Message
-	tryShutdownCh    chan bool
-	closeListenCh    chan error
-	parentShutdownCh chan struct{}
-	statsCh          chan chan statsRes
-	selfShutdownCh   chan struct{}
-	events           EventHandler
+	uid   gregor1.UID
+	conns map[*connection]bool
+	alive bool
+
+	sendBroadcastCh chan broadcastArg
+	shutdownCh      chan struct{}
+	events          EventHandler
 
 	log   rpc.LogOutput
 	stats stats.Registry
@@ -42,30 +34,35 @@ type perUIDServer struct {
 	broadcastTimeout time.Duration // in MS
 }
 
-func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArgs,
-	shutdownCh chan struct{}, events EventHandler, log rpc.LogOutput, stats stats.Registry,
-	bt time.Duration) *perUIDServer {
+func newPerUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}, events EventHandler,
+	log rpc.LogOutput, stats stats.Registry, bt time.Duration) *perUIDServer {
 
 	s := &perUIDServer{
 		uid:              uid,
-		conns:            make(map[connectionID]*connection),
-		newConnectionCh:  make(chan *connectionArgs, 1),
-		sendBroadcastCh:  make(chan gregor1.Message, 1000), // make this a huge queue for slow devices
-		tryShutdownCh:    make(chan bool, 1),               // buffered so it can receive inside serve()
-		closeListenCh:    make(chan error, 100),            // each connection uses the same closeListenCh, so buffer it more than 1
-		parentConfirmCh:  parentConfirmCh,
-		parentShutdownCh: shutdownCh,
-		statsCh:          make(chan chan statsRes),
-		selfShutdownCh:   make(chan struct{}),
+		conns:            make(map[*connection]bool),
+		sendBroadcastCh:  make(chan broadcastArg, 1000), // make this a huge queue for slow devices
+		shutdownCh:       make(chan struct{}),
 		events:           events,
 		log:              log,
 		stats:            stats.SetPrefix("user_server"),
 		broadcastTimeout: bt,
+		alive:            true,
 	}
 
 	s.stats.Count("new")
 
-	go s.serve()
+	// Spawn thread to look for our parent going down so we can clean up
+	go func() {
+		select {
+		case <-s.shutdownCh:
+			return
+		case <-parentShutdownCh:
+			s.Shutdown(true)
+		}
+	}()
+
+	// Spawn thread for running broadcast requests
+	go s.broadcastHandler()
 
 	if s.events != nil {
 		s.events.UIDServerCreated(s.uid)
@@ -74,75 +71,153 @@ func newPerUIDServer(uid gregor1.UID, parentConfirmCh chan confirmUIDShutdownArg
 	return s
 }
 
-func (s *perUIDServer) logError(prefix string, err error) {
-	if err == nil {
-		return
-	}
-	s.log.Info("[uid %s] %s error: %s", s.uid, prefix, err)
+func (s *perUIDServer) GetStats() statsRes {
+	s.RLock()
+	defer s.RUnlock()
+	return statsRes{totalConns: len(s.conns)}
 }
 
-func (s *perUIDServer) sendStats(resChan chan statsRes) {
-	resChan <- statsRes{totalConns: len(s.conns)}
-}
+// AddConnection will add a new connection to the list for this user server
+func (s *perUIDServer) AddConnection(conn *connection) {
+	s.Lock()
+	defer s.Unlock()
 
-func (s *perUIDServer) serve() {
-	defer func() {
-		if s.events != nil {
-			s.events.UIDServerDestroyed(s.uid)
-		}
-		s.stats.Count("destroyed")
-	}()
-	for {
-		select {
-		case a := <-s.newConnectionCh:
-			s.logError("addConn", s.addConn(a))
-		case m := <-s.sendBroadcastCh:
-			s.broadcast(m)
-		case <-s.closeListenCh:
-			s.checkClosed()
-			s.tryShutdown()
-		case <-s.tryShutdownCh:
-			s.tryShutdown()
-		case <-s.parentShutdownCh:
-			s.removeAllConns()
-			return
-		case <-s.selfShutdownCh:
-			s.removeAllConns()
-			return
-		case r := <-s.statsCh:
-			s.sendStats(r)
-		}
-	}
-}
+	// Spawn a thread which will watch for this connection going down
+	go s.waitOnConnection(conn)
 
-func (s *perUIDServer) addConn(a *connectionArgs) error {
-	// Multiplex the connection close errors into closeListenCh.
-	go func() {
-		<-a.c.serverDoneChan()
-		s.closeListenCh <- a.c.serverDoneErr()
-	}()
+	s.conns[conn] = true
+
 	s.stats.Count("new conn")
-	s.conns[a.id] = a.c
-	s.lastConnID = a.id
 	if s.events != nil {
 		s.events.ConnectionCreated(s.uid)
 	}
-
-	return nil
 }
 
-func (s *perUIDServer) broadcast(m gregor1.Message) {
-	var errCh = make(chan connectionArgs)
+// waitOnConnection will wait for the connection to terminate, or for the
+// UID server to be shutdown
+func (s *perUIDServer) waitOnConnection(conn *connection) {
+	select {
+	case <-conn.serverDoneChan():
+		s.checkConnections()
+	case <-s.shutdownCh:
+		return
+	}
+}
+
+// checkConnections loops over all active connections and removes any that
+// are currently dead
+func (s *perUIDServer) checkConnections() {
+	s.Lock()
+	defer s.Unlock()
+
+	s.log.Info("uid server %s: received connection closed message, checking all connections", s.uid)
+	for conn, _ := range s.conns {
+		if conn.xprt.IsConnected() {
+			continue
+		}
+		s.log.Info("uid server %s: connection closed", s.uid)
+		s.removeConnection(conn)
+	}
+}
+
+// connections makes a copy of all the current connections and returns it
+func (s *perUIDServer) connections() map[*connection]bool {
+	s.RLock()
+	defer s.RUnlock()
+	m := make(map[*connection]bool)
+	for k, v := range s.conns {
+		m[k] = v
+	}
+	return m
+}
+
+// removeConnection removes a connection for the server. This function must
+// be called with the perUIDServer write lock
+func (s *perUIDServer) removeConnection(conn *connection) {
+	s.log.Info("uid server %s: removing connection", s.uid)
+	conn.close()
+	s.stats.Count("remove conn")
+	delete(s.conns, conn)
+	if s.events != nil {
+		s.events.ConnectionDestroyed(s.uid)
+	}
+}
+
+// Shutdown shuts down all goroutines spawned by the UID server and
+// removes all connection
+func (s *perUIDServer) Shutdown(force bool) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	if !s.alive {
+		return false
+	}
+
+	if !force && len(s.conns) > 0 {
+		return false
+	}
+
+	s.log.Info("shutting down uid server: uid: %s", s.uid)
+	close(s.shutdownCh)
+	s.removeAllConns()
+	s.alive = false
+
+	return true
+}
+
+// removeAllConns removes all connections. This function must be called with
+// the UID server write lock
+func (s *perUIDServer) removeAllConns() {
+	for conn, _ := range s.conns {
+		s.removeConnection(conn)
+	}
+}
+
+type broadcastArg struct {
+	m       gregor1.Message
+	resChan chan struct{}
+}
+
+// BroadcastMessage will dispatch a broadcast request to the broadcast handler
+// goroutine. If it cannot queue it onto the channel it will fail so it does
+// does not block. It will also return a channel that can be waited on for the
+// broadcast to complete
+func (s *perUIDServer) BroadcastMessage(m gregor1.Message) (error, <-chan struct{}) {
+	resChan := make(chan struct{}, 1)
+	select {
+	case s.sendBroadcastCh <- broadcastArg{m: m, resChan: resChan}:
+	default:
+		return errors.New("broadcast queue full, rejected"), nil
+	}
+	return nil, resChan
+}
+
+func (s *perUIDServer) broadcastHandler() {
+	for {
+		select {
+		case a := <-s.sendBroadcastCh:
+			s.broadcast(a.m, a.resChan)
+		case <-s.shutdownCh:
+			return
+		}
+	}
+}
+
+// broadcast loops over all connections and sends the messages to them
+func (s *perUIDServer) broadcast(m gregor1.Message, resChan chan struct{}) {
+	var errCh = make(chan *connection)
 	var wg sync.WaitGroup
 
+	conns := s.connections()
 	s.stats.Count("broadcast")
-	s.stats.ValueInt("broadcast - conns", len(s.conns))
+	s.stats.ValueInt("broadcast - conns", len(conns))
 
-	for id, conn := range s.conns {
-		s.log.Info("uid %s broadcast to %d", s.uid, id)
+	for conn, _ := range conns {
 		if err := conn.checkMessageAuth(context.Background(), m); err != nil {
-			s.log.Info("[connection %d]: %s", id, err)
-			s.removeConnection(conn, id)
+			s.log.Info("[connection auth failed]: %s", err)
+			s.Lock()
+			s.removeConnection(conn)
+			s.Unlock()
 			continue
 		}
 		oc := gregor1.OutgoingClient{Cli: rpc.NewClient(conn.xprt, keybase1.ErrorUnwrapper{})}
@@ -152,19 +227,19 @@ func (s *perUIDServer) broadcast(m gregor1.Message) {
 		// 2.) Spawn each call into it's own goroutine so a slow device doesn't
 		//     prevent faster devices from getting these messages timely.
 		wg.Add(1)
-		go func(conn *connection, id connectionID) {
+		go func(conn *connection) {
 			defer wg.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), s.broadcastTimeout)
 			defer cancel()
 			if err := oc.BroadcastMessage(ctx, m); err != nil {
-				s.log.Info("[connection %d]: %s", id, err)
+				s.log.Info("broadcast error: %s", err)
 
 				// Push these onto a channel to clean up afterward
 				if s.isConnDown(err) {
-					errCh <- connectionArgs{conn, id}
+					errCh <- conn
 				}
 			}
-		}(conn, id)
+		}(conn)
 	}
 
 	// Wait on all the calls
@@ -174,45 +249,17 @@ func (s *perUIDServer) broadcast(m gregor1.Message) {
 	}()
 
 	// Clean up all the connections we determined are dead
-	for ca := range errCh {
-		s.removeConnection(ca.c, ca.id)
+	for conn := range errCh {
+		s.Lock()
+		s.removeConnection(conn)
+		s.Unlock()
 	}
 
 	if s.events != nil {
 		s.events.BroadcastSent(m)
 	}
 
-	if len(s.conns) == 0 {
-		s.tryShutdownCh <- true
-	}
-}
-
-// tryShutdown makes a request to the parent server for this
-// server to be terminated.
-func (s *perUIDServer) tryShutdown() {
-	// make sure no connections have been added
-	if len(s.conns) != 0 {
-		s.log.Info("tried shutdown, but %d conns for %s", len(s.conns), s.uid)
-		return
-	}
-
-	// confirm with the server that it is ok to shutdown
-	args := confirmUIDShutdownArgs{
-		uid:        s.uid,
-		lastConnID: s.lastConnID,
-	}
-	s.parentConfirmCh <- args
-}
-
-func (s *perUIDServer) checkClosed() {
-	s.log.Info("uid server %s: received connection closed message, checking all connections", s.uid)
-	for id, conn := range s.conns {
-		if conn.xprt.IsConnected() {
-			continue
-		}
-		s.log.Info("uid server %s: connection %d closed", s.uid, id)
-		s.removeConnection(conn, id)
-	}
+	resChan <- struct{}{}
 }
 
 func (s *perUIDServer) isConnDown(err error) bool {
@@ -223,20 +270,4 @@ func (s *perUIDServer) isConnDown(err error) bool {
 		return true
 	}
 	return false
-}
-
-func (s *perUIDServer) removeConnection(conn *connection, id connectionID) {
-	s.log.Info("uid server %s: removing connection %d", s.uid, id)
-	conn.close()
-	s.stats.Count("remove conn")
-	delete(s.conns, id)
-	if s.events != nil {
-		s.events.ConnectionDestroyed(s.uid)
-	}
-}
-
-func (s *perUIDServer) removeAllConns() {
-	for id, conn := range s.conns {
-		s.removeConnection(conn, id)
-	}
 }

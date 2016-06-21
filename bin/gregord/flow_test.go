@@ -206,7 +206,7 @@ func startTestGregord(t *testing.T, db *sql.DB, auth *mockAuth) (net.Addr, *test
 		StorageHandlers:  10,
 		StorageQueueSize: 10000,
 	}
-	srv := server.NewServer(rpc.SimpleLogOutput{}, stats.DummyRegistry{}, opts)
+	srv := server.NewServer(rpc.SimpleLogOutput{}, clockwork.NewFakeClock(), stats.DummyRegistry{}, opts)
 	srv.SetAuthenticator(auth)
 	e := test.NewEvents()
 	srv.SetEventHandler(e)
@@ -220,7 +220,6 @@ func startTestGregord(t *testing.T, db *sql.DB, auth *mockAuth) (net.Addr, *test
 	sm, clock := storage.NewTestMySQLEngine(db, gregor1.ObjFactory{})
 	srv.SetStorageStateMachine(sm)
 
-	go srv.Serve()
 	go func() {
 		maybeSleep()
 		if err := ms.listenAndServe(); err != nil {

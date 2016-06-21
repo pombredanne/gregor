@@ -49,7 +49,7 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 	stats := setupStats(opts, log)
 	defer stats.Shutdown()
 
-	srv := server.NewServer(log, stats, srvopts)
+	srv := server.NewServer(log, clockwork.NewRealClock(), stats, srvopts)
 
 	if opts.MockAuth {
 		srv.SetAuthenticator(newMockAuth())
@@ -84,7 +84,6 @@ func mainInner(log *bin.StandardLogger) (int, error) {
 
 	sm := storage.NewMySQLEngine(db, gregor1.ObjFactory{})
 	srv.SetStorageStateMachine(sm)
-	go srv.Serve()
 
 	log.Debug("Calling mainServer.listenAndServe()")
 	err = newMainServer(opts, srv).listenAndServe()

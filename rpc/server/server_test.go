@@ -89,7 +89,7 @@ var mockAuthenticator Authenticator = mockAuth{
 	},
 }
 
-func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Events) {
+func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Events, clockwork.FakeClock) {
 	ev := test.NewEvents()
 	opts := ServerOpts{
 		BroadcastTimeout: 10 * time.Second,
@@ -99,15 +99,15 @@ func startTestServer(ssm gregor.StateMachine) (*Server, net.Listener, *test.Even
 		StorageHandlers:  10,
 		StorageQueueSize: 10000,
 	}
-	s := NewServer(rpc.SimpleLogOutput{}, stats.DummyRegistry{}, opts)
+	c := clockwork.NewFakeClock()
+	s := NewServer(rpc.SimpleLogOutput{}, c, stats.DummyRegistry{}, opts)
 	s.events = ev
 	s.useDeadlocker = true
 	s.SetAuthenticator(mockAuthenticator)
 	s.SetStorageStateMachine(ssm)
 	l := newLocalListener()
-	go s.Serve()
 	go s.ListenLoop(l)
-	return s, l, ev
+	return s, l, ev, c
 }
 
 func newLocalListener() net.Listener {
@@ -208,7 +208,7 @@ func (c *slowClient) BroadcastMessage(ctx context.Context, m gregor1.Message) er
 }
 
 func TestAuthentication(t *testing.T) {
-	_, l, _ := startTestServer(nil)
+	_, l, _, _ := startTestServer(nil)
 	defer l.Close()
 
 	c := newClient(l.Addr())
@@ -224,7 +224,7 @@ func TestAuthentication(t *testing.T) {
 }
 
 func TestCreatePerUIDServer(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -238,11 +238,9 @@ func TestCreatePerUIDServer(t *testing.T) {
 	// wait for events from above before checking state
 	<-ev.ConnCreated
 
-	ch := make(chan *Stats)
-	s.statsCh <- ch
-	stats := <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	usc := s.UIDServerCount()
+	if usc != 1 {
+		t.Errorf("user servers: %d, expected 1", usc)
 	}
 }
 
@@ -277,7 +275,7 @@ func newUpdateMessage(uid gregor1.UID) gregor1.Message {
 }
 
 func TestBroadcast(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -304,7 +302,7 @@ func TestBroadcast(t *testing.T) {
 
 func TestConsume(t *testing.T) {
 	incoming := newStorageStateMachine()
-	s, l, _ := startTestServer(incoming)
+	s, l, _, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -321,7 +319,7 @@ func TestConsume(t *testing.T) {
 
 func TestImpersonation(t *testing.T) {
 	incoming := newStorageStateMachine()
-	s, l, _ := startTestServer(incoming)
+	s, l, _, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -338,7 +336,7 @@ func TestImpersonation(t *testing.T) {
 
 func TestSuperUser(t *testing.T) {
 	incoming := newStorageStateMachine()
-	s, l, _ := startTestServer(incoming)
+	s, l, _, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -356,7 +354,7 @@ func TestSuperUser(t *testing.T) {
 // Test to make sure gregord functions for other users if a user is slow
 func TestBlockedUser(t *testing.T) {
 	incoming := newStorageStateMachine()
-	s, l, ev := startTestServer(incoming)
+	s, l, ev, _ := startTestServer(incoming)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -414,7 +412,7 @@ func TestBlockedUser(t *testing.T) {
 // Test that a single user device won't completely block the perUIDServer
 // if it is slow
 func TestBroadcastTimeout(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -452,7 +450,7 @@ func TestBroadcastTimeout(t *testing.T) {
 }
 
 func TestCloseOne(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, cl := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -464,11 +462,9 @@ func TestCloseOne(t *testing.T) {
 
 	<-ev.PerUIDCreated
 
-	ch := make(chan *Stats)
-	s.statsCh <- ch
-	stats := <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	usc := s.UIDServerCount()
+	if usc != 1 {
+		t.Errorf("user servers: %d, expected 1", usc)
 	}
 
 	c.Shutdown()
@@ -486,18 +482,18 @@ func TestCloseOne(t *testing.T) {
 	}
 
 	// wait for the perUID server to be shutdown
+	cl.Advance(time.Minute)
 	<-ev.PerUIDDestroyed
 
 	// and the user server should be deleted:
-	s.statsCh <- ch
-	stats = <-ch
-	if stats.UserServerCount != 0 {
-		t.Errorf("user servers: %d, expected 0", stats.UserServerCount)
+	usc = s.UIDServerCount()
+	if usc != 0 {
+		t.Errorf("user servers: %d, expected 0", usc)
 	}
 }
 
 func TestCloseConnect(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -528,11 +524,9 @@ func TestCloseConnect(t *testing.T) {
 	<-ev.BcastSent
 
 	// the user server should still exist due to c2:
-	ch := make(chan *Stats)
-	s.statsCh <- ch
-	stats := <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	usc := s.UIDServerCount()
+	if usc != 1 {
+		t.Errorf("user servers: %d, expected 1", usc)
 	}
 
 	// c1 shouldn't have received the broadcast:
@@ -547,7 +541,7 @@ func TestCloseConnect(t *testing.T) {
 }
 
 func TestCloseConnect2(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, cl := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -569,6 +563,7 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
+	cl.Advance(time.Minute)
 	<-ev.PerUIDDestroyed
 
 	c2 := newClient(l.Addr())
@@ -580,11 +575,9 @@ func TestCloseConnect2(t *testing.T) {
 	<-ev.ConnCreated
 
 	// the user server should exist due to c2:
-	ch := make(chan *Stats)
-	s.statsCh <- ch
-	stats := <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	usc := s.UIDServerCount()
+	if usc != 1 {
+		t.Errorf("user servers: %d, expected 1", usc)
 	}
 
 	// c1 shouldn't have received the broadcast:
@@ -599,7 +592,7 @@ func TestCloseConnect2(t *testing.T) {
 }
 
 func TestCloseConnect3(t *testing.T) {
-	s, l, ev := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -635,11 +628,9 @@ func TestCloseConnect3(t *testing.T) {
 	<-ev.ConnDestroyed
 
 	// the user server should exist due to c2:
-	ch := make(chan *Stats)
-	s.statsCh <- ch
-	stats := <-ch
-	if stats.UserServerCount != 1 {
-		t.Errorf("user servers: %d, expected 1", stats.UserServerCount)
+	usc := s.UIDServerCount()
+	if usc != 1 {
+		t.Errorf("user servers: %d, expected 1", usc)
 	}
 
 	// c1 shouldn't have received the broadcast:
