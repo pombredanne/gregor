@@ -2,6 +2,7 @@ package gregor1
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
 	"math/rand"
 	"reflect"
 	"testing"
@@ -35,7 +36,7 @@ func MakeTestItems(o gregor.ObjFactory, fc clockwork.FakeClock) ([]gregor.Item, 
 	items := make([]gregor.Item, 12)
 	for i := range items {
 		var b [8]byte
-		if _, err := rand.Read(b[:]); err != nil {
+		if _, err := cryptorand.Read(b[:]); err != nil {
 			return nil, err
 		}
 
