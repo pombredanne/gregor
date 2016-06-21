@@ -37,7 +37,7 @@ func TestSessionCacher(t *testing.T) {
 	}
 	checkBad(t, a, badToken)
 	checkGood(t, a, goodToken, goodUID)
-	d := 100 * time.Millisecond
+	d := 2 * time.Minute
 	fc := clockwork.NewFakeClock()
 	sc := NewSessionCacher(a, stats.DummyRegistry{}, fc, d)
 	defer sc.Close()
@@ -58,7 +58,9 @@ func TestSessionCacher(t *testing.T) {
 	assertCacheSize(t, sc, 1)
 
 	// Advance past timeout, cached results gone
+	fc.BlockUntil(1)
 	fc.Advance(d)
+	fc.BlockUntil(1)
 	assertCacheSize(t, sc, 0)
 	checkBad(t, sc, goodToken)
 }
