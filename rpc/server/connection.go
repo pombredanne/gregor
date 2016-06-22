@@ -208,13 +208,8 @@ func validateConsumeMessage(m gregor1.Message) error {
 						return errfunc("missing body")
 					}
 				}
-				if upd.Dismissal() != nil {
-					if upd.Dismissal().MsgIDsToDismiss() == nil {
-						return errfunc("missing msg IDs to dismiss")
-					}
-					if upd.Dismissal().RangesToDismiss() == nil {
-						return errfunc("missing ranges to dismiss")
-					}
+				if upd.Dismissal() != nil && upd.Dismissal().MsgIDsToDismiss() == nil && upd.Dismissal().RangesToDismiss() == nil {
+					return errfunc("missing ranges or IDs to dismiss")
 				}
 			}
 		}
