@@ -199,17 +199,14 @@ func validateConsumeMessage(m gregor1.Message) error {
 
 			if upd.Creation() == nil && upd.Dismissal() == nil {
 				return errfunc("unknown state update message type")
-			} else {
-				if upd.Creation() != nil {
-					if upd.Creation().Category() == nil {
-						return errfunc("missing category")
-					}
-					if upd.Creation().Body() == nil {
-						return errfunc("missing body")
-					}
+			}
+
+			if upd.Creation() != nil {
+				if upd.Creation().Category() == nil {
+					return errfunc("missing category")
 				}
-				if upd.Dismissal() != nil && upd.Dismissal().MsgIDsToDismiss() == nil && upd.Dismissal().RangesToDismiss() == nil {
-					return errfunc("missing ranges or IDs to dismiss")
+				if upd.Creation().Body() == nil {
+					return errfunc("missing body")
 				}
 			}
 		}
