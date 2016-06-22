@@ -1,7 +1,19 @@
 #!groovy
 
 node("linux") {
+    properties([
+            [$class: "BuildDiscarderProperty",
+                strategy: [$class: "LogRotator",
+                    numToKeepStr: "30",
+                    daysToKeepStr: "10",
+                    artifactNumToKeepStr: "1",
+                ]
+            ],
+    ])
     def GOPATH=pwd()
+    dir("${GOPATH}/bin") {
+        deleteDir()
+    }
 
     ws("${GOPATH}/src/github.com/keybase/gregor") {
 
