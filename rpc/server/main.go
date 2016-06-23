@@ -195,7 +195,7 @@ func (s *Server) updateServerValueStatsLoop() {
 		select {
 		case <-s.shutdownCh:
 			return
-		case <-time.After(time.Second):
+		case <-s.clock.After(time.Second):
 			s.updateServerValueStats()
 		}
 	}
