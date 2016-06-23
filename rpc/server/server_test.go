@@ -450,7 +450,7 @@ func TestBroadcastTimeout(t *testing.T) {
 }
 
 func TestCloseOne(t *testing.T) {
-	s, l, ev, cl := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -482,7 +482,6 @@ func TestCloseOne(t *testing.T) {
 	}
 
 	// wait for the perUID server to be shutdown
-	cl.Advance(time.Minute)
 	<-ev.PerUIDDestroyed
 
 	// and the user server should be deleted:
@@ -541,7 +540,7 @@ func TestCloseConnect(t *testing.T) {
 }
 
 func TestCloseConnect2(t *testing.T) {
-	s, l, ev, cl := startTestServer(nil)
+	s, l, ev, _ := startTestServer(nil)
 	defer l.Close()
 	defer s.Shutdown()
 
@@ -563,7 +562,6 @@ func TestCloseConnect2(t *testing.T) {
 		t.Logf("broadcast error: %s", err)
 	}
 
-	cl.Advance(time.Minute)
 	<-ev.PerUIDDestroyed
 
 	c2 := newClient(l.Addr())

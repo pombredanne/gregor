@@ -143,9 +143,6 @@ func NewServer(log rpc.LogOutput, clock clockwork.Clock, stats stats.Registry, o
 		tlsConfig:         opts.TLSConfig,
 	}
 
-	// Spawn loop for shutting down dead UID servers
-	go s.reapUIDServersLoop()
-
 	// Spawn threads for handling storage requests
 	for i := 0; i < opts.StorageHandlers; i++ {
 		go s.storageDispatchHandler()
@@ -176,13 +173,8 @@ func (s *Server) SetStatusGroup(g Aliver) {
 	s.statusGroup = g
 }
 
-func (s *Server) uidKey(u gregor.UID) (string, error) {
-	tuid, ok := u.(gregor1.UID)
-	if !ok {
-		s.log.Info("can't cast %v (%T) to gregor1.UID", u, u)
-		return "", ErrBadCast
-	}
-	return hex.EncodeToString(tuid), nil
+func (s *Server) uidKey(u gregor1.UID) string {
+	return hex.EncodeToString(u)
 }
 
 func (s *Server) updateServerValueStats() {
@@ -211,12 +203,9 @@ func (s *Server) updateServerValueStatsLoop() {
 
 // getPerUIDServer gets a perUIDServer object representing all user connections.
 // This function must be called with the UID server read lock
-func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
+func (s *Server) getPerUIDServer(u gregor1.UID) (*perUIDServer, error) {
 	s.deadlocker()
-	k, err := s.uidKey(u)
-	if err != nil {
-		return nil, err
-	}
+	k := s.uidKey(u)
 	ret := s.users[k]
 	if ret != nil {
 		return ret, nil
@@ -226,12 +215,9 @@ func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
 
 // setPerUIDServer adds a new UID server to the UID server map. This function
 // must be called with the UID server write lock
-func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
+func (s *Server) setPerUIDServer(u gregor1.UID, usrv *perUIDServer) error {
 	s.deadlocker()
-	k, err := s.uidKey(u)
-	if err != nil {
-		return err
-	}
+	k := s.uidKey(u)
 	s.users[k] = usrv
 	return nil
 }
@@ -240,6 +226,46 @@ func (s *Server) UIDServerCount() int {
 	s.RLock()
 	defer s.RUnlock()
 	return len(s.users)
+}
+
+// createUIDServer starts up a new UID server, and adds it to the map of UID servers
+// This function must be called with the write lock
+func (s *Server) createUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}, events EventHandler,
+	log rpc.LogOutput, stats stats.Registry, bt time.Duration) (*perUIDServer, error) {
+
+	usrv := newPerUIDServer(uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
+	if err := s.setPerUIDServer(uid, usrv); err != nil {
+		usrv.Shutdown(true)
+		return nil, err
+	}
+
+	// Spawn thread to wait for a signal that it is time to attempt to reap
+	// this new UID server
+	go s.waitOnUIDServer(usrv)
+
+	return usrv, nil
+}
+
+// waitOnUIDServer blocks until the UID server signals that is can be shutdown,
+// or the Server shuts down
+func (s *Server) waitOnUIDServer(usrv *perUIDServer) {
+	for {
+		select {
+		case <-usrv.ShouldShutdown():
+			s.Lock()
+			if usrv.Shutdown(false) {
+				delete(s.users, s.uidKey(usrv.uid))
+				if s.events != nil {
+					s.events.UIDServerDestroyed(usrv.uid)
+				}
+				s.Unlock()
+				return
+			}
+			s.Unlock()
+		case <-s.shutdownCh:
+			return
+		}
+	}
 }
 
 // addUIDConnection adds a new connection to a UID server. Will also create
@@ -259,8 +285,8 @@ func (s *Server) addUIDConnection(c *connection) error {
 
 	s.stats.Count("addUIDConnection - newconn")
 	if usrv == nil {
-		usrv = newPerUIDServer(res.Uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
-		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
+		usrv, err = s.createUIDServer(res.Uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
+		if err != nil {
 			return err
 		}
 	} else {
@@ -271,34 +297,6 @@ func (s *Server) addUIDConnection(c *connection) error {
 	usrv.AddConnection(c)
 	s.deadlocker()
 	return nil
-}
-
-// reapUIDServers loops over all active servers and determiens which ones
-// are ready to be shutdown (those with no active connections)
-func (s *Server) reapUIDServers() {
-
-	s.Lock()
-	defer s.Unlock()
-
-	for uid, srv := range s.users {
-		if srv.Shutdown(false) {
-			delete(s.users, uid)
-			if s.events != nil {
-				s.events.UIDServerDestroyed(srv.uid)
-			}
-		}
-	}
-}
-
-func (s *Server) reapUIDServersLoop() {
-	for {
-		select {
-		case <-s.clock.After(10 * time.Second):
-			s.reapUIDServers()
-		case <-s.shutdownCh:
-			return
-		}
-	}
 }
 
 // startSync gets called from the connection object that exists for each
@@ -445,7 +443,7 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 func (s *Server) broadcastConsumeMessage(m gregor1.Message) {
 
 	s.RLock()
-	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
+	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m).(gregor1.UID))
 	s.RUnlock()
 	if err != nil {
 		s.log.Error("broadcastConsumeMessage: failed to get UID server: %s", err)

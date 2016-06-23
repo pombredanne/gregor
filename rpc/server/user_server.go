@@ -24,9 +24,10 @@ type perUIDServer struct {
 	conns map[*connection]bool
 	alive bool
 
-	sendBroadcastCh chan broadcastArg
-	shutdownCh      chan struct{}
-	events          EventHandler
+	sendBroadcastCh  chan broadcastArg
+	shutdownCh       chan struct{}
+	shouldShutdownCh chan struct{}
+	events           EventHandler
 
 	log   rpc.LogOutput
 	stats stats.Registry
@@ -42,6 +43,7 @@ func newPerUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}, events Eve
 		conns:            make(map[*connection]bool),
 		sendBroadcastCh:  make(chan broadcastArg, 1000), // make this a huge queue for slow devices
 		shutdownCh:       make(chan struct{}),
+		shouldShutdownCh: make(chan struct{}, 10), // give this some space just in case
 		events:           events,
 		log:              log,
 		stats:            stats.SetPrefix("user_server"),
@@ -86,6 +88,7 @@ func (s *perUIDServer) AddConnection(conn *connection) {
 	go s.waitOnConnection(conn)
 
 	s.conns[conn] = true
+	s.log.Info("uid server %s: added connection: count: %d", s.uid, len(s.conns))
 
 	s.stats.Count("new conn")
 	if s.events != nil {
@@ -134,12 +137,21 @@ func (s *perUIDServer) connections() map[*connection]bool {
 // removeConnection removes a connection for the server. This function must
 // be called with the perUIDServer write lock
 func (s *perUIDServer) removeConnection(conn *connection) {
-	s.log.Info("uid server %s: removing connection", s.uid)
 	conn.close()
 	s.stats.Count("remove conn")
 	delete(s.conns, conn)
 	if s.events != nil {
 		s.events.ConnectionDestroyed(s.uid)
+	}
+
+	// We seem to be done here, let parent know we can be shutdown
+	s.log.Info("uid server %s: removed connection: count: %d", s.uid, len(s.conns))
+	if len(s.conns) == 0 {
+		select {
+		case s.shouldShutdownCh <- struct{}{}:
+		default:
+			s.log.Error("uid server: failed to send a shutdown message! orphaned uid server for %s", s.uid)
+		}
 	}
 }
 
@@ -163,6 +175,10 @@ func (s *perUIDServer) Shutdown(force bool) bool {
 	s.alive = false
 
 	return true
+}
+
+func (s *perUIDServer) ShouldShutdown() <-chan struct{} {
+	return s.shouldShutdownCh
 }
 
 // removeAllConns removes all connections. This function must be called with
@@ -193,6 +209,7 @@ func (s *perUIDServer) BroadcastMessage(m gregor1.Message) (error, <-chan struct
 }
 
 func (s *perUIDServer) broadcastHandler() {
+	s.log.Debug("uid server %s: starting broadcast handler", s.uid)
 	for {
 		select {
 		case a := <-s.sendBroadcastCh:
