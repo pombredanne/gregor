@@ -228,16 +228,18 @@ func (s *Server) waitOnUIDServer(usrv *perUIDServer) {
 		select {
 		case <-usrv.ShouldShutdown():
 			s.Lock()
-			if usrv.ConfirmShutdown() {
+			confirmed := usrv.ConfirmShutdown()
+			if confirmed {
 				delete(s.users, s.uidKey(usrv.uid))
-				s.Unlock()
+			}
+			s.Unlock()
+			if confirmed {
 				usrv.Shutdown()
 				if s.events != nil {
 					s.events.UIDServerDestroyed(usrv.uid)
 				}
 				return
 			}
-			s.Unlock()
 		case <-s.shutdownCh:
 			return
 		}
