@@ -59,7 +59,7 @@ func newPerUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}, events Eve
 		case <-s.shutdownCh:
 			return
 		case <-parentShutdownCh:
-			s.Shutdown(true)
+			s.Shutdown()
 		}
 	}()
 
@@ -124,20 +124,58 @@ func (s *perUIDServer) checkConnections() {
 }
 
 // connections makes a copy of all the current connections and returns it
-func (s *perUIDServer) connections() map[*connection]bool {
+func (s *perUIDServer) connections() []*connection {
 	s.RLock()
 	defer s.RUnlock()
-	m := make(map[*connection]bool)
-	for k, v := range s.conns {
-		m[k] = v
+	var cl []*connection
+	for k := range s.conns {
+		cl = append(cl, k)
 	}
-	return m
+	return cl
+}
+
+// Shutdown shuts down all goroutines spawned by the UID server and
+// removes all connection
+func (s *perUIDServer) Shutdown() {
+	s.Lock()
+	defer s.Unlock()
+
+	if !s.alive {
+		return
+	}
+
+	s.log.Info("shutting down uid server: uid: %s", s.uid)
+	close(s.shutdownCh)
+	s.removeAllConns()
+	s.alive = false
+}
+
+func (s *perUIDServer) ConfirmShutdown() bool {
+	s.Lock()
+	defer s.Unlock()
+	return len(s.conns) == 0
+}
+
+func (s *perUIDServer) ShouldShutdown() <-chan struct{} {
+	return s.shouldShutdownCh
+}
+
+// removeAllConns removes all connections. This function must be called with
+// the UID server write lock
+func (s *perUIDServer) removeAllConns() {
+	for conn, _ := range s.conns {
+		s.removeConnection(conn)
+	}
 }
 
 // removeConnection removes a connection for the server. This function must
 // be called with the perUIDServer write lock
 func (s *perUIDServer) removeConnection(conn *connection) {
+
+	// This might be slow, so we should be careful about blocking on it while
+	// holding a lock
 	conn.close()
+
 	s.stats.Count("remove conn")
 	delete(s.conns, conn)
 	if s.events != nil {
@@ -152,40 +190,6 @@ func (s *perUIDServer) removeConnection(conn *connection) {
 		default:
 			s.log.Error("uid server: failed to send a shutdown message! orphaned uid server for %s", s.uid)
 		}
-	}
-}
-
-// Shutdown shuts down all goroutines spawned by the UID server and
-// removes all connection
-func (s *perUIDServer) Shutdown(force bool) bool {
-	s.Lock()
-	defer s.Unlock()
-
-	if !s.alive {
-		return false
-	}
-
-	if !force && len(s.conns) > 0 {
-		return false
-	}
-
-	s.log.Info("shutting down uid server: uid: %s", s.uid)
-	close(s.shutdownCh)
-	s.removeAllConns()
-	s.alive = false
-
-	return true
-}
-
-func (s *perUIDServer) ShouldShutdown() <-chan struct{} {
-	return s.shouldShutdownCh
-}
-
-// removeAllConns removes all connections. This function must be called with
-// the UID server write lock
-func (s *perUIDServer) removeAllConns() {
-	for conn, _ := range s.conns {
-		s.removeConnection(conn)
 	}
 }
 
@@ -229,7 +233,7 @@ func (s *perUIDServer) broadcast(m gregor1.Message, resChan chan struct{}) {
 	s.stats.Count("broadcast")
 	s.stats.ValueInt("broadcast - conns", len(conns))
 
-	for conn, _ := range conns {
+	for _, conn := range conns {
 		if err := conn.checkMessageAuth(context.Background(), m); err != nil {
 			s.log.Info("[connection auth failed]: %s", err)
 			s.Lock()

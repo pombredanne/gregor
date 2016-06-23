@@ -68,6 +68,8 @@ type Authenticator interface {
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
+	sync.RWMutex
+
 	// At first we only allow one state machine, but there might be a need to
 	// chain them together.
 	storage gregor.StateMachine
@@ -112,9 +114,6 @@ type Server struct {
 
 	// TLS Config for reaching out to other similar peers
 	tlsConfig *tls.Config
-
-	// UID server lock
-	sync.RWMutex
 }
 
 type ServerOpts struct {
@@ -201,27 +200,6 @@ func (s *Server) updateServerValueStatsLoop() {
 	}
 }
 
-// getPerUIDServer gets a perUIDServer object representing all user connections.
-// This function must be called with the UID server read lock
-func (s *Server) getPerUIDServer(u gregor1.UID) (*perUIDServer, error) {
-	s.deadlocker()
-	k := s.uidKey(u)
-	ret := s.users[k]
-	if ret != nil {
-		return ret, nil
-	}
-	return nil, nil
-}
-
-// setPerUIDServer adds a new UID server to the UID server map. This function
-// must be called with the UID server write lock
-func (s *Server) setPerUIDServer(u gregor1.UID, usrv *perUIDServer) error {
-	s.deadlocker()
-	k := s.uidKey(u)
-	s.users[k] = usrv
-	return nil
-}
-
 func (s *Server) UIDServerCount() int {
 	s.RLock()
 	defer s.RUnlock()
@@ -234,10 +212,7 @@ func (s *Server) createUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}
 	log rpc.LogOutput, stats stats.Registry, bt time.Duration) (*perUIDServer, error) {
 
 	usrv := newPerUIDServer(uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
-	if err := s.setPerUIDServer(uid, usrv); err != nil {
-		usrv.Shutdown(true)
-		return nil, err
-	}
+	s.users[s.uidKey(uid)] = usrv
 
 	// Spawn thread to wait for a signal that it is time to attempt to reap
 	// this new UID server
@@ -253,12 +228,13 @@ func (s *Server) waitOnUIDServer(usrv *perUIDServer) {
 		select {
 		case <-usrv.ShouldShutdown():
 			s.Lock()
-			if usrv.Shutdown(false) {
+			if usrv.ConfirmShutdown() {
 				delete(s.users, s.uidKey(usrv.uid))
+				s.Unlock()
+				usrv.Shutdown()
 				if s.events != nil {
 					s.events.UIDServerDestroyed(usrv.uid)
 				}
-				s.Unlock()
 				return
 			}
 			s.Unlock()
@@ -271,22 +247,17 @@ func (s *Server) waitOnUIDServer(usrv *perUIDServer) {
 // addUIDConnection adds a new connection to a UID server. Will also create
 // one if no such server currently exists.
 func (s *Server) addUIDConnection(c *connection) error {
-
 	s.Lock()
 	defer s.Unlock()
 
 	_, res, _ := c.authInfo.get()
-
-	usrv, err := s.getPerUIDServer(res.Uid)
-	if err != nil {
-		s.stats.Count("addUIDConnection - getPerUIDServer error")
-		return err
-	}
+	usrv := s.users[s.uidKey(res.Uid)]
 
 	s.stats.Count("addUIDConnection - newconn")
 	if usrv == nil {
-		usrv, err = s.createUIDServer(res.Uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
-		if err != nil {
+		var err error
+		if usrv, err = s.createUIDServer(res.Uid, s.shutdownCh, s.events, s.log, s.stats,
+			s.broadcastTimeout); err != nil {
 			return err
 		}
 	} else {
@@ -443,19 +414,15 @@ func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
 func (s *Server) broadcastConsumeMessage(m gregor1.Message) {
 
 	s.RLock()
-	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m).(gregor1.UID))
+	srv := s.users[s.uidKey(gregor.UIDFromMessage(m).(gregor1.UID))]
 	s.RUnlock()
-	if err != nil {
-		s.log.Error("broadcastConsumeMessage: failed to get UID server: %s", err)
-		return
-	}
 
 	// Nothing to do...
 	if srv == nil {
 		// even though nothing to do, create an event if
 		// an event handler in place:
 		if s.events != nil {
-			s.log.Info("broadcastConsumeMessahe: no PerUIDServer for %s", gregor.UIDFromMessage(m))
+			s.log.Error("broadcastConsumeMessage: no PerUIDServer for %s", gregor.UIDFromMessage(m))
 			s.events.BroadcastSent(m)
 		}
 		return
