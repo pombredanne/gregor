@@ -2,6 +2,7 @@ package schema
 
 import (
 	"database/sql"
+	"strings"
 )
 
 var schema = []string{
@@ -70,6 +71,13 @@ func Schema(engine string) []string {
 	return schema
 }
 
+func engineCustomize(engine string, stmt string) string {
+	if engine == "mysql" && strings.HasPrefix(stmt, "CREATE TABLE") {
+		return stmt + " ENGINE=InnoDB DEFAULT CHARSET=utf8"
+	}
+	return stmt
+}
+
 // CreateDB connects to a DB and initializes it with Gregor Schema.
 func CreateDB(engine string, name string) (*sql.DB, error) {
 	db, err := sql.Open(engine, name)
@@ -83,7 +91,8 @@ func CreateDB(engine string, name string) (*sql.DB, error) {
 	}
 
 	for _, stmt := range Schema(engine) {
-		if _, err := tx.Exec(stmt); err != nil {
+		estmt := engineCustomize(engine, stmt)
+		if _, err := tx.Exec(estmt); err != nil {
 			return nil, err
 		}
 	}
