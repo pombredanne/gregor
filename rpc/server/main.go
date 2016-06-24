@@ -51,12 +51,6 @@ type confirmUIDShutdownArgs struct {
 	lastConnID connectionID
 }
 
-// Stats contains information about the current state of the
-// server.
-type Stats struct {
-	UserServerCount int
-}
-
 type storageReq interface{}
 
 // Aliver is an interface to an object that can tell Server which
@@ -74,6 +68,8 @@ type Authenticator interface {
 // Server is an RPC server that implements gregor.NetworkInterfaceOutgoing
 // and gregor.NetworkInterface.
 type Server struct {
+	sync.RWMutex
+
 	// At first we only allow one state machine, but there might be a need to
 	// chain them together.
 	storage gregor.StateMachine
@@ -84,17 +80,9 @@ type Server struct {
 	// key is the Hex-encoding of the binary UIDs
 	users map[string](*perUIDServer)
 
-	// last connection added per UID
-	lastConns map[string]connectionID
-
-	newConnectionCh   chan *connection
-	statsCh           chan chan *Stats
-	broadcastCh       chan gregor1.Message
-	publishCh         chan gregor1.Message
-	closeCh           chan struct{}
-	confirmCh         chan confirmUIDShutdownArgs
+	shutdownCh        chan struct{}
+	publishDispatchCh chan gregor1.Message
 	storageDispatchCh chan storageReq
-	nextConnectionID  connectionID
 
 	// used to determine which other servers are alive
 	statusGroup Aliver
@@ -138,19 +126,13 @@ type ServerOpts struct {
 	TLSConfig        *tls.Config
 }
 
-// NewServer creates a Server.  You must call ListenLoop(...) and Serve(...)
-// for it to be functional.
-func NewServer(log rpc.LogOutput, stats stats.Registry, opts ServerOpts) *Server {
+// NewServer creates a Server.  You must call ListenLoop(...) for it to be functional.
+func NewServer(log rpc.LogOutput, clock clockwork.Clock, stats stats.Registry, opts ServerOpts) *Server {
 	s := &Server{
-		clock:             clockwork.NewRealClock(),
+		clock:             clock,
 		users:             make(map[string]*perUIDServer),
-		lastConns:         make(map[string]connectionID),
-		newConnectionCh:   make(chan *connection),
-		statsCh:           make(chan chan *Stats, 1),
-		broadcastCh:       make(chan gregor1.Message),
-		publishCh:         make(chan gregor1.Message, opts.PublishChSize),
-		closeCh:           make(chan struct{}),
-		confirmCh:         make(chan confirmUIDShutdownArgs),
+		publishDispatchCh: make(chan gregor1.Message, opts.PublishChSize),
+		shutdownCh:        make(chan struct{}),
 		storageDispatchCh: make(chan storageReq, opts.StorageQueueSize),
 		log:               log,
 		stats:             stats.SetPrefix("server"),
@@ -190,22 +172,19 @@ func (s *Server) SetStatusGroup(g Aliver) {
 	s.statusGroup = g
 }
 
-func (s *Server) uidKey(u gregor.UID) (string, error) {
-	tuid, ok := u.(gregor1.UID)
-	if !ok {
-		s.log.Info("can't cast %v (%T) to gregor1.UID", u, u)
-		return "", ErrBadCast
-	}
-	return hex.EncodeToString(tuid), nil
+func (s *Server) uidKey(u gregor1.UID) string {
+	return hex.EncodeToString(u)
 }
 
 func (s *Server) updateServerValueStats() {
+	s.RLock()
+	defer s.RUnlock()
+
 	s.stats.ValueInt("total user servers", len(s.users))
 	totalConns := 0
 	for _, usrv := range s.users {
-		rchan := make(chan statsRes)
-		usrv.statsCh <- rchan
-		totalConns += (<-rchan).totalConns
+		stats := usrv.GetStats()
+		totalConns += stats.totalConns
 	}
 	s.stats.ValueInt("total connections", totalConns)
 }
@@ -213,157 +192,83 @@ func (s *Server) updateServerValueStats() {
 func (s *Server) updateServerValueStatsLoop() {
 	for {
 		select {
-		case <-s.closeCh:
+		case <-s.shutdownCh:
 			return
-		case <-time.After(time.Second):
+		case <-s.clock.After(time.Second):
 			s.updateServerValueStats()
 		}
 	}
 }
 
-func (s *Server) getPerUIDServer(u gregor.UID) (*perUIDServer, error) {
-	s.deadlocker()
-	k, err := s.uidKey(u)
-	if err != nil {
-		return nil, err
-	}
-	ret := s.users[k]
-	if ret != nil {
-		return ret, nil
-	}
-	return nil, nil
+func (s *Server) UIDServerCount() int {
+	s.RLock()
+	defer s.RUnlock()
+	return len(s.users)
 }
 
-func (s *Server) setPerUIDServer(u gregor.UID, usrv *perUIDServer) error {
-	s.deadlocker()
-	k, err := s.uidKey(u)
-	if err != nil {
-		return err
-	}
-	s.users[k] = usrv
-	return nil
+// createUIDServer starts up a new UID server, and adds it to the map of UID servers
+// This function must be called with the write lock
+func (s *Server) createUIDServer(uid gregor1.UID, parentShutdownCh chan struct{}, events EventHandler,
+	log rpc.LogOutput, stats stats.Registry, bt time.Duration) (*perUIDServer, error) {
+
+	usrv := newPerUIDServer(uid, s.shutdownCh, s.events, s.log, s.stats, s.broadcastTimeout)
+	s.users[s.uidKey(uid)] = usrv
+
+	// Spawn thread to wait for a signal that it is time to attempt to reap
+	// this new UID server
+	go s.waitOnUIDServer(usrv)
+
+	return usrv, nil
 }
 
+// waitOnUIDServer blocks until the UID server signals that is can be shutdown,
+// or the Server shuts down
+func (s *Server) waitOnUIDServer(usrv *perUIDServer) {
+	for {
+		select {
+		case <-usrv.ShouldShutdown():
+			s.Lock()
+			confirmed := usrv.ConfirmShutdown()
+			if confirmed {
+				delete(s.users, s.uidKey(usrv.uid))
+			}
+			s.Unlock()
+			if confirmed {
+				usrv.Shutdown()
+				if s.events != nil {
+					s.events.UIDServerDestroyed(usrv.uid)
+				}
+				return
+			}
+		case <-s.shutdownCh:
+			return
+		}
+	}
+}
+
+// addUIDConnection adds a new connection to a UID server. Will also create
+// one if no such server currently exists.
 func (s *Server) addUIDConnection(c *connection) error {
-	_, res, _ := c.authInfo.get()
+	s.Lock()
+	defer s.Unlock()
 
-	usrv, err := s.getPerUIDServer(res.Uid)
-	if err != nil {
-		s.stats.Count("addUIDConnection - getPerUIDServer error")
-		return err
-	}
+	_, res, _ := c.authInfo.get()
+	usrv := s.users[s.uidKey(res.Uid)]
 
 	s.stats.Count("addUIDConnection - newconn")
 	if usrv == nil {
-		usrv = newPerUIDServer(res.Uid, s.confirmCh, s.closeCh, s.events, s.log, s.stats,
-			s.broadcastTimeout)
-		if err := s.setPerUIDServer(res.Uid, usrv); err != nil {
+		var err error
+		if usrv, err = s.createUIDServer(res.Uid, s.shutdownCh, s.events, s.log, s.stats,
+			s.broadcastTimeout); err != nil {
 			return err
 		}
 	} else {
 		s.stats.Count("addUIDConnection - uidserver hit")
 	}
 
-	k, err := s.uidKey(res.Uid)
-	if err != nil {
-		return err
-	}
-	s.lastConns[k] = s.nextConnectionID
 	s.deadlocker()
-	usrv.newConnectionCh <- &connectionArgs{c: c, id: s.nextConnectionID}
+	usrv.AddConnection(c)
 	s.deadlocker()
-	s.nextConnectionID++
-	return nil
-}
-
-func (s *Server) confirmUIDShutdown(a confirmUIDShutdownArgs) {
-	s.deadlocker()
-	k, err := s.uidKey(a.uid)
-	if err != nil {
-		s.stats.Count("uid shutdown - uidKey error")
-		s.log.Info("confirmUIDShutdown, uidKey error: %s", err)
-		return
-	}
-	serverLast, ok := s.lastConns[k]
-	if !ok {
-		s.stats.Count("uid shutdown - lastconns error")
-		s.log.Info("confirmUIDShutdown, bad state: no lastConns entry for %s", k)
-		return
-	}
-
-	// it's ok to shutdown if the last connection that the server knows about
-	// matches the last connection in the perUIDServer
-	if serverLast == a.lastConnID {
-		su := s.users[k]
-
-		// remove the perUIDServer from users, lastConns
-		delete(s.users, k)
-		delete(s.lastConns, k)
-
-		s.stats.Count("uid shutdown")
-
-		// close perUser's selfShutdown channel so it will
-		// self-destruct
-		if su != nil {
-			s.deadlocker()
-			close(su.selfShutdownCh)
-		}
-
-		return
-	}
-}
-
-func (s *Server) reportStats(c chan *Stats) {
-	s.log.Info("reportStats")
-	stats := &Stats{
-		UserServerCount: len(s.users),
-	}
-	c <- stats
-}
-
-func (s *Server) logError(prefix string, err error) {
-	if err == nil {
-		return
-	}
-	s.log.Info("%s error: %s", prefix, err)
-}
-
-// BroadcastMessage implements gregor.NetworkInterfaceOutgoing.
-func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
-	tm, ok := m.(gregor1.Message)
-	if !ok {
-		return ErrBadCast
-	}
-	s.broadcastCh <- tm
-	return nil
-}
-
-func (s *Server) sendBroadcast(m gregor1.Message) error {
-	srv, err := s.getPerUIDServer(gregor.UIDFromMessage(m))
-	if err != nil {
-		return err
-	}
-	// Nothing to do...
-	if srv == nil {
-		// even though nothing to do, create an event if
-		// an event handler in place:
-		if s.events != nil {
-			s.log.Info("sendBroadcast: no PerUIDServer for %s", gregor.UIDFromMessage(m))
-			s.events.BroadcastSent(m)
-		}
-		return nil
-	}
-
-	s.stats.Count("broadcast")
-	// If this is going to block, we just drop the broadcast. It means that
-	// the user has a device that is not responding fast enough
-	select {
-	case srv.sendBroadcastCh <- m:
-	default:
-		s.log.Error("user %s super slow receiving broadcasts, rejecting!",
-			gregor.UIDFromMessage(m))
-		return errors.New("broadcast queue full, rejected")
-	}
 	return nil
 }
 
@@ -444,7 +349,7 @@ func (s *Server) runConsumeMessageMainSequence(c context.Context, m gregor1.Mess
 // consumePublish handles published messages from other gregord
 // servers.  It doesn't store to db or publish.
 func (s *Server) consumePublish(c context.Context, m gregor1.Message) error {
-	s.broadcastCh <- m
+	s.broadcastConsumeMessage(m)
 	return nil
 }
 
@@ -455,7 +360,7 @@ func (s *Server) publishSpawn() {
 }
 
 func (s *Server) publishProcess() {
-	for marg := range s.publishCh {
+	for marg := range s.publishDispatchCh {
 		if err := s.publish(marg); err != nil {
 			s.log.Warning("publish error: %s", err)
 		}
@@ -471,7 +376,7 @@ func (s *Server) createAliveGroup() {
 		id = s.statusGroup.MyID()
 	}
 
-	s.group = newAliveGroup(s.statusGroup, s.auth, id, s.publishTimeout, s.clock, s.closeCh, s.log, s.tlsConfig)
+	s.group = newAliveGroup(s.statusGroup, s.auth, id, s.publishTimeout, s.clock, s.shutdownCh, s.log, s.tlsConfig)
 }
 
 func (s *Server) publish(m gregor1.Message) error {
@@ -498,37 +403,50 @@ func (s *Server) publish(m gregor1.Message) error {
 	return nil
 }
 
+// BroadcastMessage implements gregor.NetworkInterfaceOutgoing.
+func (s *Server) BroadcastMessage(c context.Context, m gregor.Message) error {
+	tm, ok := m.(gregor1.Message)
+	if !ok {
+		return ErrBadCast
+	}
+	s.broadcastConsumeMessage(tm)
+	return nil
+}
+
 func (s *Server) broadcastConsumeMessage(m gregor1.Message) {
-	s.broadcastCh <- m
+
+	s.RLock()
+	srv := s.users[s.uidKey(gregor.UIDFromMessage(m).(gregor1.UID))]
+	s.RUnlock()
+
+	// Nothing to do...
+	if srv == nil {
+		// even though nothing to do, create an event if
+		// an event handler in place:
+		if s.events != nil {
+			s.log.Error("broadcastConsumeMessage: no PerUIDServer for %s", gregor.UIDFromMessage(m))
+			s.events.BroadcastSent(m)
+		}
+		return
+	}
+
+	s.stats.Count("broadcast")
+	if err, _ := srv.BroadcastMessage(m); err != nil {
+		s.log.Error("broadcastConsumeMessage: user %s failed BroadcastMessage: %s",
+			gregor.UIDFromMessage(m), err)
+	}
+
 }
 
 func (s *Server) publishConsumeMessage(m gregor1.Message) error {
 	select {
-	case s.publishCh <- m:
+	case s.publishDispatchCh <- m:
 	default:
-		s.log.Error("publishCh full: %d", len(s.publishCh))
+		s.log.Error("publishDispatchCh full: %d", len(s.publishDispatchCh))
 		s.stats.Count("publish queue full")
 		return ErrPublishChannelFull
 	}
 	return nil
-}
-
-// Serve starts the serve loop for Server.
-func (s *Server) Serve() error {
-	for {
-		select {
-		case c := <-s.newConnectionCh:
-			s.logError("addUIDConnection", s.addUIDConnection(c))
-		case m := <-s.broadcastCh:
-			s.sendBroadcast(m)
-		case c := <-s.statsCh:
-			s.reportStats(c)
-		case a := <-s.confirmCh:
-			s.confirmUIDShutdown(a)
-		case <-s.closeCh:
-			return nil
-		}
-	}
 }
 
 type consumeMessageRet struct {
@@ -708,7 +626,7 @@ func (s *Server) handleNewConnection(c net.Conn) error {
 		nc.close()
 		return err
 	}
-	s.newConnectionCh <- nc
+	s.addUIDConnection(nc)
 	return nil
 }
 
@@ -730,7 +648,7 @@ func (s *Server) ListenLoop(l net.Listener) error {
 // Shutdown tells the server to stop its Serve loop and storage dispatch
 // handlers
 func (s *Server) Shutdown() {
-	close(s.publishCh)
-	close(s.closeCh)
+	close(s.shutdownCh)
+	close(s.publishDispatchCh)
 	close(s.storageDispatchCh)
 }

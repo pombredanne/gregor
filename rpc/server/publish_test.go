@@ -18,7 +18,7 @@ func TestPublish(t *testing.T) {
 	log := rpc.SimpleLogOutput{}
 
 	incoming1 := newStorageStateMachine()
-	s1, l1, e1 := startTestServer(incoming1)
+	s1, l1, e1, _ := startTestServer(incoming1)
 	defer s1.Shutdown()
 	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
@@ -26,7 +26,7 @@ func TestPublish(t *testing.T) {
 	s1.SetStatusGroup(sg1)
 
 	incoming2 := newStorageStateMachine()
-	s2, l2, e2 := startTestServer(incoming2)
+	s2, l2, e2, _ := startTestServer(incoming2)
 	defer s2.Shutdown()
 	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
@@ -92,7 +92,7 @@ func TestNodeIds(t *testing.T) {
 	log := rpc.SimpleLogOutput{}
 
 	incoming1 := newStorageStateMachine()
-	s1, l1, _ := startTestServer(incoming1)
+	s1, l1, _, _ := startTestServer(incoming1)
 	defer s1.Shutdown()
 	sg1 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg1.Shutdown()
@@ -100,14 +100,14 @@ func TestNodeIds(t *testing.T) {
 	s1.SetStatusGroup(sg1)
 
 	incoming2 := newStorageStateMachine()
-	s2, l2, _ := startTestServer(incoming2)
+	s2, l2, _, _ := startTestServer(incoming2)
 	defer s2.Shutdown()
 	sg2 := srvup.New("gregord", 1*time.Second, 2*time.Second, m, log)
 	defer sg2.Shutdown()
 	sg2.HeartbeatLoop("fmprpc://" + l2.Addr().String())
 	s2.SetStatusGroup(sg2)
 
-	ag := newAliveGroup(sg1, s1.auth, sg1.MyID(), s1.publishTimeout, c, s1.closeCh,
+	ag := newAliveGroup(sg1, s1.auth, sg1.MyID(), s1.publishTimeout, c, s1.shutdownCh,
 		rpc.SimpleLogOutput{}, nil)
 	if len(ag.group) != 1 {
 		t.Fatalf("alive group is wrong size %d != 1", len(ag.group))
