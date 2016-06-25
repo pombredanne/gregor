@@ -62,7 +62,7 @@ node("linux") {
         def gregorImage = docker.build("keybaseprivate/kbgregor", "bin")
         def kbgregor = "kbgregor_${env.BUILD_TAG}.tar"
         sh "docker save -o $kbgregor keybaseprivate/kbgregor"
-        archive kbgregor
+        stash(name: kbgregor, includes: kbgregor)
 
         stage "Integrate"
         // build "/keybase-api-server"
