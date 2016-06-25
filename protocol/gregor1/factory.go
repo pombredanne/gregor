@@ -263,19 +263,4 @@ func (o ObjFactory) MakeReminderSetFromReminders(reminders []gregor.Reminder, mo
 	return ret, nil
 }
 
-type FastLookupObjFactory struct {
-	ObjFactory
-}
-
-func (fo FastLookupObjFactory) MakeStateWithLookupTable(items []gregor.Item,
-	table map[string]gregor.Item) (gregor.State, error) {
-
-	state, err := fo.MakeState(items)
-	if err != nil {
-		return nil, err
-	}
-
-	return gregor.NewFastLookupState(state, table), nil
-}
-
 var _ gregor.ObjFactory = ObjFactory{}
