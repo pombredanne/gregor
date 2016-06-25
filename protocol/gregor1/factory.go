@@ -275,7 +275,7 @@ func (fo FastLookupObjFactory) MakeStateWithLookupTable(items []gregor.Item,
 		return nil, err
 	}
 
-	return newFastLookupState(state, table), nil
+	return gregor.NewFastLookupState(state, table), nil
 }
 
 var _ gregor.ObjFactory = ObjFactory{}
